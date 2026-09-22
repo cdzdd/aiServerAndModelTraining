@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-003 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 002、004 并行；先用契约 mock 完成，真实认证联调等待 002 合入 |
 | 负责目录 | `frontend/src/{app,router,shared}/`、`frontend/src/features/{auth,users}/`、角色布局与前端测试 |
@@ -70,4 +70,8 @@ npm run test:e2e -- e2e/auth-shell.spec.ts
 - 冻结安装：uv sync --directory backend --frozen --extra dev 与 npm ci --prefix frontend 成功；新增依赖首次官方 registry 直连 ECONNRESET，使用已运行本机代理临时重试后成功，没有提交代理配置。npm audit 为 0 vulnerabilities。
 - 浏览器范围：13 项认证/用户管理契约模拟用例 + 1 项真实 FastAPI/PostgreSQL 健康检查。覆盖登录/注册、刷新/退出、角色隔离、安全返回地址、401/403/断网恢复、表单提交禁用/422字段提示、空列表、用户修改、最后管理员错误、窄屏和竞态。桌面与 375px 窄屏截图检查无横向溢出。
 - 已知限制：真实登录/用户管理页面联调仍由 016、聊天身份由 009 承接；未部署公网。现有 Starlette/anyio 与 Node 脚本弃用警告保留，检查 exit 0；不宣称云端 CI 通过。
-- 状态：本地验收 + GitHub PR；当前 in_review，功能 PR 和独立收尾 PR 实际合入后才为 done。原生 worktree 保留，脱敏原始日志在忽略的 .local/。
+- 状态：本地验收 + GitHub PR；功能已合入，done 状态随本独立收尾 PR 合入后生效。原生 worktree 保留，脱敏原始日志在忽略的 .local/。
+
+- 功能 PR：[\#3](https://github.com/cdzdd/aiServerAndModelTraining/pull/3)，于 2026-09-22T11:13:06Z 实际 MERGED；功能合并 SHA：`bec1b56fa8ad49d4fc65d9cb09136c7ecdb57a2d`。待合并头 `64e85e3b8719ddc09311b42bb7542c4b681bdd0a` 与合并结果文件树核对一致。
+- 专项最终验收：`npm run test -- --run src/features/auth/session.test.ts src/router/guards.test.ts src/features/users/UserEditor.test.ts` 为 27 passed；完整应用检查对应上述 c53df3f，之后仅任务记录文档变化，未冒用旧结果证明新代码。
+- 收尾：本分支只更新 todo-003 的 done 状态与真实合并证据；此纯文档状态 PR 合入权威 origin/main 后完成收尾。主目录同步、领取释放按 WORKFLOW 执行，原生 worktree 由平台管理并保留。
