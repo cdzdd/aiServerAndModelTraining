@@ -116,9 +116,12 @@ def revoke_cookie(db: Session, request: Request):
         db.execute(delete(AuthSession).where(AuthSession.token_hash == token_hash(raw)))
 
 
-def login_user(db: Session, request: Request, username: str, password: str):
+def authenticate(db: Session, request: Request, username: str, password: str):
     user = db.scalar(select(User).where(User.username == username))
     valid = verify_password(user.password_hash if user else dummy_password_hash(), password)
+    if user is not None and valid:
+        # Recheck under a row lock after expensive hashing; serialize with account disabling.
+        db.refresh(user, with_for_update=True)
     if not valid or user is None or not user.is_active:
         audit(db, request, "auth.login", outcome="failure")
         db.commit()
@@ -190,3 +193,22 @@ def update_user(db: Session, request: Request, user_id, data):
     )
     db.commit()
     return user
+
+
+def login_user(db: Session, request: Request, username: str, password: str):
+    limiter = request.app.state.login_limiter
+    # ASGI server resolves the peer; this application never reads X-Forwarded-For.
+    source = request.client.host if request.client else "unknown"
+    try:
+        reservation = limiter.reserve(source, username)
+    except AuthError:
+        audit(db, request, "auth.login", outcome="rate_limited")
+        db.commit()
+        raise
+    failed = True
+    try:
+        result = authenticate(db, request, username, password)
+        failed = False
+        return result
+    finally:
+        limiter.finish(reservation, failed=failed)

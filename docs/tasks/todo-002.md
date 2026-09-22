@@ -68,3 +68,4 @@ uv run alembic heads
 - 依 [WORKFLOW](../WORKFLOW.md) 交付测试证据和评审结果；功能分支收尾为 `in_review`，合入权威 main 并检查通过后再统一更新 `done`。
 - 会话/CSRF 第一轮：新增测试因缺失路由出现 17 failed + 7 fixture errors（404）；实现后完整 pytest 43 passed。基线统一检查 19 pytest + 6 Vitest + 1 Playwright 通过。
 - 权限/管理/引导：缺失实现时 35 failed；实现后完整 pytest 79 passed，含真实 PostgreSQL 两管理员并发降级及并发首次引导，最后管理员保护通过。
+- 限流/部署：11 个失败场景补齐后全后端 94 passed；额外复现并修复密码验证期间停用账户竞态、已限流来源占用新计数器容量的问题，均有红绿回归。

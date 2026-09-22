@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import ArgumentError
@@ -25,6 +26,33 @@ class Settings(BaseSettings):
     upload_dir: Path = Field(validation_alias="UPLOAD_DIR")
 
     public_origin: str | None = Field(default=None, validation_alias="PUBLIC_ORIGIN")
+
+    login_account_limit: int = Field(default=5, ge=1, validation_alias="LOGIN_ACCOUNT_LIMIT")
+    login_ip_limit: int = Field(default=30, ge=1, validation_alias="LOGIN_IP_LIMIT")
+    login_window_seconds: int = Field(default=300, ge=1, validation_alias="LOGIN_WINDOW_SECONDS")
+    login_max_entries: int = Field(default=10000, ge=2, validation_alias="LOGIN_MAX_ENTRIES")
+
+    @model_validator(mode="after")
+    def validate_auth_deployment(self):
+        if self.public_origin:
+            parsed = urlsplit(self.public_origin)
+            if (
+                parsed.scheme not in ("http", "https")
+                or not parsed.hostname
+                or parsed.username
+                or parsed.password
+                or parsed.query
+                or parsed.fragment
+                or parsed.path not in ("", "/")
+            ):
+                raise ValueError("PUBLIC_ORIGIN must contain only an http(s) origin")
+            _ = parsed.port
+        if self.app_env == "production":
+            if not self.public_origin or urlsplit(self.public_origin).scheme != "https":
+                raise ValueError("production requires an HTTPS PUBLIC_ORIGIN")
+            if len(self.session_secret.get_secret_value()) < 32:
+                raise ValueError("production SESSION_SECRET must have at least 32 characters")
+        return self
 
     @field_validator("database_url")
     @classmethod

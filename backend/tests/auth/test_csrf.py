@@ -74,3 +74,14 @@ def test_production_cookies_secure_and_responses_not_cached(auth_app):
         assert "Secure" in response.headers["set-cookie"]
         assert response.headers["cache-control"] == "no-store"
         assert client.get("/api/v1/auth/csrf").headers["cache-control"] == "no-store"
+
+
+def test_non_ascii_forged_token_is_rejected_not_internal_error(client):
+    csrf(client)
+    response = client.post(
+        "/api/v1/auth/login",
+        json={},
+        headers={b"Origin": b"http://testserver", b"X-CSRF-Token": b"\xe9" * 64},
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "CSRF_FAILED"

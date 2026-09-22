@@ -17,6 +17,7 @@ from app.core.config import Settings
 from app.core.database import create_db_engine
 from app.core.errors import error_response
 from app.core.security import AuthError
+from app.modules.auth.limits import LoginLimiter
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import check_csrf
 
@@ -45,6 +46,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
 
     app.state.auth_clock = lambda: datetime.now(UTC)
+    app.state.login_limiter = LoginLimiter(
+        account_limit=settings.login_account_limit,
+        ip_limit=settings.login_ip_limit,
+        window_seconds=settings.login_window_seconds,
+        max_entries=settings.login_max_entries,
+    )
     app.include_router(auth_router)
 
     @app.exception_handler(AuthError)
