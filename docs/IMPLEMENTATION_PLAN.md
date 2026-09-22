@@ -8,7 +8,7 @@
 
 **技术栈：**Node 24 LTS、Vue 3、TypeScript、Vite、Element Plus、ECharts；Python 3.12、FastAPI、SQLAlchemy 2、Alembic、uv；PostgreSQL 16、pgvector；SentenceTransformers `BAAI/bge-small-zh-v1.5`；Linux、Docker Compose、Caddy。云模型 API 为基础路线，Ollama 为本地切换路线；4B QLoRA 在后期使用 WSL2 与 LLaMAFactory 实验。
 
-**规格依据：**[架构](ARCHITECTURE.md)与[接口契约](CONTRACTS.md)是任务实现依据；发生冲突先修订契约并记录影响，再修改代码。没有现有应用代码，所有应用路径和命令均为规划目标。
+**规格依据：**[架构](ARCHITECTURE.md)与[接口契约](CONTRACTS.md)是任务实现依据；发生冲突先修订契约并记录影响，再修改代码。001 已提供工程基础，其余能力以任务状态为准；不能将规划路径视为已实现功能。当前采用用户授权的“本地验收 + GitHub PR”，合并依据与恢复云端 CI 条件见 [WORKFLOW 10.1](WORKFLOW.md)。
 
 ## 全局约束
 
@@ -20,7 +20,7 @@
 - 入库、引用、流式事件、错误码、迁移与配置遵循 [CONTRACTS](CONTRACTS.md)，不得在不同任务中各自发明协议。
 - 每个任务先编写有意义的行为测试并确认预期失败，再实现最小功能；文档与实验记录修改只做结构、内容和复现检查，不为文档捏造单元测试。
 - `done` 只用于已合入权威 `main` 且检查通过的任务。任务分支最终状态为 `in_review`；合并后通过统一收尾提交或 PR 更新为 `done`，不用包含自己提交 SHA 的自引用记录。
-- 当前阶段仅规划：不安装依赖、不开发应用、不启动服务、不声称任何测试已通过；允许为规划文档建立本地 main 基线提交。
+- 用户指定任务后按对应范围实施；不自动启动尚未领取的任务。实际安装、测试与合并结果记录在任务文件中。
 - 文档解析与索引分开交接：006 解析候选版本到 `parsed`、创建 index 任务但不切换有效版本；007 索引全部成功后原子切换 `active_revision_id` 并设 `ready`，期间旧有效版本继续服务。
 
 ## 重点评审条件
@@ -184,6 +184,6 @@ npm run test:e2e
 - [ ] 按任务内测试、最小实现、验证、评审步骤交付一个可独立评审的变更。
 - [ ] 在任务工作记录写入真实命令、结果、限制、分支和提交；只有实际生成后才能记录这些标识。
 - [ ] 任务分支到 `in_review`，完成评审和合并。
-- [ ] 整合者依据合入的 commit/PR 与 CI 结果，另做收尾记录将任务置为 `done`；下一批从权威 main 开始。
+- [ ] 整合者依据合入的 commit/PR 与当前验收模式的真实结果，另做收尾记录将任务置为 `done`；下一批从权威 main 开始。
 
 详细状态机、领取模板及完成证据格式以 [WORKFLOW](WORKFLOW.md) 为准。
