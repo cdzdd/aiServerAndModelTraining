@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import App from './App.vue'
+import App from './app/HealthPage.vue'
 
 enableAutoUnmount(afterEach)
 
@@ -82,3 +82,4 @@ describe('service readiness', () => {
     expect(page.get('[role="status"]').text()).toContain('已连接')
   })
 })
+
