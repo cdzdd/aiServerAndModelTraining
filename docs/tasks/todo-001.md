@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-001 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | 无 |
 | 并行可行性 | 本任务先行；未合入前其余任务可预读规格，不在相同骨架上并行开发 |
 | 负责目录 | `backend/` 基础配置、`frontend/` 基础配置、`infra/compose.dev.yaml`、`scripts/`、`.github/workflows/` |
@@ -74,7 +74,7 @@ npm run test:e2e
 ## 已知问题与外部阻塞
 
 - 本地无阻塞。Starlette 1.6.0 的 TestClient 引用 anyio 旧别名，有一条上游弃用警告；测试通过且未屏蔽警告。前端间接依赖有弃用提示，`npm audit` 当前为 0 vulnerabilities。
-- GitHub 已使用用户指定的 cdzdd 登录，仓库 `cdzdd/aiServerAndModelTraining` 公开、拥有 ADMIN 权限；规划基线首次推送成功。功能 PR [#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1) 已建立；GitHub Actions 曾因账号账单锁定未启动；用户已授权改用本地验收 + GitHub PR，按 WORKFLOW 10.1 完成合并收尾，功能分支仍为 in_review。
+- GitHub 已使用用户指定的 cdzdd 登录，仓库 `cdzdd/aiServerAndModelTraining` 公开、拥有 ADMIN 权限；规划基线首次推送成功。功能 PR [#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1) 已建立；GitHub Actions 曾因账号账单锁定未启动；用户已授权本地验收 + GitHub PR。功能已按 WORKFLOW 10.1 合入，此 done 状态随本独立收尾 PR 合入权威 main 后生效。
 - 本任务只交付开发基础，没有登录、知识问答、模型推理或公开网址部署。
 
 ## 工作记录
@@ -90,6 +90,7 @@ npm run test:e2e
 - 统一验收：2026-09-22 执行 `node scripts/dev.mjs check`，exit 0；Ruff 通过、pytest 19 passed、两次 Alembic upgrade head 通过、ESLint/vue-tsc 通过、Vitest 6 passed、Vite build 通过、Playwright Chromium 1 passed（真实网页→Vite代理→FastAPI→PostgreSQL）。另外 `alembic check` 无模型差异，唯一迁移 head 为 001_audit_foundation。
 - 评审：独立只读评审指出 DATABASE_URL/TEST_DATABASE_URL 未脱敏以及 HTTP 异常头丢失；已补回归并修复，复核无剩余阻塞。根目录 `.env`、生成文件、模型/上传数据均被忽略，真实秘密不进入版本管理。
 - CI：工作流使用全新 PostgreSQL 服务，冻结安装、同一检查入口，不依赖云模型/GPU/生产密钥；文档 PR 同样运行必要检查。本地已通过；远程运行 [35714271910](https://github.com/cdzdd/aiServerAndModelTraining/actions/runs/35714271910) 在启动任何步骤前失败。GitHub 注解原文："The job was not started because your account is locked due to a billing issue." 此为真实的历史云端失败，不代表应用测试执行失败。2026-09-22 用户明确授权暂用本地验收，工作流保留并改为手动触发；恢复条件见 WORKFLOW 10.1。
-- 功能提交：`0c88e221db8037da8e59f360dfa3f318e0ecfe0c`；功能 PR：[#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1)。尚未合并，无功能合并 SHA。合并入口：核对最新 head 与本地验收证据、独立评审及服务端规则，按已授权的 WORKFLOW 10.1 普通合并与另建状态收尾 PR，不重新实现基础工程。
+- 功能 PR：[#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1)，于 2026-09-22T10:32:48Z 实际 MERGED；合并 SHA：`19ae54bf6f208c439d01a5ed53a4ce1d9015f8b0`。待合并头 `ab238ee58d8f7a4ff315d413da387f6fd25f5050` 与合并结果文件树完全一致。
 - 临时流程：用户授权本地验收后，AGENTS、WORKFLOW、PR 模板、准备清单和 CI 触发方式已同步；GitHub 仍是权威远端，保留独立 worktree、评审、串行合并和任务收尾要求。
-- 完成标准：遵循 [WORKFLOW](../WORKFLOW.md)；功能分支保持 `in_review`，功能合入权威 main 且检查通过后才由收尾 PR 更新为 `done`。
+- 最终验收：2026-09-22 在 `dda4fc2703cfb02974b3db909c4acdd92b29acc7` 执行完整本地入口，19 pytest + 6 Vitest + 1 Playwright 全通过，静态检查、构建和重复迁移通过。之后至 PR head 仅 PR 模板和准备文档变化，77 个文件/28 份 Markdown 的秘密、相对链接与 diff 核验通过；规范独立复核无剩余问题。云端 CI 未运行成功，按用户授权不作为本次完成依据。
+- 收尾：本分支只更新 todo-001 状态与实际合并证据；按 [WORKFLOW](../WORKFLOW.md) 合入后，002/003/004 可从最新 origin/main 分别领取并行开发。
