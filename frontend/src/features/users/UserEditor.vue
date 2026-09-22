@@ -5,17 +5,17 @@ import type { User } from '../auth/session'
 import { updateUser, type UserChanges } from './api'
 import { errorMessage, fieldErrors } from '../../shared/api/errors'
 const props=defineProps<{user:User}>()
-const emit=defineEmits<{saved:[user:User];cancel:[]}>()
+const emit=defineEmits<{saved:[user:User];cancel:[];saving:[value:boolean]}>()
 const form=ref<UserChanges>({display_name:props.user.display_name,role:props.user.role,is_active:props.user.is_active})
 const saving=ref(false)
 const error=ref('')
 const fields=ref<Record<string,string>>({})
 async function save() {
   if(saving.value) return
-  saving.value=true;error.value='';fields.value={}
+  saving.value=true;emit('saving',true);error.value='';fields.value={}
   try {emit('saved',await updateUser(props.user.id,form.value))}
   catch(cause) {error.value=errorMessage(cause);fields.value=fieldErrors(cause)}
-  finally {saving.value=false}
+  finally {saving.value=false;emit('saving',false)}
 }
 </script>
 <template>

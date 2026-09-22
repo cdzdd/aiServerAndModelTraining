@@ -31,7 +31,7 @@ node scripts/dev.mjs api
 node scripts/dev.mjs web
 ```
 
-访问 `http://127.0.0.1:<WEB_PORT>`。页面显示数据库就绪情况；API 存活检查为 `http://127.0.0.1:<API_PORT>/health/live`，就绪检查为 `/health/ready`。
+访问 `http://127.0.0.1:<WEB_PORT>` 进入服务中心；服务连接检查在 `/status`。页面路由与接入约定见 [前端说明](../frontend/README.md)。API 存活检查为 `http://127.0.0.1:<API_PORT>/health/live`，就绪检查为 `/health/ready`。
 
 Vite 开发服务器把 `/api` 和 `/health` 代理到本 worktree 的 API 端口，不需要跨域白名单。生产同域反向代理将在部署任务实现；当前这些命令是本地开发入口。
 

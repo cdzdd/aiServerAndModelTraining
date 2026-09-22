@@ -102,3 +102,53 @@ describe('cookie session and API contract', () => {
   })
 })
 
+
+it('does not let a late 401 from an old session invalidate the next login',async()=>{
+  let finish!:(response:Response)=>void
+  vi.stubGlobal('fetch',async(url:string)=>{
+    if(url.endsWith('/me')) return json(user)
+    if(url.endsWith('/csrf')) return json({csrf_token:'before'})
+    if(url.endsWith('/logout')) return new Response(null,{status:204})
+    if(url.endsWith('/login')) return json({user:{...user,id:'22222222-2222-4222-8222-222222222222',username:'new'},csrf_token:'new-token'})
+    return new Promise<Response>(resolve=>{finish=resolve})
+  })
+  const session=createSession();await session.restore()
+  const oldRequest=session.api.request('/admin/users').catch(error=>error)
+  await session.logout();await session.login({username:'new',password:'example-password'})
+  finish(json({error:{code:'UNAUTHENTICATED',message:'expired'}},401))
+  await oldRequest
+  expect(session.state.user?.username).toBe('new')
+  expect(session.state.expired).toBe(false)
+})
+it('does not send a queued write after the session changes during CSRF acquisition',async()=>{
+  let finish!:(response:Response)=>void
+  const writes:string[]=[]
+  vi.stubGlobal('fetch',async(url:string)=>{
+    if(url.endsWith('/me')) return json(user)
+    if(url.endsWith('/csrf')) return new Promise<Response>(resolve=>{finish=resolve})
+    writes.push(url);return json(user)
+  })
+  const session=createSession();await session.restore()
+  const pending=session.api.request('/admin/users/'+user.id,{method:'PATCH',body:{role:'agent'}}).catch(error=>error)
+  session.api.setCsrfToken('replacement-token')
+  finish(json({csrf_token:'old-token'}));await pending
+  expect(writes).toEqual([])
+})
+
+
+it('a superseded logout response cannot clear a newer login',async()=>{
+  let finish!:(response:Response)=>void
+  vi.stubGlobal('fetch',async(url:string)=>{
+    if(url.endsWith('/me')) return json(user)
+    if(url.endsWith('/csrf')) return json({csrf_token:'before'})
+    if(url.endsWith('/logout')) return new Promise<Response>(resolve=>{finish=resolve})
+    return json({user:{...user,username:'new'},csrf_token:'new-token'})
+  })
+  const session=createSession();await session.restore()
+  const logout=session.logout()
+  await vi.waitFor(()=>expect(finish).toBeTypeOf('function'))
+  await session.login({username:'new',password:'example-password'})
+  finish(new Response(null,{status:204}));await logout
+  expect(session.state.user?.username).toBe('new')
+})
+

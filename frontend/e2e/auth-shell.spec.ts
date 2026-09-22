@@ -133,3 +133,63 @@ test('offline session restoration can retry on a narrow screen',async({page})=>{
   await expect(page.getByRole('heading',{name:'我的服务'})).toBeVisible()
 })
 
+
+test('pending user save cannot be replaced by another editor',async({page})=>{
+  const state=await mockAuth(page,'admin')
+  state.users.push({...fixtureUser,id:'22222222-2222-4222-8222-222222222222',username:'bob',role:'user'})
+  let release!:()=>void
+  const pending=new Promise<void>(resolve=>{release=resolve})
+  await page.route('**/api/v1/admin/users/*',async route=>{await pending;await route.fallback()})
+  await page.goto('/admin/users')
+  await page.getByRole('button',{name:'编辑 alice'}).click()
+  await page.getByLabel('角色',{exact:true}).selectOption('agent')
+  await page.getByRole('button',{name:'保存修改'}).click()
+  await expect(page.getByRole('button',{name:'编辑 bob'})).toBeDisabled()
+  release()
+  await expect(page).toHaveURL(/\/agent$/)
+})
+test('self role synchronization survives navigating away during the save',async({page})=>{
+  await mockAuth(page,'admin')
+  let release!:()=>void
+  const pending=new Promise<void>(resolve=>{release=resolve})
+  await page.route('**/api/v1/admin/users/*',async route=>{await pending;await route.fallback()})
+  await page.goto('/admin/users')
+  await page.getByRole('button',{name:'编辑 alice'}).click()
+  await page.getByLabel('角色',{exact:true}).selectOption('agent')
+  await page.getByRole('button',{name:'保存修改'}).click()
+  await page.getByRole('link',{name:'管理概览',exact:true}).click()
+  await expect(page).toHaveURL(/\/admin$/)
+  release()
+  await expect(page.getByRole('link',{name:'用户管理'})).toHaveCount(0)
+  await expect(page.getByRole('heading',{name:'客服工作台'})).toBeVisible()
+})
+
+
+test('login submission disables duplicate attempts and displays server field errors',async({page})=>{
+  await mockAuth(page)
+  let release!:()=>void
+  const pending=new Promise<void>(resolve=>{release=resolve})
+  await page.route('**/api/v1/auth/login',async route=>{
+    await pending
+    await route.fulfill({status:422,contentType:'application/json',body:JSON.stringify({error:{code:'VALIDATION_ERROR',message:'请求参数无效',request_id:'r',details:[{location:['body','password'],code:'string_too_short'}]}})})
+  })
+  await page.goto('/login')
+  await login(page)
+  await expect(page.getByRole('button',{name:'登录中…'})).toBeDisabled()
+  release()
+  await expect(page.getByLabel('密码',{exact:true})).toHaveAttribute('aria-invalid','true')
+  await expect(page.getByText('密码需为 12–128 个字符。')).toBeVisible()
+  await expect(page.getByRole('button',{name:'登录',exact:true})).toBeEnabled()
+})
+test('administrator can disable another user and sees the returned list state',async({page})=>{
+  const state=await mockAuth(page,'admin')
+  state.users=[{...fixtureUser,id:'22222222-2222-4222-8222-222222222222',username:'bob',role:'user'}]
+  await page.goto('/admin/users')
+  await page.getByRole('button',{name:'编辑 bob'}).click()
+  await page.getByLabel('启用账号').uncheck()
+  await page.getByRole('button',{name:'保存修改'}).click()
+  await expect(page.getByText('已停用',{exact:true})).toBeVisible()
+  await expect(page.getByRole('status')).toContainText('用户已更新')
+  await expect(page).toHaveURL(/\/admin\/users$/)
+})
+

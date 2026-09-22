@@ -30,7 +30,7 @@ export function createSession() {
         const user=await api.request<User>('/auth/me')
         if(current===version) {state.user=user;state.initialized=true}
       } catch(error) {
-        if(!(error instanceof ApiError && error.status===401)) throw error
+        if(!(error instanceof ApiError && (error.status===401 || error.code==='SESSION_CHANGED'))) throw error
       } finally {state.loading=false;restoring=null}
     })()
     return restoring
@@ -47,11 +47,20 @@ export function createSession() {
   }
   async function logout() {
     try {await api.request<void>('/auth/logout',{method:'POST'})}
-    catch(error) {if(!(error instanceof ApiError && error.status===401)) throw error}
+    catch(error) {
+      if(error instanceof ApiError && error.code==='SESSION_CHANGED') return
+      if(!(error instanceof ApiError && error.status===401)) throw error
+    }
     clear()
     state.expired=false
   }
-  return {state:readonly(state),api,restore,login,register,logout}
+  function acceptUserUpdate(user:User) {
+    if(user.id!==state.user?.id) return
+    version++
+    if(!user.is_active) {state.expired=true;clear()}
+    else state.user=user
+  }
+  return {state:readonly(state),api,restore,login,register,logout,acceptUserUpdate}
 }
 export const session=createSession()
 export type Session=ReturnType<typeof createSession>
