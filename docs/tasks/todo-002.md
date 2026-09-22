@@ -78,3 +78,6 @@ uv run alembic heads
 - 运行边界：单 API 进程限流，重启清空计数；扩多进程前需共享限流。管理员密码由部署者安全输入，无默认管理员；本任务没有创建真实部署管理员。
 - 依赖冻结：本 worktree 初次 `uv sync --directory backend --frozen --extra dev`、`npm ci --prefix frontend` 成功；增加 Argon2 后再次 frozen sync 成功。警告为已知上游 anyio 弃用、Node shell/色彩环境提示，均如实保留。
 - 当前验收模式为本地验收 + GitHub PR；云端 CI 本轮未触发，不伪记成功。本机脱敏前原始日志保存在忽略的 `.local/`。
+
+- main 集成验证：003 功能/状态 PR 完成后，合入 `origin/main a778c4a6c31f18671a0e7f7390752ad72856905b`，无冲突，组合提交为 `790c392005637fd98e5485b42bf159f00474119c`。按新前端锁文件重新 npm ci、后端 frozen sync 后，`node scripts/dev.mjs check` exit 0：**100 pytest + 33 Vitest + 15 Playwright**，全部静态/构建/重复迁移通过。其中 auth-protocol 和 health 使用真实后端，003 页面状态场景使用其既有契约 Mock，不把后者伪称完整真实角色页面联调。
+- 功能 PR：[#4](https://github.com/cdzdd/aiServerAndModelTraining/pull/4)。后续至待合并头只有本任务证据文档变化；按 WORKFLOW 10.1 复用组合提交代码验收，另作 diff/链接/秘密/状态事实核对。功能及状态收尾实际合并前保持 in_review。
