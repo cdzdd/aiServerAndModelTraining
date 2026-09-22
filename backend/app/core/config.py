@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr = Field(validation_alias="SESSION_SECRET")
     upload_dir: Path = Field(validation_alias="UPLOAD_DIR")
 
+    public_origin: str | None = Field(default=None, validation_alias="PUBLIC_ORIGIN")
+
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: SecretStr) -> SecretStr:

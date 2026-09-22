@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-002 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 003、004 并行；共享路由注册、依赖锁与迁移入口由单一整合者协调 |
 | 负责目录 | `backend/app/modules/auth/`、`backend/app/core/security.py`、认证迁移与对应测试 |
@@ -63,6 +63,7 @@ uv run alembic heads
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
+- 2026-09-22 领取：feat/todo-002-auth；原生 worktree todo-002-auth；基点 origin/main 35cc22f，依赖 001 已 done。实施细化见 [执行计划](todo-002-plan.md)。
 - 未实施；无测试或安全检查通过声明。
 - 依 [WORKFLOW](../WORKFLOW.md) 交付测试证据和评审结果；功能分支收尾为 `in_review`，合入权威 main 并检查通过后再统一更新 `done`。
+- 会话/CSRF 第一轮：新增测试因缺失路由出现 17 failed + 7 fixture errors（404）；实现后完整 pytest 43 passed。基线统一检查 19 pytest + 6 Vitest + 1 Playwright 通过。
