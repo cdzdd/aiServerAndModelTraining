@@ -31,24 +31,24 @@
 Files: core/security.py; auth/models.py, schemas.py, service.py, router.py; migrations/versions/002_auth.py; main/config/migrations/env; tests/auth/conftest.py, test_sessions.py, test_csrf.py.
 Consumes: Settings, get_db, Base, record_audit.
 Produces: register/login/logout/me/csrf routes; User/AuthSession; current_user and Actor.
-- [ ] Write API tests first: 201 registration/user only, 200 login and cookie, replay after logout/expiry 401, missing/forged/cross-origin CSRF 403, valid multipart request succeeds.
-- [ ] Run uv run pytest tests/auth/test_sessions.py tests/auth/test_csrf.py -q; expect missing routes (404).
-- [ ] Add models/migration and Argon2 dependency; implement routes/security and global unsafe-API guard.
-- [ ] Run tests and full pytest; commit passing session deliverable.
+- [x] Write API tests first: 201 registration/user only, 200 login and cookie, replay after logout/expiry 401, missing/forged/cross-origin CSRF 403, valid multipart request succeeds.
+- [x] Run uv run pytest tests/auth/test_sessions.py tests/auth/test_csrf.py -q; expect missing routes (404).
+- [x] Add models/migration and Argon2 dependency; implement routes/security and global unsafe-API guard.
+- [x] Run tests and full pytest; commit passing session deliverable.
 
 ## Task 2: Permissions, administration and bootstrap
 
 Files: auth/permissions.py, bootstrap_admin.py; schemas/service/router; tests/auth/test_permissions.py, test_user_management.py, test_bootstrap.py.
 Produces: require_roles, require_conversation_access, require_knowledge_access and admin endpoints.
-- [ ] Write failing role matrix, last-admin/concurrency, bootstrap hidden-input/repeat and session invalidation tests.
-- [ ] Run named tests; implement smallest authorization functions and serial admin transaction.
-- [ ] Run full pytest and migration checks; commit passing administration deliverable.
+- [x] Write failing role matrix, last-admin/concurrency, bootstrap hidden-input/repeat and session invalidation tests.
+- [x] Run named tests; implement smallest authorization functions and serial admin transaction.
+- [x] Run full pytest and migration checks; commit passing administration deliverable.
 
 ## Task 3: Login limiting, integration and review
 
 Files: auth/limits.py; config/service/router; tests/auth/test_login_limits.py; auth README and CONTRACTS.
-- [ ] Write failing controllable-clock account/IP/concurrent/bounded-counter tests.
-- [ ] Implement configured fixed-window counters with thread lock; keep verification and failure registration atomic per limiter operation.
-- [ ] Run full unified node scripts/dev.mjs check and task checks; record actual evidence.
-- [ ] Independent security review, reproduce/fix important findings with tests, refresh checks for changed code.
-- [ ] PR + ordinary squash under integration lock; separate status PR; verify origin/main done and sync clean main.
+- [x] Write failing controllable-clock account/IP/concurrent/bounded-counter tests.
+- [x] Implement configured fixed-window counters with thread lock; keep verification and failure registration atomic per limiter operation.
+- [x] Run full unified node scripts/dev.mjs check and task checks; record actual evidence.
+- [x] Independent security review, reproduce/fix important findings with tests, refresh checks for changed code.
+- PR + ordinary squash under integration lock; separate status PR; verify origin/main done and sync clean main.

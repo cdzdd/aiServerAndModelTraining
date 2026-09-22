@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-002 |
-| 状态 | in_progress |
+| 状态 | in_review |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 003、004 并行；共享路由注册、依赖锁与迁移入口由单一整合者协调 |
 | 负责目录 | `backend/app/modules/auth/`、`backend/app/core/security.py`、认证迁移与对应测试 |
@@ -20,14 +20,14 @@
 
 ## 分步执行
 
-- [ ] 领取任务并核对 001 已合入；把角色矩阵和 Cookie/CSRF 行为逐项映射到 CONTRACTS。
-- [ ] 先写会话测试：登录、过期、退出、匿名访问、错误密码；写越权注册、缺少 CSRF、用户管理权限及最后一个管理员保护测试，运行确认预期失败。
-- [ ] 创建用户/会话模型与迁移，使用 Argon2id；提供本地首次管理员引导 CLI，仅交互隐藏输入或 stdin 接收密码，无默认密码、不写命令参数或日志。
-- [ ] 实现认证路由、会话撤销和登录尝试限流；对账户与来源按配置限制，超限返回 429，错误提示不枚举用户名。Cookie 使用 `HttpOnly`、生产 `Secure`，不把令牌返回给前端保存到 localStorage。
-- [ ] 实现 CSRF 签发/校验及来源约束；覆盖 JSON 状态请求、表单上传与退出，GET 请求不得承担写操作。
-- [ ] 实现角色检查、会话归属/接单客服/管理员规则与知识库授权规则；对不存在和无权对象按统一错误策略处理，避免泄露资源内容。
-- [ ] 实现管理员用户列表与 display_name/role/is_active 修改；阻止移除最后有效管理员，角色/停用变更即时约束旧会话；认证及用户管理变更调用 001 审计入口。
-- [ ] 用隔离数据库验证迁移、会话过期/撤销及所有角色边界；给 003 提供登录和错误响应契约，给 005/009 提供授权调用示例。
+- [x] 领取任务并核对 001 已合入；把角色矩阵和 Cookie/CSRF 行为逐项映射到 CONTRACTS。
+- [x] 先写会话测试：登录、过期、退出、匿名访问、错误密码；写越权注册、缺少 CSRF、用户管理权限及最后一个管理员保护测试，运行确认预期失败。
+- [x] 创建用户/会话模型与迁移，使用 Argon2id；提供本地首次管理员引导 CLI，仅交互隐藏输入或 stdin 接收密码，无默认密码、不写命令参数或日志。
+- [x] 实现认证路由、会话撤销和登录尝试限流；对账户与来源按配置限制，超限返回 429，错误提示不枚举用户名。Cookie 使用 `HttpOnly`、生产 `Secure`，不把令牌返回给前端保存到 localStorage。
+- [x] 实现 CSRF 签发/校验及来源约束；覆盖 JSON 状态请求、表单上传与退出，GET 请求不得承担写操作。
+- [x] 实现角色检查、会话归属/接单客服/管理员规则与知识库授权规则；对不存在和无权对象按统一错误策略处理，避免泄露资源内容。
+- [x] 实现管理员用户列表与 display_name/role/is_active 修改；阻止移除最后有效管理员，角色/停用变更即时约束旧会话；认证及用户管理变更调用 001 审计入口。
+- [x] 用隔离数据库验证迁移、会话过期/撤销及所有角色边界；给 003 提供登录和错误响应契约，给 005/009 提供授权调用示例。
 - [ ] 执行测试与静态检查，独立评审 Cookie、CSRF 和越权路径；修复后记录真实结果，提交至 `in_review`，按 WORKFLOW 合并收尾。
 
 ## 验收与测试场景
@@ -64,8 +64,17 @@ uv run alembic heads
 ## 工作记录与完成标准
 
 - 2026-09-22 领取：feat/todo-002-auth；原生 worktree todo-002-auth；基点 origin/main 35cc22f，依赖 001 已 done。实施细化见 [执行计划](todo-002-plan.md)。
-- 未实施；无测试或安全检查通过声明。
+- 实现与本地验收完成；等待功能 PR 和独立状态收尾 PR，尚未标记 done。
 - 依 [WORKFLOW](../WORKFLOW.md) 交付测试证据和评审结果；功能分支收尾为 `in_review`，合入权威 main 并检查通过后再统一更新 `done`。
 - 会话/CSRF 第一轮：新增测试因缺失路由出现 17 failed + 7 fixture errors（404）；实现后完整 pytest 43 passed。基线统一检查 19 pytest + 6 Vitest + 1 Playwright 通过。
 - 权限/管理/引导：缺失实现时 35 failed；实现后完整 pytest 79 passed，含真实 PostgreSQL 两管理员并发降级及并发首次引导，最后管理员保护通过。
 - 限流/部署：11 个失败场景补齐后全后端 94 passed；额外复现并修复密码验证期间停用账户竞态、已限流来源占用新计数器容量的问题，均有红绿回归。
+
+- 最终代码提交：`90465b9b98ab6681958bf9d6ae98d10fe3a0e030`。2026-09-22 在 Windows 11、Node 24.11.0、uv 0.12.17、Python 3.12.14、Docker Engine 29.8.0 的独立环境执行 `node scripts/dev.mjs check`，exit 0：Ruff、pytest **100 passed**、两次 Alembic upgrade head、ESLint、vue-tsc、Vitest **6 passed**、Vite build、Playwright Chromium **2 passed**。
+- 专项验证：`uv run --directory backend --frozen alembic heads` 唯一 head 为 `002_auth`；`alembic check` 为 No new upgrade operations detected。隔离 dev 库从 001 升级，pytest 每次创建空 schema 升到最新并核对模型，未操作其他任务数据库。
+- 浏览器回归：新 `frontend/e2e/auth-protocol.spec.ts` 用真实 Chromium→Vite→FastAPI→PostgreSQL 验证注册 201、登录/me 200、缺 CSRF 403、退出 204、旧 Cookie 重放 401、HttpOnly/SameSite。初次失败定位为 Vite 字符串代理默认 changeOrigin:true；经 003 确认文件归属后，显式设置 changeOrigin:false，红绿回归已通过并接入统一入口。
+- 独立评审：reviewer `auth_security_review` 只读审查 `35cc22f..06331d8`，未发现越权/会话绕过或阻塞级问题，提出两处异常输入可能返回 500：非 ASCII CSRF 比较、NUL/孤立代理字符进入数据库/哈希。评审原评级 Minor；本执行者依 403/422 接口契约将其纳入必须修复的验收缺口，6 项回归先失败后通过，最终完整后端 100 passed。无遗留评审问题。
+- 评审边界裁定：公网 HTTPS 与实际生产代理部署仍属于 016/017；本任务验证生产 Secure 属性、显式 HTTPS PUBLIC_ORIGIN 配置和来源校验，不声称公网部署已验收。若生产代理不按文档限定信任地址，来源限流仍可能配置错误，部署任务必须实测。
+- 运行边界：单 API 进程限流，重启清空计数；扩多进程前需共享限流。管理员密码由部署者安全输入，无默认管理员；本任务没有创建真实部署管理员。
+- 依赖冻结：本 worktree 初次 `uv sync --directory backend --frozen --extra dev`、`npm ci --prefix frontend` 成功；增加 Argon2 后再次 frozen sync 成功。警告为已知上游 anyio 弃用、Node shell/色彩环境提示，均如实保留。
+- 当前验收模式为本地验收 + GitHub PR；云端 CI 本轮未触发，不伪记成功。本机脱敏前原始日志保存在忽略的 `.local/`。
