@@ -32,7 +32,7 @@ switch (process.argv[2]) {
   case 'api': {
     const port = process.env.API_PORT
     if (!port || !/^\d+$/.test(port)) throw new Error('Set API_PORT in .env.')
-    run('uv', ['run', '--frozen', 'uvicorn', 'app.main:create_app', '--factory', '--no-access-log', '--host', '127.0.0.1', '--port', port], backend)
+    run('uv', ['run', '--frozen', 'uvicorn', 'app.main:create_app', '--factory', '--no-proxy-headers', '--no-access-log', '--host', '127.0.0.1', '--port', port], backend)
     break
   }
   case 'web':

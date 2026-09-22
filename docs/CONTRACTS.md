@@ -33,6 +33,18 @@
 
 首次管理员由todo-002提供 `uv run python -m app.modules.auth.bootstrap_admin`，在backend目录交互输入用户名和两次隐藏密码；无默认管理员/默认密码，不从命令行参数接收明文密码。只有当前没有有效管理员时允许引导，重复执行报告已初始化。账号列表、角色与启停API由002实现，用户管理页面由003按契约实现；真实联调归016。测试环境使用专属fixture，不调用生产引导。
 
+
+### 002 已实现接入细则
+
+认证实现与调用示例见 [auth/README](../backend/app/modules/auth/README.md)。
+username 经 NFKC、trim、casefold 后校验 3–50 字符；display_name 去首尾空格后 1–100 字符。PATCH 只接受非空的 display_name/role/is_active 子集，不接受 null、字符串布尔值和其他字段。
+错误 details 沿用 `[{location: [...], code: "..."}]`，不回显输入。错误码包括 INVALID_CREDENTIALS、UNAUTHENTICATED、CSRF_FAILED、FORBIDDEN、NOT_FOUND、CONFLICT、RATE_LIMITED；前端同时按 HTTP 状态处理。
+
+所有状态改变的 API 请求（含注册、登录、退出、multipart、后续 SSE POST）要求 Cookie、X-CSRF-Token 和同源 Origin/Referer。预登录 Cookie qa_prelogin 有效 10 分钟；登录成功改用 qa_session 并返回新 csrf_token。生产必须配置 HTTPS PUBLIC_ORIGIN，SESSION_SECRET 至少 32 字符；开发默认使用请求 origin。敏感响应设置 Cache-Control: no-store。
+LOGIN_ACCOUNT_LIMIT=5、LOGIN_IP_LIMIT=30、LOGIN_WINDOW_SECONDS=300、LOGIN_MAX_ENTRIES=10000 可配置；并发请求预占账户失败额度，容量耗尽拒绝新请求且不驱逐有效限制。第一版仅单进程；应用不读取 X-Forwarded-For，部署 ASGI 代理信任必须显式限定地址。
+
+内部接口：`service.current_user` 提供 User，`service.current_actor` 提供 schemas.Actor（FastAPI Depends）；`permissions.require_roles(actor, *roles)` 不通过返回 403；`require_conversation_access(actor, *, owner_id, assigned_agent_id)` 和 `require_knowledge_access(actor, *, visibility, is_member, is_active)` 不通过返回 404。资源字段/成员资格须由数据库获得，调用方负责不存在对象的相同 404 和列表过滤。停用知识库对所有角色不可读；具体业务写操作仍由对应模块校验角色与状态。
+
 ## 3. 知识与文件（todo-005/006）
 
 KnowledgeBase：`id,name,description,visibility,is_active,version`；visibility=`public|restricted`。成员由独立关联表维护，version用于管理员修改冲突检测。FAQ：`id,kb_id,question,answer,is_active,version,indexed_version,updated_at`；编辑递增version，仅indexed_version=version的片段可用于检索，停用立即排除。

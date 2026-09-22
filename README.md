@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-本仓库提供 FastAPI、Vue 3 和 PostgreSQL/pgvector 基础工程，包括健康检查、审计基础、数据库迁移、测试与 CI。尚未实现登录、知识库、问答或公开网站部署，任务进展以任务文件为准。
+本仓库提供 FastAPI、Vue 3 和 PostgreSQL/pgvector 基础工程，包括健康检查、审计基础、数据库迁移、测试与 CI。已实现后端注册/登录、会话、用户管理与角色/资源授权基础；知识库、问答与公开网站部署尚未实现，任务进展以任务文件为准。
 
 GitHub 仓库：[cdzdd/aiServerAndModelTraining](https://github.com/cdzdd/aiServerAndModelTraining)。首次规划基线已经同步；后续功能通过 PR 验证与合并。
 

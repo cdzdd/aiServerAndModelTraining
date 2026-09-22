@@ -1,6 +1,7 @@
 import json
 import logging
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from http import HTTPStatus
 from uuid import UUID, uuid4
 
@@ -9,11 +10,16 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
+from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException
 
 from app.core.config import Settings
 from app.core.database import create_db_engine
 from app.core.errors import error_response
+from app.core.security import AuthError
+from app.modules.auth.limits import LoginLimiter
+from app.modules.auth.router import router as auth_router
+from app.modules.auth.service import check_csrf
 
 request_logger = logging.getLogger("app.requests")
 
@@ -39,6 +45,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
 
+    app.state.auth_clock = lambda: datetime.now(UTC)
+    app.state.login_limiter = LoginLimiter(
+        account_limit=settings.login_account_limit,
+        ip_limit=settings.login_ip_limit,
+        window_seconds=settings.login_window_seconds,
+        max_entries=settings.login_max_entries,
+    )
+    app.include_router(auth_router)
+
+    @app.exception_handler(AuthError)
+    async def auth_error(request: Request, exc: AuthError):
+        return error_response(request, exc.status, exc.code, exc.message)
+
     @app.middleware("http")
     async def request_context(request: Request, call_next):
         try:
@@ -47,10 +66,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             request_id = str(uuid4())
         request.state.request_id = request_id
         try:
+            if request.url.path.startswith("/api/v1/") and request.method not in (
+                "GET",
+                "HEAD",
+                "OPTIONS",
+            ):
+                await run_in_threadpool(check_csrf, request)
             response = await call_next(request)
+        except AuthError as exc:
+            response = error_response(request, exc.status, exc.code, exc.message)
         except Exception:
             response = error_response(request, 500, "INTERNAL_ERROR", "服务暂时不可用")
         response.headers["X-Request-ID"] = request_id
+        if request.url.path.startswith(("/api/v1/auth/", "/api/v1/admin/")):
+            response.headers["Cache-Control"] = "no-store"
         route = request.scope.get("route")
         request_logger.info(
             json.dumps(
