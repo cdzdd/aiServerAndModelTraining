@@ -1,6 +1,8 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Query, Request, Response
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -14,7 +16,16 @@ from app.core.security import (
 )
 from app.modules.auth import service
 from app.modules.auth.models import User
-from app.modules.auth.schemas import LoginInput, LoginResult, RegisterInput, UserSummary
+from app.modules.auth.permissions import require_roles
+from app.modules.auth.schemas import (
+    Actor,
+    LoginInput,
+    LoginResult,
+    RegisterInput,
+    UserPage,
+    UserPatch,
+    UserSummary,
+)
 
 router = APIRouter(prefix="/api/v1")
 Database = Annotated[Session, Depends(get_db)]
@@ -81,3 +92,33 @@ def logout(request: Request, response: Response, db: Database, user: CurrentUser
     db.commit()
     clear_cookie(response, request, SESSION_COOKIE)
     clear_cookie(response, request, PRELOGIN_COOKIE)
+
+
+@router.get("/admin/users", response_model=UserPage)
+def users(
+    db: Database,
+    actor: Annotated[Actor, Depends(service.current_actor)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+):
+    require_roles(actor, "admin")
+    total = db.scalar(select(func.count()).select_from(User))
+    items = db.scalars(
+        select(User)
+        .order_by(User.created_at, User.id)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.patch("/admin/users/{user_id}", response_model=UserSummary)
+def patch_user(
+    user_id: UUID,
+    data: UserPatch,
+    request: Request,
+    db: Database,
+    actor: Annotated[Actor, Depends(service.current_actor)],
+):
+    require_roles(actor, "admin")
+    return service.update_user(db, request, user_id, data)

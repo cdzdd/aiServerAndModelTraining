@@ -3,7 +3,15 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, SecretStr
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    SecretStr,
+    StrictBool,
+    model_validator,
+)
 
 Role = Literal["user", "agent", "admin"]
 
@@ -51,3 +59,25 @@ class Actor(BaseModel):
     model_config = ConfigDict(frozen=True)
     user_id: UUID
     role: Role
+
+
+class UserPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    display_name: DisplayName | None = None
+    role: Role | None = None
+    is_active: StrictBool | None = None
+
+    @model_validator(mode="after")
+    def nonempty_nonnull_patch(self):
+        if not self.model_fields_set or any(
+            getattr(self, key) is None for key in self.model_fields_set
+        ):
+            raise ValueError("至少提供一个非空修改字段")
+        return self
+
+
+class UserPage(BaseModel):
+    items: list[UserSummary]
+    total: int
+    page: int
+    page_size: int

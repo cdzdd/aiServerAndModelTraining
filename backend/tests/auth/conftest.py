@@ -24,6 +24,8 @@ def auth_app(migrated_engine, tmp_path):
     app.state.auth_clock = lambda: datetime.now(UTC)
     yield app
     app.state.engine.dispose()
+    with migrated_engine.begin() as db:
+        db.execute(text("UPDATE users SET role='user' WHERE role='admin'"))
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ from datetime import timedelta
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -140,3 +140,53 @@ def login_user(db: Session, request: Request, username: str, password: str):
     audit(db, request, "auth.login", user)
     db.commit()
     return user, raw
+
+
+def lock_admin_changes(db: Session):
+    # Serialize bootstrap and role/activation edits, including an empty user table.
+    db.execute(text("SELECT pg_advisory_xact_lock(2002, 1)"))
+
+
+def active_admin_count(db: Session) -> int:
+    return db.scalar(
+        select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))
+    )
+
+
+def update_user(db: Session, request: Request, user_id, data):
+    from app.modules.auth.permissions import require_roles
+
+    lock_admin_changes(db)
+    db.expire_all()
+    actor_user = current_user(request, db)
+    require_roles(Actor(user_id=actor_user.id, role=actor_user.role), "admin")
+    user = db.get(User, user_id)
+    if user is None:
+        raise AuthError(404, "NOT_FOUND", "资源不存在或不可见")
+    changes = data.model_dump(exclude_unset=True)
+    losing_admin = changes.get("role", user.role) != "admin" or not changes.get(
+        "is_active", user.is_active
+    )
+    if user.role == "admin" and user.is_active and losing_admin and active_admin_count(db) <= 1:
+        raise AuthError(409, "CONFLICT", "必须保留至少一个有效管理员")
+    before = {key: getattr(user, key) for key in changes if key != "display_name"}
+    for key, value in changes.items():
+        setattr(user, key, value)
+    if changes.get("is_active") is False:
+        db.execute(delete(AuthSession).where(AuthSession.user_id == user.id))
+    record_audit(
+        db,
+        actor_id=actor_user.id,
+        action="user.update",
+        target_type="user",
+        target_id=str(user.id),
+        outcome="success",
+        request_id=request.state.request_id,
+        metadata={
+            "fields": sorted(changes),
+            "before": before,
+            "after": {k: v for k, v in changes.items() if k != "display_name"},
+        },
+    )
+    db.commit()
+    return user
