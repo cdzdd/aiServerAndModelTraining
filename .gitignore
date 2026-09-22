@@ -1,0 +1,45 @@
+# Per-worktree and local coordination state
+.worktrees/
+worktrees/
+.local/
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Python / frontend generated files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# Private runtime data and model artifacts
+data/private/
+data/uploads/
+data/backups/
+models/
+checkpoints/
+adapters/
+experiments/runs/
+*.safetensors
+*.gguf
+*.log
+*.sqlite
+*.sqlite3
+*.pem
+*.key
+
+# Editor / OS local state
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
