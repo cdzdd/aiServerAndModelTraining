@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-002 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 003、004 并行；共享路由注册、依赖锁与迁移入口由单一整合者协调 |
 | 负责目录 | `backend/app/modules/auth/`、`backend/app/core/security.py`、认证迁移与对应测试 |
@@ -28,7 +28,7 @@
 - [x] 实现角色检查、会话归属/接单客服/管理员规则与知识库授权规则；对不存在和无权对象按统一错误策略处理，避免泄露资源内容。
 - [x] 实现管理员用户列表与 display_name/role/is_active 修改；阻止移除最后有效管理员，角色/停用变更即时约束旧会话；认证及用户管理变更调用 001 审计入口。
 - [x] 用隔离数据库验证迁移、会话过期/撤销及所有角色边界；给 003 提供登录和错误响应契约，给 005/009 提供授权调用示例。
-- [ ] 执行测试与静态检查，独立评审 Cookie、CSRF 和越权路径；修复后记录真实结果，提交至 `in_review`，按 WORKFLOW 合并收尾。
+- [x] 执行测试与静态检查，独立评审 Cookie、CSRF 和越权路径；修复后记录真实结果，提交至 `in_review`，按 WORKFLOW 合并收尾。
 
 ## 验收与测试场景
 
@@ -64,7 +64,7 @@ uv run alembic heads
 ## 工作记录与完成标准
 
 - 2026-09-22 领取：feat/todo-002-auth；原生 worktree todo-002-auth；基点 origin/main 35cc22f，依赖 001 已 done。实施细化见 [执行计划](todo-002-plan.md)。
-- 实现与本地验收完成；等待功能 PR 和独立状态收尾 PR，尚未标记 done。
+- 实现、本地验收与功能合并已完成；本独立状态 PR 合入后 done 生效。
 - 依 [WORKFLOW](../WORKFLOW.md) 交付测试证据和评审结果；功能分支收尾为 `in_review`，合入权威 main 并检查通过后再统一更新 `done`。
 - 会话/CSRF 第一轮：新增测试因缺失路由出现 17 failed + 7 fixture errors（404）；实现后完整 pytest 43 passed。基线统一检查 19 pytest + 6 Vitest + 1 Playwright 通过。
 - 权限/管理/引导：缺失实现时 35 failed；实现后完整 pytest 79 passed，含真实 PostgreSQL 两管理员并发降级及并发首次引导，最后管理员保护通过。
@@ -81,3 +81,6 @@ uv run alembic heads
 
 - main 集成验证：003 功能/状态 PR 完成后，合入 `origin/main a778c4a6c31f18671a0e7f7390752ad72856905b`，无冲突，组合提交为 `790c392005637fd98e5485b42bf159f00474119c`。按新前端锁文件重新 npm ci、后端 frozen sync 后，`node scripts/dev.mjs check` exit 0：**100 pytest + 33 Vitest + 15 Playwright**，全部静态/构建/重复迁移通过。其中 auth-protocol 和 health 使用真实后端，003 页面状态场景使用其既有契约 Mock，不把后者伪称完整真实角色页面联调。
 - 功能 PR：[#4](https://github.com/cdzdd/aiServerAndModelTraining/pull/4)。后续至待合并头只有本任务证据文档变化；按 WORKFLOW 10.1 复用组合提交代码验收，另作 diff/链接/秘密/状态事实核对。功能及状态收尾实际合并前保持 in_review。
+
+- 功能实际合并：PR [#4](https://github.com/cdzdd/aiServerAndModelTraining/pull/4) 于 **2026-09-22T11:18:50Z** MERGED，普通 squash 合并 SHA：`9ca44fe06c12647fdc058993d9a4e97bde7ce2c5`。已核对合并树与已验证 PR head `d146e75247e15d588439c970c155c5e202d80a72` 完全一致。
+- 收尾：基于该远端 main 创建 `docs/todo-002-close`，只更新本任务状态与真实合并证据。此 done 状态随独立状态 PR 合入权威 main 后生效；不再创建记录收尾 PR 自身的下一层 PR。
