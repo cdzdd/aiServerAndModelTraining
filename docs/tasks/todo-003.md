@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-003 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 002、004 并行；先用契约 mock 完成，真实认证联调等待 002 合入 |
 | 负责目录 | `frontend/src/{app,router,shared}/`、`frontend/src/features/{auth,users}/`、角色布局与前端测试 |
@@ -57,6 +57,7 @@ npm run test:e2e -- e2e/auth-shell.spec.ts
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未实施；前端页面和测试尚不存在。
+- 2026-09-22 领取：owner f3857500-7549-43ca-92f2-50b78656e381；分支 feat/todo-003-frontend；原生 worktree C:/Users/Administrator/.codex/worktrees/todo-003-frontend/aiSoftwareAttempt；基点 35cc22f。已核对 origin/main 的 001 done，原子领取并登记前端路由所有权。
+- 隔离环境：API 8103、Web 5203、DB 15436；Compose qa-todo-003-f38575。冻结安装 uv/npm 成功，基线 Vitest 6 passed。
 - 按 [WORKFLOW](../WORKFLOW.md) 记录 mock/真实联调范围，独立评审后到 `in_review`；合入权威 main 且检查通过后统一置为 `done`。
+
