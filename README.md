@@ -4,7 +4,22 @@
 
 ## 当前状态
 
-本仓库当前是规划与协作基线，尚未实现业务代码、安装项目依赖或部署网站。开发任务和验收要求已经拆分，任务进展以任务文件为准。GitHub 远端由用户提供地址后接入，不在文档中假定已经同步。
+本仓库提供 FastAPI、Vue 3 和 PostgreSQL/pgvector 基础工程，包括健康检查、审计基础、数据库迁移、测试与 CI。尚未实现登录、知识库、问答或公开网站部署，任务进展以任务文件为准。
+
+GitHub 仓库：[cdzdd/aiServerAndModelTraining](https://github.com/cdzdd/aiServerAndModelTraining)。首次规划基线已经同步；后续功能通过 PR 验证与合并。
+
+## 本地运行
+
+准备 Node.js 24、Python 3.12、uv 和 Docker，在独立 worktree 配置 `.env`，按 [开发与检查说明](scripts/README.md) 安装依赖并启动。常用入口：
+
+```text
+node scripts/dev.mjs db-up
+node scripts/dev.mjs api
+node scripts/dev.mjs web
+node scripts/dev.mjs check
+```
+
+前后端分别在两个终端运行；完整检查会自行启动测试服务，运行前先停止开发服务。
 
 ## 文档入口
 
@@ -36,4 +51,4 @@
 
 ## 规划文件和运行文件
 
-本轮只提供 Markdown 规划、Git 忽略规则、文本格式约定和 PR 模板。`backend/`、`frontend/`、`infra/`、`experiments/` 等是后续任务将创建的目录；文档中的运行命令需要相应任务实施后才可使用。
+`backend/`、`frontend/`、`infra/` 和 `scripts/` 是 todo-001 的工程基础；`docs/tasks/` 中其余任务描述未来功能，不能把规划中的接口当作已实现功能。具体测试结果、阻塞与合并记录见 [todo-001](docs/tasks/todo-001.md)。
