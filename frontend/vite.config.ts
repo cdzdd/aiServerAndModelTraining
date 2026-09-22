@@ -17,8 +17,8 @@ export default defineConfig(({ mode }) => {
       port: Number(webPort),
       strictPort: true,
       proxy: {
-        '/api': `http://127.0.0.1:${apiPort}`,
-        '/health': `http://127.0.0.1:${apiPort}`,
+        '/api': { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false },
+        '/health': { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false },
       },
     },
     test: {

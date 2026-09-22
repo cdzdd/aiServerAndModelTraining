@@ -10,13 +10,31 @@ from pydantic import (
     Field,
     SecretStr,
     StrictBool,
+    field_validator,
     model_validator,
 )
 
 Role = Literal["user", "agent", "admin"]
 
 
+def valid_text(value):
+    if isinstance(value, str):
+        if "\0" in value:
+            raise ValueError("文本不能包含空字符")
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("文本包含无效 Unicode 字符") from None
+    return value
+
+
+def clean_display_name(value):
+    value = valid_text(value)
+    return value.strip() if isinstance(value, str) else value
+
+
 def normalize_username(value: str) -> str:
+    value = valid_text(value)
     return (
         unicodedata.normalize("NFKC", value).strip().casefold() if isinstance(value, str) else value
     )
@@ -25,7 +43,7 @@ def normalize_username(value: str) -> str:
 Username = Annotated[str, BeforeValidator(normalize_username), Field(min_length=3, max_length=50)]
 DisplayName = Annotated[
     str,
-    BeforeValidator(lambda v: v.strip() if isinstance(v, str) else v),
+    BeforeValidator(clean_display_name),
     Field(min_length=1, max_length=100),
 ]
 
@@ -34,6 +52,15 @@ class LoginInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: Username
     password: SecretStr = Field(min_length=12, max_length=128)
+
+    @field_validator("password")
+    @classmethod
+    def valid_password_unicode(cls, value: SecretStr):
+        try:
+            value.get_secret_value().encode("utf-8")
+        except UnicodeEncodeError:
+            raise ValueError("密码包含无效 Unicode 字符") from None
+        return value
 
 
 class RegisterInput(LoginInput):

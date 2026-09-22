@@ -54,7 +54,7 @@ Missing and inaccessible resources return the same 404 envelope; callers handle 
 
 ## Configuration and operating limits
 
-- Production requires `PUBLIC_ORIGIN=https://your-host` (origin only) and a SESSION_SECRET of at least 32 characters. Development may leave PUBLIC_ORIGIN unset; Vite preserves the browser Host by default.
+- Production requires `PUBLIC_ORIGIN=https://your-host` (origin only) and a SESSION_SECRET of at least 32 characters. Development may leave PUBLIC_ORIGIN unset; Vite proxies explicitly use changeOrigin: false to preserve the browser Host.
 - All unsafe `/api/v1/` requests use the same CSRF guard, including multipart uploads and future SSE POST endpoints. GET handlers never change business data; csrf GET only issues a prelogin cookie.
 - LOGIN_ACCOUNT_LIMIT=5 failed attempts per IP+normalized username; LOGIN_IP_LIMIT=30 total attempts per IP; LOGIN_WINDOW_SECONDS=300; LOGIN_MAX_ENTRIES=10000. Pending requests reserve account capacity, so concurrent attempts cannot exceed it. Saturation returns 429 without evicting live restrictions; expired windows are pruned on traffic.
 - Limits are per API process, reset on restart and require shared storage before multiple workers/replicas. Use one API process for this foundation.

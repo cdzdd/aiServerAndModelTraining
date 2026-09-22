@@ -88,7 +88,12 @@ def check_csrf(request: Request) -> None:
         binding = csrf_binding(db, request)
     candidate = request.headers.get("x-csrf-token", "")
     expected_token = csrf_token(settings.session_secret.get_secret_value(), binding or "")
-    if not binding or len(candidate) != 64 or not hmac.compare_digest(candidate, expected_token):
+    if (
+        not binding
+        or len(candidate) != 64
+        or not candidate.isascii()
+        or not hmac.compare_digest(candidate, expected_token)
+    ):
         raise AuthError(403, "CSRF_FAILED", "请求来源或安全令牌无效")
 
 

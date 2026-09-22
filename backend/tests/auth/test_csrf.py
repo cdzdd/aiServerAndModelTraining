@@ -85,3 +85,33 @@ def test_non_ascii_forged_token_is_rejected_not_internal_error(client):
     )
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "CSRF_FAILED"
+
+
+def test_raw_non_ascii_csrf_header_is_rejected(client, auth_app):
+    from fastapi import Request
+
+    from app.core.security import AuthError
+    from app.modules.auth.service import check_csrf
+
+    csrf(client)
+    # TestClient's header encoding changes byte counts; retain the actual wire/ASGI bytes.
+    request = Request(
+        {
+            "type": "http",
+            "app": auth_app,
+            "scheme": "http",
+            "method": "POST",
+            "server": ("testserver", 80),
+            "path": "/api/v1/auth/login",
+            "query_string": b"",
+            "headers": [
+                (b"host", b"testserver"),
+                (b"origin", b"http://testserver"),
+                (b"cookie", ("qa_prelogin=" + client.cookies.get("qa_prelogin")).encode()),
+                (b"x-csrf-token", b"\xe9" * 64),
+            ],
+        }
+    )
+    with pytest.raises(AuthError) as error:
+        check_csrf(request)
+    assert error.value.status == 403
