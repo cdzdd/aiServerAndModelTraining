@@ -41,10 +41,10 @@ P0/P1/P2表示推进顺序，不表示能绕过依赖。014/015尚未完成时�
 
 这些是首次规划时的检查结果；解决后在所属任务记录证据，并更新本段中对应项目，不反复添加重复任务。
 
-- 工作区尚无应用代码、依赖文件和运行环境：todo-001。
-- GitHub远端URL尚未提供；gh命令不存在：先按PREPARATION准备，接入后在todo-001记录真实CI结果。
-- 已有Node24和Git；项目需要的uv/Python3.12尚未配置：todo-001。
-- Docker CLI存在，但本次工具环境无法连接引擎；WSL状态查询被拒，不能断定整机未安装：todo-001核实开发环境，todo-015核实训练环境。
+- todo-001 已实现应用基础、锁定依赖和本地运行/检查入口；是否已合入并收尾以该任务状态为准。
+- GitHub 已接入 cdzdd/aiServerAndModelTraining，gh/uv/Docker 已安装并验证。当前按用户授权使用“本地验收 + GitHub PR”；云端 CI 因账号限制暂为手动触发，详见 WORKFLOW 10.1 和 todo-001 的实际记录。
+- Node 24、Git、uv 和 Python 3.12 已配置；新 worktree 仍需按锁文件建立自己的依赖环境。
+- Docker Desktop 已升级到 4.92.0，引擎、测试容器、PostgreSQL/pgvector 与开发环境隔离已验证；用于模型训练的 WSL/GPU 软件栈仍由 todo-014/015 实测。
 - 尚无提供商endpoint/model/key配置：todo-004完成Mock和协议适配；todo-017在正式发布前必须完成选定真实模型的smoke检查。
 - 首个业务场景、允许使用的文档/FAQ、独立测试资料待用户提供：todo-005/006/013。
 - 公网服务器、域名/HTTPS地址、预算和部署访问方式待部署阶段确定：todo-016/017；不阻塞前期工程工作。

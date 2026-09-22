@@ -8,6 +8,8 @@
 
 GitHub 仓库：[cdzdd/aiServerAndModelTraining](https://github.com/cdzdd/aiServerAndModelTraining)。首次规划基线已经同步；后续功能通过 PR 验证与合并。
 
+**当前采用本地验收 + GitHub PR。** 本地测试、构建和独立评审通过后按规则合并，云端 CI 暂为手动触发。具体证据与恢复条件见 [WORKFLOW 第 10.1 节](docs/WORKFLOW.md)。
+
 ## 本地运行
 
 准备 Node.js 24、Python 3.12、uv 和 Docker，在独立 worktree 配置 `.env`，按 [开发与检查说明](scripts/README.md) 安装依赖并启动。常用入口：
@@ -48,6 +50,8 @@ node scripts/dev.mjs check
 ## 首轮开发安排
 
 先完成 todo-001。它合入 main 后，todo-002（身份权限）、todo-003（前端框架）、todo-004（模型接口）可以分别交给三个对话。依赖未完成的任务可以阅读规划，不能把尚不存在的接口当作已可用成果。
+
+这三项的用户准备内容见 [下一批任务准备](docs/PREPARATION.md#下一批任务准备)。每个新对话负责自己的端口、数据库与 worktree，不直接复用 001 的 `.env`。
 
 ## 规划文件和运行文件
 

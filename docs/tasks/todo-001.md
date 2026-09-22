@@ -74,7 +74,7 @@ npm run test:e2e
 ## 已知问题与外部阻塞
 
 - 本地无阻塞。Starlette 1.6.0 的 TestClient 引用 anyio 旧别名，有一条上游弃用警告；测试通过且未屏蔽警告。前端间接依赖有弃用提示，`npm audit` 当前为 0 vulnerabilities。
-- GitHub 已使用用户指定的 cdzdd 登录，仓库 `cdzdd/aiServerAndModelTraining` 公开、拥有 ADMIN 权限；规划基线首次推送成功。功能 PR [#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1) 已建立；GitHub Actions 因账号账单锁定未启动，等待用户解除限制后重试，尚未标记 done。
+- GitHub 已使用用户指定的 cdzdd 登录，仓库 `cdzdd/aiServerAndModelTraining` 公开、拥有 ADMIN 权限；规划基线首次推送成功。功能 PR [#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1) 已建立；GitHub Actions 曾因账号账单锁定未启动；用户已授权改用本地验收 + GitHub PR，按 WORKFLOW 10.1 完成合并收尾，功能分支仍为 in_review。
 - 本任务只交付开发基础，没有登录、知识问答、模型推理或公开网址部署。
 
 ## 工作记录
@@ -89,6 +89,7 @@ npm run test:e2e
 - 前端红绿：6 项连接状态/异常/重试组件测试先失败后通过；干净 `npm ci` 成功，audit 0；桌面和窄屏检查无横向溢出。
 - 统一验收：2026-09-22 执行 `node scripts/dev.mjs check`，exit 0；Ruff 通过、pytest 19 passed、两次 Alembic upgrade head 通过、ESLint/vue-tsc 通过、Vitest 6 passed、Vite build 通过、Playwright Chromium 1 passed（真实网页→Vite代理→FastAPI→PostgreSQL）。另外 `alembic check` 无模型差异，唯一迁移 head 为 001_audit_foundation。
 - 评审：独立只读评审指出 DATABASE_URL/TEST_DATABASE_URL 未脱敏以及 HTTP 异常头丢失；已补回归并修复，复核无剩余阻塞。根目录 `.env`、生成文件、模型/上传数据均被忽略，真实秘密不进入版本管理。
-- CI：工作流使用全新 PostgreSQL 服务，冻结安装、同一检查入口，不依赖云模型/GPU/生产密钥；文档 PR 同样运行必要检查。本地已通过；远程运行 [35714271910](https://github.com/cdzdd/aiServerAndModelTraining/actions/runs/35714271910) 在启动任何步骤前失败。GitHub 注解原文："The job was not started because your account is locked due to a billing issue." 不绕过检查或合并 main；账号恢复后重跑最新 PR 提交的 CI。
-- 功能提交：`0c88e221db8037da8e59f360dfa3f318e0ecfe0c`；功能 PR：[#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1)。尚未合并，无功能合并 SHA。恢复入口：先核对 PR 最新 head 和账号限制，CI 通过后按 WORKFLOW 合并与另建状态收尾 PR，不重新实现基础工程。
+- CI：工作流使用全新 PostgreSQL 服务，冻结安装、同一检查入口，不依赖云模型/GPU/生产密钥；文档 PR 同样运行必要检查。本地已通过；远程运行 [35714271910](https://github.com/cdzdd/aiServerAndModelTraining/actions/runs/35714271910) 在启动任何步骤前失败。GitHub 注解原文："The job was not started because your account is locked due to a billing issue." 此为真实的历史云端失败，不代表应用测试执行失败。2026-09-22 用户明确授权暂用本地验收，工作流保留并改为手动触发；恢复条件见 WORKFLOW 10.1。
+- 功能提交：`0c88e221db8037da8e59f360dfa3f318e0ecfe0c`；功能 PR：[#1](https://github.com/cdzdd/aiServerAndModelTraining/pull/1)。尚未合并，无功能合并 SHA。合并入口：核对最新 head 与本地验收证据、独立评审及服务端规则，按已授权的 WORKFLOW 10.1 普通合并与另建状态收尾 PR，不重新实现基础工程。
+- 临时流程：用户授权本地验收后，AGENTS、WORKFLOW、PR 模板、准备清单和 CI 触发方式已同步；GitHub 仍是权威远端，保留独立 worktree、评审、串行合并和任务收尾要求。
 - 完成标准：遵循 [WORKFLOW](../WORKFLOW.md)；功能分支保持 `in_review`，功能合入权威 main 且检查通过后才由收尾 PR 更新为 `done`。

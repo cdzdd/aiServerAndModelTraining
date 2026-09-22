@@ -47,6 +47,8 @@ node scripts/dev.mjs check
 
 该命令执行 Ruff、完整 pytest（真实 PostgreSQL/pgvector）、连续两次 Alembic 升级、前端 lint/typecheck/Vitest/build/Playwright。Playwright 自行启动 API 和 Vite，禁止借用已有服务，以免误测其他 worktree。测试数据使用独立库中的随机 schema，测试结束只清理自己创建的 schema。
 
+当前采用 [WORKFLOW 10.1](../docs/WORKFLOW.md) 的本地验收模式：此入口与任务专项检查是代码 PR 的合并依据，需保留提交对应的脱敏结果和独立评审。GitHub 工作流暂时仅手动触发，本地通过不等于云端 CI 已通过。纯文档 PR 做格式、链接与事实检查。
+
 迁移命令会升级当前 `DATABASE_URL` 的数据库；执行检查前确认它属于本 worktree。CI 使用全新临时 PostgreSQL 服务和固定测试配置，无需模型密钥、GPU 或云服务。
 
 单项排错可以在 `backend/` 运行 `uv run --frozen pytest -q`、`uv run --frozen ruff check .`；在 `frontend/` 运行 `npm run lint`、`npm run typecheck`、`npm run test -- --run`、`npm run build`、`npm run test:e2e`。

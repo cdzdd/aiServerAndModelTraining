@@ -2,7 +2,9 @@
 
 核对日期：2026-09-22。项目按“先完成可运行工程，再接真实模型，再部署，最后做本地模型实验”的顺序推进。**不需要先购买云服务器、域名或 GPU 服务；没有模型密钥时，可以先用 Mock 模型完成页面、接口、数据库和测试。**
 
-本文的安装、登录、创建仓库和验证命令是后续操作指南，不表示本轮已执行。项目实施顺序见 `todo.md` 和 `docs/IMPLEMENTATION_PLAN.md`，协作与合并规则见 `docs/WORKFLOW.md`。本轮仓库、提交和远程连接状态请查看 `README.md`、`todo.md` 与实际 `git status`，以实际结果为准。
+todo-001 已完成工具安装、本地工程验收和 GitHub 接入，具体合并状态见 [任务记录](tasks/todo-001.md)。本文的创建仓库、安装和登录命令保留为新环境参考，本机无需重复执行。当前使用用户提供的公开仓库 `cdzdd/aiServerAndModelTraining`，不自行更改可见性。
+
+**当前验收方式：**用户已授权本地验收 + GitHub PR，云端工作流仅手动触发。账号账单限制不再阻塞符合 [WORKFLOW 10.1](WORKFLOW.md) 的本地验收与普通 PR 合并；仍须满足现有服务端保护。
 
 ## 1. 当前电脑已知状态
 
@@ -11,10 +13,10 @@
 | 硬件 | Core Ultra 7 265K、约 31.5 GiB 内存、RTX 5070 Ti 16 GB | 足以开始工程开发；模型容量与训练参数需要实测 |
 | Git | 已安装 2.52.0，提交姓名和邮箱已配置 | 沿用现有身份；需要更改时仅改项目级配置 |
 | Node.js / npm | v24.11.0 / 11.6.1 | 项目统一 Node 24 LTS，无需降级到 22；具体补丁版在工程初始化时锁定 |
-| Python | 已发现 3.10.11 | 项目独立使用 Python 3.12，不替换系统 Python |
-| GitHub CLI / uv / Ollama | 当前环境未找到相应命令 | gh、uv 在近期准备；Ollama 延后到本地模型阶段 |
-| Docker | CLI 29.2.0 可用 | 本工具环境连接引擎失败，且配置访问受限；不能据此断言 Docker 未安装或未启动 |
-| WSL | 命令存在 | 本工具环境读取状态被拒，发行版、WSL 2 与 GPU 环境均待验证 |
+| Python | uv 管理的 3.12.14 已安装并验证 | 各 worktree 独立虚拟环境，保留系统 Python |
+| GitHub CLI / uv / Ollama | gh 2.101.0、uv 0.12.17；cdzdd 登录和推送已验证 | Ollama 延后到本地模型阶段；不需要更换 GitHub 账号 |
+| Docker | Desktop 4.92.0、Engine 29.8.0、Compose 5.5.1；容器和项目数据库已验证 | 保持运行；各 worktree 使用独立项目名、端口与卷 |
+| WSL | Docker 的 WSL 2 后端已正常运行 | 用于训练的 Linux 发行版、CUDA/PyTorch 和 GPU 链路留到 014/015 验证 |
 
 Node 24 在核对日期仍为 LTS；项目统一版本是为了本机、CI、部署环境保持一致。[Node.js 官方发布表](https://nodejs.org/en/about/previous-releases)
 
@@ -22,9 +24,23 @@ Node 24 在核对日期仍为 LTS；项目统一版本是为了本机、CI、部
 
 表中勾选表示已完成验收，而不是仅下载了安装包。
 
+### 下一批任务准备
+
+002、003、004 都只依赖 001。先确认权威 `origin/main` 的 001 为 done，再在本工作区开启三个独立对话，分别领取一个任务；无需重新创建仓库、购买服务器或提供真实业务数据。
+
+| 任务 | 当前必须准备 | 可选输入或以后再准备 |
+| --- | --- | --- |
+| 002 身份认证、会话与权限 | 无需额外用户资料；开发者按现有三角色、Cookie、CSRF 契约实现，测试使用专用账号 | 实际启用时确定首个管理员用户名，密码通过本机隐藏输入设置；现在不用发送密码，也不需要邮箱/短信服务 |
+| 003 前端框架、登录与角色页面 | 无需等 002 完成；先按契约 mock 开发与验收 | 可指定显示名称、配色或已有页面偏好；无指定时沿用当前中文页面和 Element Plus。真实认证/用户管理联调由 016 承接 |
+| 004 模型接口、Mock 与流式适配 | 无需真实密钥；用 MockProvider 和假 HTTP 服务验证既定 OpenAI-compatible Chat Completions 文字流协议 | 如需提前真实联调，再提供厂商名称、模型 ID、含版本路径的 API base URL 和明确测试预算；API key 仅存本机忽略的环境文件，不能发到 PR 或提交 |
+
+每个开发对话自行创建独立 worktree、冻结安装依赖、生成自己的 `.env`/会话密钥，检查并登记端口、Compose project、数据库卷与上传目录。002 和 004 修改后端依赖、配置、路由入口或共享契约时须持共享文件锁；开发可并行，合并与收尾串行。003 使用 mock 的通过不能表述为真实登录已验证；004 无真实调用时注明云连接未验证，最晚在 017 发布前完成真实验证。
+
+服务器、域名和公开访问配置留到 016/017；FAQ、文档和样例问题按 005/006/013 准备；本地推理与训练环境留到 014/015。这些不是开始 002/003/004 的前置门槛。
+
 | 完成 | 准备项 | 如何准备 | 完成标准 |
 | --- | --- | --- | --- |
-| [ ] | GitHub 账号和仓库 | 登录自己的账号，创建 **Private 私有空仓库** | 能打开仓库，确认所有者和项目名称 |
+| [x] | GitHub 账号和仓库 | 已使用用户创建的公开仓库 cdzdd/aiServerAndModelTraining | 所有者、项目名称和可见性已核实，不重复创建 |
 | [ ] | GitHub 命令行登录 | 安装 gh，按下方步骤通过浏览器登录 | `gh auth status` 显示正确账号且登录有效 |
 | [ ] | 仓库权限 | 个人仓库使用所有者账号；组织仓库确认写入权限及组织要求 | 能读仓库、推送功能分支、创建及合并 PR；保护设置还需管理权限 |
 | [ ] | Git 身份 | 检查已有 `user.name` 与 `user.email` | 姓名、邮箱是本人希望写入提交记录的身份 |
@@ -81,7 +97,7 @@ gh auth status
 gh repo view OWNER/REPO --json nameWithOwner,url,isPrivate,viewerPermission
 ```
 
-成功预期：仓库名称正确、`isPrivate` 为 `true`，当前账号具备所需写入权限。组织仓库若使用 SSO 或限制 GitHub Actions，需要由组织管理员完成相应授权。
+成功预期：仓库名称、可见性与用户选择一致，当前账号具备所需写入权限；本项目现为用户创建的公开仓库，不要求改为私有。组织仓库若使用 SSO 或限制 GitHub Actions，需要由组织管理员完成相应授权。
 
 在当前项目目录检查 Git 身份：
 
@@ -99,6 +115,8 @@ git config --local user.email "YOUR_GIT_COMMIT_EMAIL"
 
 ### 2.3 `main` 保护与自动合并
 
+下表的云端 CI/required check 项在恢复云端验收时执行；当前按 WORKFLOW 10.1 本地验收。启用临时模式时 main 无强制 check/ruleset，后续合并仍须实时核对；不新增无法运行的 check，也不削弱已经存在的保护。
+
 目标流程是：`feat/...` 功能分支 → PR → 检查通过 → 自动合并到 `main`。接入 GitHub 后完成以下设置：
 
 | 完成 | 配置 | 注意事项 |
@@ -110,7 +128,7 @@ git config --local user.email "YOUR_GIT_COMMIT_EMAIL"
 | [ ] | 开启仓库 auto-merge（套餐支持时） | PR 满足检查与其他规则后才自动合并 |
 | [ ] | 审批数量符合实际协作方式 | 单人仓库不强制“必须另一人 approve”，避免无人可审批；以后有审阅者再增加 |
 
-私有仓库的分支保护、规则和原生 auto-merge 可用性取决于仓库归属及 GitHub 套餐，不能保证免费私有仓库全部可用。官方说明列出私有仓库支持 GitHub Pro、Team、Enterprise 等套餐。若当前套餐不可用，先保留“PR + CI 成功后由当前任务检查并合并”的操作流程，明确记录尚无服务端强制保护；不擅自改成公开仓库、不购买套餐，也不绕过现有服务端规则。[分支保护](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、[PR 自动合并](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/automatically-merging-a-pull-request)
+私有仓库的分支保护、规则和原生 auto-merge 可用性取决于仓库归属及 GitHub 套餐，不能保证免费私有仓库全部可用。官方说明列出私有仓库支持 GitHub Pro、Team、Enterprise 等套餐。若当前套餐不可用，保留“PR + 按当前模式验收后由任务检查并合并”的操作流程，明确记录尚无服务端强制保护；不擅自修改仓库可见性、不购买套餐，也不绕过现有服务端规则。[分支保护](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)、[PR 自动合并](https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/automatically-merging-a-pull-request)
 
 ### 2.4 Python 3.12 与依赖工具
 
