@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-004 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 002、003 并行；仅在 provider 目录实现，不提前修改 RAG 或聊天状态机 |
 | 负责目录 | `backend/app/modules/providers/`、provider 测试、配置示例 |
@@ -50,6 +50,8 @@ uv run ruff check .
 
 ## 已知问题与外部阻塞
 
+当前本地 DeepSeek 配置已于 2026-09-23 完成单次真实流式 smoke，结果与调用限制见文末续作记录；本轮无未解决外部阻塞。早先未验证条目保留为基础交付时的历史。
+
 真实调用需要用户选定云提供商、模型 ID、API base URL、API key 和测试预算。无密钥时完整 MockProvider、CloudProvider 协议适配与 fake HTTP 契约测试可以满足本任务完成条件，并明确记录真实云连接未验证。首次真实云 API smoke 可在 004/008 提前完成，最晚由 017 作为正式发布必需验收执行，不让密钥成为 008/009 开发的隐藏阻塞。
 
 ## 工作记录与完成标准
@@ -89,3 +91,10 @@ uv run ruff check .
 - 本轮调用额度在联网前以忽略的 .local/cloud-smoke-attempt-20260923.json 原子预占；实际仅执行 1 次，1/1 已用完，不再自动请求。该记录与 .env/key 均不提交。
 - 成本：按 [DeepSeek 官方价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/) 的高峰输入未命中 2 CNY/百万 tokens、输出 8 CNY/百万 tokens，保守估算上限为 `(16*2 + 1*8)/1000000 = 0.00004 CNY`，低于用户授权 5 CNY。不是账户实际扣款回执；未额外调用账单或余额 API。
 - 验证边界：已验证这份本地 DeepSeek 配置的单次真实流式连接、正常结束、usage 解析和资源关闭；不代表 RAG/聊天页面已完成，不代表质量、吞吐或生产部署验收。017 仍须验证最终部署使用的模型配置。
+### 真实云续作合并与收尾
+
+- 功能续作 PR [#9](https://github.com/cdzdd/aiServerAndModelTraining/pull/9) 于 `2026-09-23T09:48:55Z` 实际 MERGED，普通 squash 合并 SHA `0fcee90d1fd9dcc200d0628d13fb5238d7f3e0c0`。
+- 已验证源码提交 `11be023ea92a0d7b24afb0489e731def3428aa62`，最终 PR head `6b9ff6847b8a4c814455536e64454972dea67c67` 只追加文档证据；功能合并文件树与该 head 完全一致（git diff --exit-code exit 0）。完整本地检查148/33/15、独立只读评审、单次真实云 smoke 已完成；云端 CI 未触发。
+- 合并前 main 无变化、工作区干净、本地 HEAD 与 PR head 一致；main 未设置保护且 rulesets 为空，无服务端强制审批或 checks。未使用 --admin、未伪造检查、未直接推送 main。
+- 本次状态收尾分支 `docs/todo-004-cloud-close` 只更新此任务为 done 并记录实际合并证据；采用文档链接、diff 与 PR 事实静态验证。此 PR 合入后此次真实云联调续作完成。
+- 后续保留独立 worktree、本地密钥配置和脱敏调用记录。最多1次的本轮额度已用完；任何新的真实请求需要新的用户授权，5 CNY 预算未被解释为无限次数授权。现有应用默认仍为 Mock，不自动转为持续计费的云调用。
