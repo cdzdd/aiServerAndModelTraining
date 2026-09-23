@@ -84,5 +84,8 @@ uv run ruff check .
 - 复用原生独立 worktree，从 origin/main `0934132` 创建 `fix/todo-004-deepseek-smoke`，重新原子领取 todo-004。先前 done 为基础协议交付，此次补充适配和真实证据合入前保持 in_review。
 - 官方文档确认 DeepSeek 默认思考模式，新增默认 false 的 MODEL_DISABLE_THINKING；本次本地配置 true，仅此时发送 thinking.type=disabled，不更改消息/流接口或输出上限。新增请求契约测试先 1 failed，再 48 provider tests passed。
 - 最小适配后执行完整 node scripts/dev.mjs check，exit 0：148 pytest、33 Vitest、15 Playwright，静态检查、构建和两次迁移通过；源码验证提交在 PR 描述记录。
-- WSL：按用户要求正常停止 Docker Desktop 后执行一次 wsl --shutdown，再启动 Ubuntu 和 Docker；内核 boot ID 从 fc3e659f-6fc4-4480-90b6-5051023b3512 变为 a2ed9801-b621-487b-830b-eaa4c4522f8e。随后出现 Ubuntu 集成写配置超时；Windows Docker 和两个项目数据库保持健康，Ubuntu 本身可启动且 .docker 目录可写。正在恢复集成；没有删除容器/数据或改动 WSL 网络设置。
-- 真实调用与独立评审结果待追加；本段不是成功记录。
+- WSL：按用户要求正常停止 Docker Desktop 后执行一次 wsl --shutdown，再启动 Ubuntu 和 Docker；内核 boot ID 从 fc3e659f-6fc4-4480-90b6-5051023b3512 变为 a2ed9801-b621-487b-830b-eaa4c4522f8e。随后出现 Ubuntu 集成写配置超时；Windows Docker 和两个项目数据库保持健康，Ubuntu 本身可启动且 .docker 目录可写。保持 Ubuntu 临时运行并正常重启 Docker Desktop 后，Ubuntu 内 docker version 返回 Client/Server 均为 29.8.0，日志报告 Ubuntu distro is ready，两个原有数据库均恢复 healthy；没有删除容器/数据或改动 WSL 网络设置。
+- 独立只读评审范围 `0934132..11be023`，未发现 P0–P3 问题，可合并。源码验收提交 `11be023ea92a0d7b24afb0489e731def3428aa62`；后续仅追加文档证据。- 真实调用：2026-09-23T09:46:45Z 至 09:46:46Z，通过现有 run_smoke/CloudProvider 发出固定短问题，thinking=disabled，max_tokens=64，无重试。响应成功，elapsed_seconds=0.727，text_characters=1，finish_reason=stop；usage 为 prompt_tokens=16、completion_tokens=1、total_tokens=17。
+- 本轮调用额度在联网前以忽略的 .local/cloud-smoke-attempt-20260923.json 原子预占；实际仅执行 1 次，1/1 已用完，不再自动请求。该记录与 .env/key 均不提交。
+- 成本：按 [DeepSeek 官方价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/) 的高峰输入未命中 2 CNY/百万 tokens、输出 8 CNY/百万 tokens，保守估算上限为 `(16*2 + 1*8)/1000000 = 0.00004 CNY`，低于用户授权 5 CNY。不是账户实际扣款回执；未额外调用账单或余额 API。
+- 验证边界：已验证这份本地 DeepSeek 配置的单次真实流式连接、正常结束、usage 解析和资源关闭；不代表 RAG/聊天页面已完成，不代表质量、吞吐或生产部署验收。017 仍须验证最终部署使用的模型配置。
