@@ -27,7 +27,7 @@
 - [x] 实现连接/读取超时和上游取消；已向用户输出内容后不做透明全量重试，防止文本和计费重复。
 - [x] 实现模型配置白名单与凭据脱敏；错误信息允许定位故障，但不得记录 Authorization 或原始密钥。
 - [x] 执行假服务全场景验证；若已取得用户 API 配置则提前做短真实调用并记录模型、日期、耗时、usage 和结果，否则明确记录“真实云连接未验证，由 017 发布前完成”，不保存密钥。
-- [ ] 独立评审资源释放、异常映射和真实/假服务证据；更新记录并提交 `in_review`，按 WORKFLOW 合并收尾。
+- [x] 独立评审资源释放、异常映射和真实/假服务证据；更新记录并提交 `in_review`，按 WORKFLOW 合并收尾。
 
 ## 验收与测试场景
 
@@ -65,4 +65,8 @@ uv run ruff check .
 - 调试记录：现有 HTTP 客户端 EventSource 使用异步迭代协议；纠正调用名。Windows Proactor 假 TCP 服务在 peer reset 后触发 WinError 10054 并卡在 server.wait_closed；用独立诊断复现后，Windows 测试选择 Selector 事件循环，应用运行逻辑不变。取消/关闭连接断言保留，未改为返回假结果。
 - 依赖：仅把已锁定的 httpx2 从 dev 提升为运行依赖，未升级版本；SSE 解析复用该库的公开 EventSource，避免重复实现协议解析器。
 - 真实云联调：按用户最新指令延后，调用次数 0、模型费用 0；真实 endpoint/model/usage/耗时均没有验证结果。待用户明确开始后读取本地配置并在其预算内执行，最晚 017 发布前完成。
-- 首轮完整验收：2026-09-23 Windows，Node 24.11.0、Python 3.12.14、uv 0.12.17；执行 node scripts/dev.mjs check，exit 0，144 pytest + 33 Vitest + 15 Playwright，全量静态检查、构建、两次迁移通过。现有 Starlette 弃用和 Node DEP0190 提示保留。独立评审待执行。
+- 首轮完整验收：2026-09-23 Windows，Node 24.11.0、Python 3.12.14、uv 0.12.17；执行 node scripts/dev.mjs check，exit 0，144 pytest + 33 Vitest + 15 Playwright，全量静态检查、构建、两次迁移通过。现有 Starlette 弃用和 Node DEP0190 提示保留。后续评审及最终验证见下。
+
+- 独立评审：对 0dcff3b..681a313 的只读评审发现损坏 gzip 解码未统一映射、异常 URL 的解析器校验差异。后者同样影响统一错误边界，因此一并按必须修复处理。新增 3 个场景先 3 failed，再修复到 47 provider tests passed；没有剩余未处理评审发现。评审未涉及真实云连接和账户预算，按用户指令保留未验证。
+- 最终代码验收提交：2b5ef97a604d18302dad05eb36aa05a7f65befe0；2026-09-23 执行 node scripts/dev.mjs check，exit 0，147 pytest + 33 Vitest + 15 Playwright；Ruff、前端静态检查/构建与两次 Alembic 升级通过。代码树与此已验证提交一致；此后的任务记录更新按纯文档检查。
+- 文档和入口：3 份 Markdown 相对链接、git diff --check 通过；不带 --run 执行 smoke 入口确认没有请求，也不读取模型配置。云端 CI 未触发，按本地验收规则完成合并门槛。
