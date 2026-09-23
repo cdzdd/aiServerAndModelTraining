@@ -93,7 +93,7 @@ Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,tex
 
 Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temperature: float) -> AsyncIterator[LLMDelta]`。异步生成器，不接收数据库会话或用户权限。实现 `MockProvider`、`CloudProvider`、`OllamaProvider`，由配置选择。统一超时/取消、429/5xx、无有效输出处理；不把不同协议的错误内容直接展示给用户。
 
-首版CloudProvider固定实现 **OpenAI-compatible Chat Completions文字流协议**，不要求用户购买特定厂商服务。`MODEL_BASE_URL`包括版本路径（例如`https://example.invalid/v1`），后端POST到其`/chat/completions`，Bearer认证；请求字段为`model,messages,stream:true,max_tokens,temperature`。首个真实提供商须支持此公共子集；若选定模型只支持其他上限字段/协议，在004接入时明确适配并补契约测试，不猜测兼容。返回按SSE `data:`行解码JSON，读取`choices[0].delta.content`、`finish_reason`，以`data: [DONE]`识别完整流结束；空role片段不产生文本，存在usage的末尾空choices块也应能处理。usage未提供则记录null，不伪造计费用量。不发送工具调用/图像请求，不展示提供商的推理过程字段。协议参考[Chat Completions官方结构](https://developers.openai.com/api/reference/resources/chat)。
+首版CloudProvider固定实现 **OpenAI-compatible Chat Completions文字流协议**，不要求用户购买特定厂商服务。`MODEL_BASE_URL`包括版本路径（例如`https://example.invalid/v1`），后端POST到其`/chat/completions`，Bearer认证；请求字段为`model,messages,stream:true,max_tokens,temperature`。首个真实提供商须支持此公共子集；若选定模型只支持其他上限字段/协议，在004接入时明确适配并补契约测试，不猜测兼容。返回按SSE `data:`行解码JSON，读取`choices[0].delta.content`、`finish_reason`，以`data: [DONE]`识别完整流结束；空role片段不产生文本，存在usage的末尾空choices块也应能处理。usage未提供则记录null，不伪造计费用量。不发送工具调用/图像请求，不展示提供商的推理过程字段。为已选定的 DeepSeek 模型增加显式后端配置 `MODEL_DISABLE_THINKING=true`，仅启用时额外发送 `thinking: {type: "disabled"}`；默认 false 保持公共子集。协议参考[Chat Completions官方结构](https://developers.openai.com/api/reference/resources/chat)。
 
 004的假HTTP服务固定覆盖此协议：中文UTF-8跨网络块、SSE事件跨块、空delta、usage块、DONE、错误状态和未完整结束即断连。收到length/content_filter等终止原因时明确向调用方暴露，不能把截断/过滤内容当作正常完整答案。Ollama在014实现自身HTTP协议到同一内部类型的转换。
 
@@ -103,7 +103,7 @@ Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temper
 
 文本片段只有 text；只在 `[DONE]` 后发出一个 text 为空、finish_reason 非空的终止片段，usage 附在该片段上。`stop` 表示完整，`length/content_filter` 需业务层明确处理；缺少 DONE、协议无效或空白 stop 抛出 `ProviderError`。错误 code 及含义见模块说明，不透传厂商错误体。上游资源在终止片段前关闭；消费方提前退出须使用 `contextlib.aclosing`，任务取消保留 CancelledError。连接/读取超时分别配置，无透明重试。
 
-本任务无对外代理 API；真实云连接尚未验证，用户要求另行通知后再执行受控 smoke。该状态不阻塞 Mock/协议验收，真实验证最晚由 017 发布前完成。
+本任务无对外代理 API；真实云连接按用户明确授权执行受控 smoke，当前提供商与结果见 [todo-004](tasks/todo-004.md) 最新工作记录。单次成功不替代 017 发布前对实际部署配置的真实验收。
 Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: int = 5) -> list[SearchHit]`，异步调用。内部重新验证权限；空授权集合返回空候选，不能退化为全库。初期 score 是余弦相似度；混合检索后类型/含义变化必须更新评测与阈值，不能视为同一概率。
 
 RAG 接口：`stream_answer(actor: Actor, kb_ids: list[UUID], question: str, history: list[LLMMessage]) -> AsyncIterator[AnswerEvent]`。不依赖 Conversation ORM；由 chat 提供已过滤的历史，由 retrieval 验证知识范围。todo-008 可以在 todo-009 尚未开发时独立测试。
