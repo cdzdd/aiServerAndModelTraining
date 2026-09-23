@@ -27,6 +27,8 @@ class CloudProvider:
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
+        if settings.model_disable_thinking:
+            payload["thinking"] = {"type": "disabled"}
         finish_reason = None
         usage = None
         has_text = False

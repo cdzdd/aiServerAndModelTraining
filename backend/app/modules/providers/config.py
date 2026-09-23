@@ -17,6 +17,7 @@ class ModelSettings(BaseSettings):
         populate_by_name=True,
     )
     model_provider: Literal["mock", "cloud"] = "mock"
+    model_disable_thinking: bool = False
     model_base_url: str = ""
     model_id: str = ""
     model_api_key: SecretStr = SecretStr("")

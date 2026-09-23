@@ -157,3 +157,13 @@ async def test_smoke_makes_one_bounded_call_and_returns_only_summary(provider_ap
     assert summary["text_characters"] == 2
     assert summary["elapsed_seconds"] >= 0
     assert "fake-secret" not in str(summary)
+
+async def test_explicit_disable_thinking_is_sent_without_changing_shared_request_contract(
+    make_provider, messages
+):
+    async with cloud_server([event("你好"), event(finish="stop"), DONE]) as (url, requests, _):
+        result = await collect(make_provider(url, model_disable_thinking=True), messages)
+    assert requests[0][2]["thinking"] == {"type": "disabled"}
+    assert requests[0][2]["max_tokens"] == 32
+    assert requests[0][2]["messages"] == [{"role": "user", "content": "你好"}]
+    assert result[-1].finish_reason == "stop"
