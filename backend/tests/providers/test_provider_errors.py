@@ -168,3 +168,30 @@ async def test_factory_environment_errors_do_not_echo_secrets(provider_api, monk
         provider_api["factory"].create_provider()
     assert error.value.code == "PROVIDER_CONFIG_ERROR"
     assert "fake-secret-never-log" not in "".join(traceback.format_exception(error.value))
+
+
+async def test_corrupt_compression_is_a_sanitized_protocol_error(
+    make_provider, messages, provider_api, caplog
+):
+    async with cloud_server([b"not-gzip fake-secret-never-log"], content_encoding="gzip") as (
+        url,
+        requests,
+        _,
+    ):
+        with pytest.raises(provider_api["errors"].ProviderError) as error:
+            await collect(make_provider(url), messages)
+    assert error.value.code == "PROVIDER_PROTOCOL_ERROR"
+    assert (
+        "fake-secret-never-log"
+        not in "".join(traceback.format_exception(error.value)) + caplog.text
+    )
+    assert len(requests) == 1
+
+
+@pytest.mark.parametrize("bad_url", ["https://example.invalid/v1\n", "https://☃.example/v1"])
+async def test_client_invalid_urls_fail_during_configuration(bad_url, make_provider):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as error:
+        make_provider(bad_url)
+    assert bad_url not in str(error.value)

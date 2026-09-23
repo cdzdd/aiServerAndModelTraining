@@ -1,6 +1,7 @@
 from typing import Literal
 from urllib.parse import urlsplit
 
+from httpx2 import URL, InvalidURL
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,20 +30,19 @@ class ModelSettings(BaseSettings):
         if self.model_provider == "mock":
             return self
         try:
-            parsed = urlsplit(self.model_base_url)
+            urlsplit(self.model_base_url)  # Reject malformed bracket syntax too.
+            parsed = URL(self.model_base_url)
             _ = parsed.port
-        except ValueError:
+        except (ValueError, InvalidURL):
             raise ValueError("MODEL_BASE_URL is invalid") from None
         if (
-            not parsed.hostname
+            not parsed.host
             or parsed.username
             or parsed.password
             or parsed.query
             or parsed.fragment
             or parsed.scheme not in ("https", "http")
-            or (
-                parsed.scheme == "http" and parsed.hostname not in ("127.0.0.1", "localhost", "::1")
-            )
+            or (parsed.scheme == "http" and parsed.host not in ("127.0.0.1", "localhost", "::1"))
         ):
             raise ValueError(
                 "MODEL_BASE_URL must be HTTPS (HTTP only for loopback), without secrets"

@@ -11,11 +11,13 @@ from app.modules.providers.factory import create_provider
 from app.modules.providers.schemas import LLMMessage
 
 provider = create_provider()
-async with aclosing(provider.stream(
-    [LLMMessage(role="user", content="你好")],
-    max_tokens=128,
-    temperature=0.2,
-)) as stream:
+async with aclosing(
+    provider.stream(
+        [LLMMessage(role="user", content="你好")],
+        max_tokens=128,
+        temperature=0.2,
+    )
+) as stream:
     async for delta in stream:
         # text 是新增文本；finish_reason 非空的事件是唯一终止事件。
         # 调用者自行持久化文本、处理截断/过滤、转换为业务 SSE。

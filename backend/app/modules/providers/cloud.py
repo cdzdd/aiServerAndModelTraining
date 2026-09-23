@@ -99,7 +99,7 @@ class CloudProvider:
                         raise ProviderError("PROVIDER_STREAM_INTERRUPTED")
         except httpx.TimeoutException:
             raise ProviderError("PROVIDER_TIMEOUT") from None
-        except httpx.SSEError:
+        except (httpx.SSEError, httpx.DecodingError):
             raise ProviderError("PROVIDER_PROTOCOL_ERROR") from None
         except httpx.TransportError:
             code = "PROVIDER_STREAM_INTERRUPTED" if has_text else "PROVIDER_UNAVAILABLE"

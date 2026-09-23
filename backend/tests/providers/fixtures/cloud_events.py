@@ -22,7 +22,9 @@ DONE = b"data: [DONE]\r\n\r\n"
 
 
 @asynccontextmanager
-async def cloud_server(parts=(), *, status=200, hold=False, delay_headers=0, content_type=None):
+async def cloud_server(
+    parts=(), *, status=200, hold=False, delay_headers=0, content_type=None, content_encoding=None
+):
     requests = []
     closed = asyncio.Event()
     tasks = set()
@@ -39,9 +41,13 @@ async def cloud_server(parts=(), *, status=200, hold=False, delay_headers=0, con
             requests.append((lines[0], headers, json.loads(body)))
             await asyncio.sleep(delay_headers)
             media = content_type or "text/event-stream"
+            encoding = f"Content-Encoding: {content_encoding}\r\n" if content_encoding else ""
             writer.write(
-                f"HTTP/1.1 {status} Test\r\nContent-Type: {media}\r\n"
-                "Transfer-Encoding: chunked\r\n\r\n".encode()
+                (
+                    f"HTTP/1.1 {status} Test\r\nContent-Type: {media}\r\n"
+                    + encoding
+                    + "Transfer-Encoding: chunked\r\n\r\n"
+                ).encode()
             )
             await writer.drain()
             for part in parts:
