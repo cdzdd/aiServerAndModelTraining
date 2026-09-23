@@ -7,6 +7,7 @@ dependencies = [
   "alembic>=1.16,<2",
   "argon2-cffi>=25.1,<26",
   "fastapi>=0.115,<1",
+  "httpx2>=2.0,<3",
   "psycopg[binary]>=3.2,<4",
   "pydantic-settings>=2.9,<3",
   "sqlalchemy>=2.0,<2.1",
@@ -15,7 +16,6 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "httpx2>=2.0,<3",
   "pytest>=8.3,<10",
   "python-dotenv>=1.2,<2",
   "ruff>=0.11,<1",
