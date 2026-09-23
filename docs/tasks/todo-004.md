@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-004 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-001 |
 | 并行可行性 | 可与 002、003 并行；仅在 provider 目录实现，不提前修改 RAG 或聊天状态机 |
 | 负责目录 | `backend/app/modules/providers/`、provider 测试、配置示例 |
@@ -70,3 +70,11 @@ uv run ruff check .
 - 独立评审：对 0dcff3b..681a313 的只读评审发现损坏 gzip 解码未统一映射、异常 URL 的解析器校验差异。后者同样影响统一错误边界，因此一并按必须修复处理。新增 3 个场景先 3 failed，再修复到 47 provider tests passed；没有剩余未处理评审发现。评审未涉及真实云连接和账户预算，按用户指令保留未验证。
 - 最终代码验收提交：2b5ef97a604d18302dad05eb36aa05a7f65befe0；2026-09-23 执行 node scripts/dev.mjs check，exit 0，147 pytest + 33 Vitest + 15 Playwright；Ruff、前端静态检查/构建与两次 Alembic 升级通过。代码树与此已验证提交一致；此后的任务记录更新按纯文档检查。
 - 文档和入口：3 份 Markdown 相对链接、git diff --check 通过；不带 --run 执行 smoke 入口确认没有请求，也不读取模型配置。云端 CI 未触发，按本地验收规则完成合并门槛。
+
+## 合并与收尾
+
+- 功能 PR [#7](https://github.com/cdzdd/aiServerAndModelTraining/pull/7) 于 `2026-09-23T05:51:24Z` 实际 MERGED，普通 squash 合并 SHA：`c89788de30cd5b7debab4494d2b61d961cbc4e65`。
+- 已合并 PR head 为 `af20ba69c21982c1818c7fc34be0d1256f3bbcdf`；代码验收提交为 `2b5ef97`（完整 SHA 见上方最终代码验收记录），之后仅更新任务文档。功能合并后的整个文件树与 PR head 完全一致，`git diff --exit-code` exit 0。
+- 合并前重新确认本地工作区干净、PR head 与本地 HEAD 一致、main 无新变化；GitHub main 未设置保护且 rulesets 为空，无必要审批或强制 check。未创建虚假 check、未使用管理员绕过、未直接推送 main。
+- 本收尾分支 `docs/todo-004-close` 从真实 `origin/main` 创建，仅更新此任务的状态与合并证据；静态核对 Markdown 链接、diff 和 PR 事实。此 PR 合入后权威 main 上状态为 done，无需再创建记录自身的 PR。
+- 本地独立 worktree、忽略的模型配置模板与验证日志保留供后续真实联调。用户明确要求等待另行开始指令，因此真实云连接未验证；本次调用次数 0，未产生模型费用。真实云联调仍是 todo-017 发布前必要验收，不能据本任务 done 宣称真实模型已可用。
