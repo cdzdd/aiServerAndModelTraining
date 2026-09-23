@@ -97,6 +97,13 @@ Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temper
 
 004的假HTTP服务固定覆盖此协议：中文UTF-8跨网络块、SSE事件跨块、空delta、usage块、DONE、错误状态和未完整结束即断连。收到length/content_filter等终止原因时明确向调用方暴露，不能把截断/过滤内容当作正常完整答案。Ollama在014实现自身HTTP协议到同一内部类型的转换。
 
+### 004 已实现接入细则
+
+接口、配置与取消示例见 [providers/README](../backend/app/modules/providers/README.md)。`create_provider()` 默认选择 Mock；云模型 ID 必须在服务端 `MODEL_ALLOWED_IDS` 中，key 为后端 `MODEL_API_KEY`。`LLMDelta.usage` 为可空 `LLMUsage(prompt_tokens?, completion_tokens?, total_tokens?)`，只保留上游数值，不估算。
+
+文本片段只有 text；只在 `[DONE]` 后发出一个 text 为空、finish_reason 非空的终止片段，usage 附在该片段上。`stop` 表示完整，`length/content_filter` 需业务层明确处理；缺少 DONE、协议无效或空白 stop 抛出 `ProviderError`。错误 code 及含义见模块说明，不透传厂商错误体。上游资源在终止片段前关闭；消费方提前退出须使用 `contextlib.aclosing`，任务取消保留 CancelledError。连接/读取超时分别配置，无透明重试。
+
+本任务无对外代理 API；真实云连接尚未验证，用户要求另行通知后再执行受控 smoke。该状态不阻塞 Mock/协议验收，真实验证最晚由 017 发布前完成。
 Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: int = 5) -> list[SearchHit]`，异步调用。内部重新验证权限；空授权集合返回空候选，不能退化为全库。初期 score 是余弦相似度；混合检索后类型/含义变化必须更新评测与阈值，不能视为同一概率。
 
 RAG 接口：`stream_answer(actor: Actor, kb_ids: list[UUID], question: str, history: list[LLMMessage]) -> AsyncIterator[AnswerEvent]`。不依赖 Conversation ORM；由 chat 提供已过滤的历史，由 retrieval 验证知识范围。todo-008 可以在 todo-009 尚未开发时独立测试。
