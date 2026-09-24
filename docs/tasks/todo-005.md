@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-005 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-002、todo-003 |
 | 并行可行性 | 可与 016 并行；本任务拥有知识模型和对应迁移，部署任务不得并行修改这些结构 |
 | 负责目录 | `backend/app/modules/knowledge/`、`frontend/src/features/knowledge/`、知识库迁移与测试 |
@@ -61,6 +61,9 @@ npm run test:e2e -- e2e/knowledge.spec.ts
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未实施；权限或联调测试未执行。
+- 2026-09-24（UTC）接手：已读取 AGENTS、README、任务索引、WORKFLOW、架构与契约；fetch 后确认权威 `origin/main` 为 `0c346150f572dfa524a8f55a1b4d04adf0812fa4`，前置 todo-002、003 均已合并并收尾为 done，主工作区干净。
+- 已通过 Git common directory 的协调记录原子领取；负责人为本次 Codex 接手对话。原生独立 worktree：`C:/Users/Administrator/.codex/worktrees/todo-005-knowledge/aiSoftwareAttempt`；功能分支：`feat/todo-005-knowledge`。
+- 环境预检：Node 24.11.0、uv 0.12.17、Docker Engine 29.8.0 可用，GitHub CLI 已认证且 fetch 成功。初次沙箱限制导致的访问失败已在授权后复核；尚未完成本 worktree 的依赖安装、数据库隔离与 Python 3.12 验证。
+- 开发依据：仅管理员管理知识库、成员和 FAQ；user/agent 只读获授权内容；撤权即时生效，FAQ 变更递增版本并显示待索引。默认使用明确标注为虚构的校园服务样例；真实分类、资料和成员名单可后续提供，不阻塞功能开发验收。
+- 本次为用户要求的阶段性进度提交：尚未实现业务代码，未运行本任务测试、独立评审或 PR 合并。下一步准备隔离环境，先建立权限与 FAQ 行为失败测试，再实现并按本地验收规范完成评审、功能 PR 和独立状态收尾 PR。
 - 满足 [WORKFLOW](../WORKFLOW.md) 后任务分支置 `in_review`；合入权威 main 且检查通过，才统一更新 `done`。
