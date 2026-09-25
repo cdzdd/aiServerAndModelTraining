@@ -22,6 +22,17 @@ async function api(page:Page,path:string,method='GET',body?:unknown) {
   },{path,method,body})
 }
 
+async function findKnowledge(page:Page,name:string) {
+  await expect(page.getByRole('button',{name:'刷新列表'})).toBeEnabled()
+  const link=page.getByRole('link',{name,exact:true})
+  while(!(await link.count())) {
+    const next=page.getByRole('button',{name:'下一页',exact:true})
+    await expect(next).toBeEnabled()
+    await next.click()
+    await expect(page.getByRole('button',{name:'刷新列表'})).toBeEnabled()
+  }
+  await expect(link).toBeVisible()
+}
 test('administrator manages FAQ and membership; user and agent sessions obey revocation immediately',async({page,browser})=>{
   const users=accounts()
   const readerContext=await browser.newContext(), agentContext=await browser.newContext()
@@ -34,7 +45,7 @@ test('administrator manages FAQ and membership; user and agent sessions obey rev
     await page.getByLabel('知识库名称',{exact:true}).fill(name)
     await page.getByLabel('知识库说明').fill('验收合成资料')
     await page.getByRole('button',{name:'创建知识库',exact:true}).click()
-    await expect(page.getByRole('link',{name,exact:true})).toBeVisible()
+    await findKnowledge(page,name)
     await page.getByRole('link',{name,exact:true}).click()
     await expect(page).toHaveURL(/\/knowledge\/[0-9a-f-]{36}$/)
     const kbId=page.url().split('/').at(-1)!
@@ -104,6 +115,7 @@ test('disabled library can be restored; FAQ text is escaped on a narrow screen',
   await expect(page.getByText('<img src=x onerror=alert(1)>',{exact:true})).toBeVisible()
   await expect(page.locator('main img')).toHaveCount(0)
   await page.goto('/knowledge')
+  await findKnowledge(page,name)
   const row=page.getByRole('row').filter({has:page.getByRole('link',{name,exact:true})})
   await row.getByRole('button',{name:'停用知识库'}).click()
   await expect(page.getByRole('row').filter({hasText:name}).getByText('已停用')).toBeVisible()

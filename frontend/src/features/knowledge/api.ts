@@ -30,4 +30,3 @@ export function disableFaq(id:string) {return request<void>('/faqs/'+encodeURICo
 export function indexLabel(faq:Faq) {
   return !faq.is_active?'已停用':faq.indexed_version===faq.version?'索引版本一致':'待索引'
 }
-

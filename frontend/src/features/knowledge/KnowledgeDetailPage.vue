@@ -63,4 +63,3 @@ watch(()=>route.params.id,()=>{message.value='';saving.value=false;void load()},
 .page-heading{margin-top:26px;overflow-wrap:anywhere}.faq-list{margin-top:24px}.faq-card{margin:16px 0}.faq-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.faq-heading h2{overflow-wrap:anywhere;min-width:0}.status-tag{flex-shrink:0}.answer{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:500px){.faq-heading{flex-direction:column}}
 </style>
-

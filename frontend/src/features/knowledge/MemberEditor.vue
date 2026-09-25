@@ -46,4 +46,3 @@ onMounted(initialize)
     <div class="actions"><ElButton :disabled="saving || loading" @click="initialize">重新加载成员</ElButton><ElButton :disabled="saving" @click="emit('cancel')">取消</ElButton></div>
   </section>
 </template>
-
