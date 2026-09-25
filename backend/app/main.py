@@ -20,6 +20,7 @@ from app.core.security import AuthError
 from app.modules.auth.limits import LoginLimiter
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import check_csrf
+from app.modules.knowledge.router import router as knowledge_router
 
 request_logger = logging.getLogger("app.requests")
 
@@ -53,6 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_entries=settings.login_max_entries,
     )
     app.include_router(auth_router)
+    app.include_router(knowledge_router)
 
     @app.exception_handler(AuthError)
     async def auth_error(request: Request, exc: AuthError):
@@ -78,7 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception:
             response = error_response(request, 500, "INTERNAL_ERROR", "服务暂时不可用")
         response.headers["X-Request-ID"] = request_id
-        if request.url.path.startswith(("/api/v1/auth/", "/api/v1/admin/")):
+        if request.url.path.startswith("/api/v1/"):
             response.headers["Cache-Control"] = "no-store"
         route = request.scope.get("route")
         request_logger.info(
