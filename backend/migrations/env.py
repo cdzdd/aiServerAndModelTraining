@@ -4,6 +4,7 @@ from app.core.config import Settings
 from app.core.database import create_db_engine
 from app.core.models import Base
 from app.modules.auth import models  # noqa: F401
+from app.modules.knowledge import models as knowledge_models  # noqa: F401
 
 config = context.config
 

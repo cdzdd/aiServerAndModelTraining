@@ -27,9 +27,9 @@ async function logout() {
         <RouterLink :to="homeFor(session.state.user.role)">{{ session.state.user.role==='user' ? '我的服务' : session.state.user.role==='agent' ? '客服工作台' : '管理概览' }}</RouterLink>
         <RouterLink v-if="session.state.user.role==='admin'" to="/admin/users">用户管理</RouterLink>
         <RouterLink to="/status">服务连接</RouterLink>
+        <RouterLink to="/knowledge">知识库</RouterLink>
       </nav>
       <main class="workspace"><p v-if="error" role="alert" class="error">{{ error }}</p><RouterView /></main>
     </div>
   </div>
 </template>
-

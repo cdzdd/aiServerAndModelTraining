@@ -10,6 +10,5 @@ const titles={user:'我的服务',agent:'客服工作台',admin:'管理概览'}
     <template v-if="role==='admin'"><h2>账号与访问</h2><p class="muted">查看用户账号，管理角色与启用状态。</p><RouterLink class="text-action" to="/admin/users">管理用户 →</RouterLink></template>
     <template v-else><h2>{{ role==='agent' ? '等待服务接入' : '欢迎来到服务中心' }}</h2><p class="muted">{{ role==='agent' ? '人工接单功能尚未开放。' : '知识问答与会话记录尚未开放。' }}</p></template>
   </section>
-  <section class="upcoming"><h2>后续服务</h2><p>知识库、会话、反馈和统计将在对应功能完成后开放。</p></section>
+  <section class="upcoming"><h2>知识与服务</h2><RouterLink to="/knowledge">浏览知识库与常见问题 →</RouterLink><p>会话、反馈和统计将在对应功能完成后开放。</p></section>
 </template>
-

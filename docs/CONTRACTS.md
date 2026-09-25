@@ -68,6 +68,16 @@ Document：`id,kb_id,filename,status,active_revision_id,created_at`。status=`up
 
 上传响应 202 `{document_id,job_id,status:"uploaded"}`。FAQ 未建好索引仍可在后台维护，但不能误报可检索。
 
+### 005 已实现接入细则
+
+详见 [knowledge/README](../backend/app/modules/knowledge/README.md)。新增 GET `/knowledge-bases/{id}` 返回可读且启用的知识库摘要；GET `/knowledge-bases/{id}/members` 仅管理员可用，返回 `{user_ids,version}`。GET `/admin/knowledge-bases` 为管理员分页列出所有知识库元信息（含停用），用于恢复；普通列表和详情仍对所有角色排除停用库。
+
+POST 知识库接受 `{name,description?,visibility?}`（默认 restricted），POST FAQ 接受 `{question,answer,is_active?}`（默认 true），返回 201 摘要。PATCH 知识库/FAQ 必须带 `expected_version` 和非空修改字段子集，版本不符 409；成功递增 version。知识库 name 1–100、description 0–2000，FAQ question 1–500、answer 1–10000 字符，文本去首尾空白并拒绝无效 Unicode/NUL。额外字段、null 修改值和非严格布尔值返回 422。成员最多 1000 个不同且存在的用户 UUID。
+
+FAQ 列表按全局格式分页；user/agent 仅见启用项，管理员可见同库停用项。DELETE FAQ 返回 204 并软停用，重复停用无额外版本变更；PATCH 可重新启用。知识库通过 PATCH is_active 停用/恢复，无物理删除接口。停用知识库后所有角色的普通详情/FAQ 请求返回 404。所有知识接口返回 no-store。
+
+内部查询 `readable_knowledge_bases(actor)` 和 `effective_faqs(actor,kb_ids)` 位于 knowledge.service，返回 SQLAlchemy SELECT。后者严格执行当前知识库权限、启用状态及 FAQ 版本一致条件，空范围为空结果；007 仍须联接真实且匹配版本的 Chunk。FAQ 初始 indexed_version=null，005 不伪造索引完成。
+
 IngestionJob：`id,kind,document_id?,faq_id?,revision_id?,state,attempts,lease_until,error_code,created_at,finished_at`。kind=`parse|index`，document_id/faq_id恰好一个存在，parse只用于文档。state=`queued|running|succeeded|failed`。领任务必须原子；失败码区分超限、格式错误、无文本、解析超时、向量模型失败。测试覆盖 worker 退出后恢复。
 
 006的parse worker只领取kind=parse：成功保存候选revision和chunks，置文档parsed，完成parse job，并在同一事务创建kind=index的queued任务。007增加index handler消费它。新候选版本即使尚不是active，也必须能够建索引；只有索引全部成功才原子更新active_revision_id并置ready。替换期间旧active版本仍可查询，候选版本不参与查询。新版本失败不改变旧active；界面分别显示当前有效版本和新版本处理状态。006独立交付时停在明确的待索引状态，不把入库全链路误标完成。
