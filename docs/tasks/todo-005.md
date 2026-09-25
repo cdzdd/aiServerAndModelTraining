@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-005 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-002、todo-003 |
 | 并行可行性 | 可与 016 并行；本任务拥有知识模型和对应迁移，部署任务不得并行修改这些结构 |
 | 负责目录 | `backend/app/modules/knowledge/`、`frontend/src/features/knowledge/`、知识库迁移与测试 |
@@ -99,3 +99,10 @@ npm run test:e2e -- e2e/knowledge.spec.ts
 - `uv run --directory backend --frozen alembic heads`：单一 `005_knowledge`；相对 Markdown 链接、`git diff --check origin/main...HEAD` 与新增文件秘密扫描通过。
 - 独立评审的唯一 Important 已经失败→通过回归及完整套件复核，无未解决的合并阻塞。无延期 Minor。此前记录的管理员停用库管理入口、FAQ expected_version 两项接口细化已同步契约。
 - 后续证据提交仅修改任务记录；复用上述代码验收并检查文档事实、链接与 diff。云端 CI 未运行。此时仍为 in_review，PR 与真实合并结果在合并后补录。
+### 功能合并与状态收尾（2026-09-25）
+
+- 功能 PR [#11](https://github.com/cdzdd/aiServerAndModelTraining/pull/11) 已于 **2026-09-25T08:15:26Z** 实际 MERGED，普通 squash 合并 SHA：`3b46f90f6ef0ffe7ab1aa080004addb2b1ec3333`。
+- 已 fetch 并以 `git diff --exit-code 3b7b3df7f1c6c51de4d3d0a91f18de2d78c10600 origin/main` 核对功能合并树与已验收 PR 头完全一致。PR 头相对最终代码验收提交 `ab77ad850e977bb9e0e7ad33339a4d88eaefef20` 只有本任务证据文档变化。
+- 合并前核实 main protected=false、rulesets=[]、PR CLEAN，无服务端强制审批/检查；未使用管理员绕过、伪造 check 或恢复云端 CI。
+- 基于功能合并后的 origin/main 创建 `docs/todo-005-close`；本次仅更新此任务文件。**本 done 状态随独立收尾 PR 合入权威 main 后生效**，不再创建记录收尾 PR 自身的额外 PR。
+- 本地验收、独立评审及唯一重要问题修复已完成，无未解决合并阻塞。真实业务资料/名单仍待正式使用前由管理者核对；上传、真实索引、生产部署不在 005 范围内。原生 worktree 和本地验证日志保留。
