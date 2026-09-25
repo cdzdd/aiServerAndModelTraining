@@ -91,3 +91,11 @@ npm run test:e2e -- e2e/knowledge.spec.ts
 - 评审范围：`0c346150f572dfa524a8f55a1b4d04adf0812fa4..1470f48e90f86badb00da9224433800bbf114e27`，独立只读评审者 `review_todo005`。无 Critical 或 Minor；一项 Important：E2E 假定新知识库在第一页，历史样例累积后会误失败。
 - 已在本任务 DB 15437/qa_dev 中建立 21 个精确记录 ID 的临时前置排序样例；旧测试真实失败 2 项（目标不在第一页），修复分页定位后相同环境 2 项通过。未改变业务权限或放宽断言。临时样例仅按其精确 ID 清理，不删除其他数据。
 - 评审未发现权限、并发版本或迁移方面的合并阻塞；排除的上传、向量/索引、真实生产容量与授权名单、云端 CI 均属于已批准的后续范围或外部条件，不宣称完成。最终完整检查仍需对应修复后的提交。
+
+### 最终验收证据（2026-09-25）
+
+- 已验证代码提交：`ab77ad850e977bb9e0e7ad33339a4d88eaefef20`。Windows、Node 24.11.0、Python 3.12.14、uv 0.12.17、Docker Engine 29.8.0，本任务独立 PostgreSQL/pgvector。
+- `node scripts/dev.mjs check` exit 0，日志 `.local/final-check.log`：Ruff、**181 pytest + 37 Vitest + 17 Playwright**、两次迁移升级、ESLint、vue-tsc、Vite build 全通过。仍带 21 个前置排序临时样例运行完整套件，验证分页修复；之后校验精确 ID、名称、说明和无关联内容，仅清理这 21 个空样例，保留其他数据。
+- `uv run --directory backend --frozen alembic heads`：单一 `005_knowledge`；相对 Markdown 链接、`git diff --check origin/main...HEAD` 与新增文件秘密扫描通过。
+- 独立评审的唯一 Important 已经失败→通过回归及完整套件复核，无未解决的合并阻塞。无延期 Minor。此前记录的管理员停用库管理入口、FAQ expected_version 两项接口细化已同步契约。
+- 后续证据提交仅修改任务记录；复用上述代码验收并检查文档事实、链接与 diff。云端 CI 未运行。此时仍为 in_review，PR 与真实合并结果在合并后补录。
