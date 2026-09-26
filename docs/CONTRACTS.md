@@ -181,7 +181,23 @@ data: {"answer_status":"answered","evidence_level":"sufficient","intent":"knowle
 
 最终提交答案前再次检查会话未转人工/关闭、仍持有生成权；否则保存 cancelled，避免机器人和客服同时回答。
 
-初始模型调用限额由009实现：每用户10次/分钟、60次/业务自然日，全局最多2个正在生成、每会话最多1个；超限429或会话冲突409。接受请求时原子登记用量，重复client_message_id不重复登记，已向模型发起但失败/取消的请求仍计入次数；日计数存数据库，避免重启绕过。基础部署固定1个API进程，全局并发由该进程控制，扩多进程时必须先改成共享并发控制。用户问题最多2000字符；模型输出上限512 token，上游总超时60秒；提示词加历史按所选模型上下文上限裁剪。限额作为明确配置有默认值，在017按预算调整并记录。次数限额不等于准确货币账单，供应商usage与估算usage分开记录，云账号费用上限/告警由部署配置落实。
+初始模型调用限额由009实现：每用户10次/分钟、60次/业务自然日，全局最多2个正在生成、每会话最多1个；超限429或会话冲突409。以“接受的 RAG 请求”为单位原子预留一次，改写+回答两阶段仍算一次；重复 client_message_id、鉴权/状态/额度拒绝不计入，接受后的失败、取消及固定业务回复均计入且不退款；日计数存数据库，避免重启绕过。基础部署固定1个API进程，全局并发由该进程控制，扩多进程时必须先改成共享并发控制。用户问题最多2000字符；模型输出上限512 token，上游总超时60秒；提示词加历史按所选模型上下文上限裁剪。限额作为明确配置有默认值，在017按预算调整并记录。次数限额不等于准确货币账单，供应商usage与估算usage分开记录，云账号费用上限/告警由部署配置落实。
+
+### 009 已实现接入细则
+
+会话创建的 kb_ids 必须是 1–50 个不同且当前有权访问的知识库，创建后固定范围。content 去首尾空白后 1–2000 有效字符，拒绝 NUL 和无效 Unicode；client_message_id 为 UUID。列表与历史返回 `{items,total,page,page_size}`，默认 50、最多 100；会话按最近更新排序，历史按创建时间/ID 正序，page=1 为最早消息。正文与引用均以文本呈现，不执行 HTML。
+
+任意有效角色可以创建和使用自己的 bot 会话；管理员可审阅/软删他人会话，不能代别人发起 AI 或发送文字。agent 可读自己的会话及分配给自己的人工会话；未接单不读取完整历史。owner 可在 queued/human 发送文字，接单 agent 仅在 human 回复，closed 只读。会话删除保留消息及用量记录。
+
+`Message` 另存 in_reply_to_id、generation_token、error_code、request_id。助手占位与用户消息、GenerationUsage 在同一事务写入后发 meta；只有最终提交成功才发 done。会话/消息生成令牌和数据库唯一约束防止迟到任务覆盖新请求。重复键返回 409/DUPLICATE_MESSAGE，error.details 带既有 user_message_id 和可空 assistant_message_id；历史查询不会重发模型请求。
+
+GenerationUsage 保留每次已接受请求的身份、会话、消息、UTC accepted_at/finished_at、outcome 和实际 prompt/completion/total_tokens；缺失 usage 字段为 null。`CHAT_REQUESTS_PER_MINUTE=10` 按滚动 60 秒，`CHAT_REQUESTS_PER_DAY=60` 按 Asia/Shanghai 自然日，`CHAT_GLOBAL_CONCURRENCY=2`，每会话最多一个生成。用户行锁串行预留，获锁后读取记账时间，已提交用量不会因时间顺序反转而漏计；重启不重置计数；这是请求配额，不是供应商调用数或金额。
+
+每个应用实例绑定自己的数据库、RAG 和运行中任务表。监听真实 HTTP 断连以取消仍在等待首段的上游，结束时保存 cancelled/failed。长流在每个可见事件和最终提交前重新检查登录会话、当前身份、会话模式/归属和令牌。启动恢复先将遗留 generating 标为 failed/PROCESS_RESTARTED；恢复失败时保留 /health/live，/health/ready 返回 503，聊天写入拒绝，修复数据库后重启服务。部署仅支持单 API 进程。
+
+历史引用按当前 Chunk、知识库权限、来源有效版本与原文再次核验，不执行 embedding。任一引用失效时，响应将整条助手正文替换为“该回答所依据的资料当前不可访问”，清空 citations 并标 evidence_hidden=true；数据库原文和终态仍保留，客户端此前已看到的内容不能撤回。送入 RAG 的历史排除隐藏/未完成/失败/取消轮次，仅保留有限完整 user/assistant 对。文档引用下载仍走现有每次鉴权的下载接口。
+
+内部 `chat.service.transition_mode(db, actor, conversation_id, expected_mode=..., next_mode=..., assigned_agent_id=..., request_id=...)` 是 010 复用的状态入口，flush 不 commit，由交接业务事务提交后调用 `app.state.chat_runtime.cancel(conversation_id)`。011 可复用 get_message 验归属，不能通过反馈接口绕过当前历史来源权限。
 
 ## 6. 人工客服（todo-010）
 

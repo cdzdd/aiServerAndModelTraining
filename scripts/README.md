@@ -105,3 +105,11 @@ uv run --frozen --directory backend pytest tests/rag/smoke_real_rag.py -q -s
 ```
 
 该专项默认不会被 pytest 收集。它使用临时数据库 schema、虚构资料、真实上传/解析/BGE/检索与 DeepSeek，覆盖引用、多轮、FAQ、资料内恶意指令、无依据、越权、超长查询和生成期间来源变化。输出 `.local/real-rag-smoke.json`，含实际调用次数、usage 和逐例延时。云服务测试需要调用授权；不要通过普通统一检查隐式触发。
+## 8. 聊天与会话恢复（todo-009）
+
+登录后从“问答”进入会话，选择可见知识库后提问。配置好 BGE 目录及已建立索引的资料才有真实检索；默认 Mock 不产生可信知识答案。云模型沿用服务器侧 MODEL_* 配置，不传给浏览器。请求限额按上一节契约的已接受 RAG 请求计数，包括取消/失败；默认每分钟 10、上海自然日 60，同会话 1 个、全局 2 个生成。
+
+服务仅运行一个 API 进程。启动时把上次遗留的生成中消息恢复为失败并保留历史/用量；恢复失败时 readiness 为 503，聊天写入不可用，修复数据库后重新启动。客户端停止或断网会取消上游；重新打开会话只取历史，不自动重试收费请求。
+
+`node scripts/dev.mjs check` 除既有浏览器套件外，串行运行独立聊天套件 `npm run test:e2e -- --config playwright.chat.config.ts`。该套件启动 tests/chat/e2e_app.py 测试工厂，只替换 RAG，认证/CSRF、数据库、会话接口与前端均走真实实现；正常应用没有测试开关。单跑时在 frontend 执行该命令，不能与同 worktree 默认套件同时占用端口。云 API 不由自动化检查触发。
+已授权真实云验证时，可复用第 7 节的 `RAG_SMOKE_CONFIG`，显式运行 `uv run --frozen --directory backend pytest tests/chat/smoke_real_chat.py -q -s`。它保留真实应用 RAG/检索与认证/聊天路由，完成上传解析、真实 BGE 索引、首问/追问、持久历史、重复键及撤权投影检查，输出 `.local/real-chat-smoke.json`。默认统一检查不收集此文件，不调用云模型。

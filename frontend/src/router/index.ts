@@ -20,6 +20,7 @@ const routes:RouteRecordRaw[]=[
     {path:'admin/users',component:()=>import('../features/users/UserListPage.vue'),meta:{roles:['admin']}},
     {path:'knowledge',component:()=>import('../features/knowledge/KnowledgeListPage.vue')},
     {path:'knowledge/:id',component:()=>import('../features/knowledge/KnowledgeDetailPage.vue')},
+    {path:'chat/:id?',component:()=>import('../features/chat/ChatPage.vue')},
   ]},
   {path:'/:pathMatch(.*)*',component:()=>import('../app/StatePage.vue'),props:{kind:'not-found'},meta:{public:true}},
 ]
