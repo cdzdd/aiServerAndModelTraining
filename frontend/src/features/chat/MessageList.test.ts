@@ -22,3 +22,14 @@ it('does not offer revoked citations or present cancelled output as complete',()
   expect(wrapper.text()).toContain('已取消')
   expect(wrapper.text()).toContain('该回答所依据的资料当前不可访问')
 })
+
+it('shows feedback only for owner-visible completed assistant replies',()=>{
+  const wrapper=mount(MessageList,{props:{canFeedback:true,messages:[base,{...base,id:'cancelled',status:'cancelled'},{...base,id:'agent',role:'agent'}]}})
+  expect(wrapper.findAll('.feedback-control')).toHaveLength(1)
+  expect(wrapper.find('.feedback-control').attributes('aria-label')).toContain('m')
+})
+
+it('defaults feedback controls off for the agent workbench',()=>{
+  const wrapper=mount(MessageList,{props:{messages:[base]}})
+  expect(wrapper.find('.feedback-control').exists()).toBe(false)
+})

@@ -2,8 +2,9 @@
 import { ElButton } from 'element-plus'
 import type { MessageView } from './api'
 import type { Citation } from './stream'
+import FeedbackControl from '../feedback/FeedbackControl.vue'
 
-defineProps<{messages:MessageView[]}>()
+withDefaults(defineProps<{messages:MessageView[];canFeedback?:boolean}>(),{canFeedback:false})
 const emit=defineEmits<{citations:[items:Citation[]]}>()
 const roleLabels={user:'我',assistant:'智能助手',agent:'客服',system:'系统'}
 const statusLabels={generating:'生成中…',complete:'',failed:'生成失败',cancelled:'已取消'}
@@ -16,6 +17,7 @@ const statusLabels={generating:'生成中…',complete:'',failed:'生成失败',
       <p class="message-content">{{ item.content }}</p>
       <p v-if="item.status!=='complete'" class="muted">{{ statusLabels[item.status] }}</p>
       <ElButton v-if="item.citations.length && !item.evidence_hidden" aria-label="查看引用" @click="emit('citations',item.citations)">查看引用（{{ item.citations.length }}）</ElButton>
+      <FeedbackControl v-if="canFeedback && item.role==='assistant' && item.status==='complete'" :key="item.id" :message-id="item.id" />
     </article>
   </div>
 </template>
