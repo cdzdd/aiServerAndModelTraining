@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-006 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-005 |
 | 并行可行性 | 可与独立部署工作并行；入库表、文档版本和 chunk 契约由本任务独占到合入 |
 | 负责目录 | `backend/app/modules/ingestion/`、文档存储适配、`frontend/src/features/knowledge/documents/`、入库迁移 |
@@ -75,4 +75,10 @@ npm run test:e2e -- e2e/documents.spec.ts
 - BGE 使用 `BAAI/bge-small-zh-v1.5` 固定 revision `7999e1d3359715c523056ef9478215996d62a620`。官方模型为 **512 维**，已纠正架构/契约及 007 计划中的 384 维错误。真实 tokenizer 验证每段重新分词不超过 400 tokens；目标重叠 50 tokens，必要时回退至完整 WordPiece 词边界，实际重叠可略大于 50，保留原文。
 - 独立评审发现并已通过先失败后成功的回归关闭：缓存 ORM 对象导致并发停用状态遗漏、重复请求头绕过上传预检、旧下载 401 清除新会话、零 token 文本误标解析成功。独立复核亲自运行 9 项后端回归与 4 项客户端测试，全部通过，无剩余阻塞；报告 `.local/ingestion-full-review.md`。
 - 静态核验：`node --check scripts/dev.mjs`、`git diff --check` 与修改文档的本地链接检查通过。仅存在依赖弃用提示，无失败或跳过的验收项。
-- 限制：未运行云端 CI（按 WORKFLOW 10.1）；未验证 OCR、客户真实大文档、生产负载或 POSIX 内存限制运行效果；本任务无需调用 DeepSeek。当前保留 `in_review`，待功能及状态 PR 实际合并后收尾。
+- 限制：未运行云端 CI（按 WORKFLOW 10.1）；未验证 OCR、客户真实大文档、生产负载或 POSIX 内存限制运行效果；本任务无需调用 DeepSeek。功能已合入权威 main，本状态记录通过独立文档 PR 收尾。
+
+### 功能合并与状态收尾
+
+- 功能 PR：[#13](https://github.com/cdzdd/aiServerAndModelTraining/pull/13)，2026-09-26T06:45:32Z 普通 squash 合并，真实功能合并 SHA `f9a5c8f8c892e6726f234fab8d643d979994b539`。
+- 已验证功能提交 `6ef98cf473c44cba128ce591e7c942b991d7c9c5`；合并后完整树与该提交一致。上述统一检查和独立评审适用，云端 CI 未运行。
+- 收尾分支 `docs/todo-006-close` 仅更新本任务状态与合并证据；`git diff --check`、Markdown 本地链接与合并事实核验通过，不重复运行应用测试。本状态 PR 合入后权威 main 上任务为 done。
