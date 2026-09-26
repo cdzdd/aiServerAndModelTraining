@@ -81,3 +81,5 @@ npm run test:e2e -- --config playwright.chat.config.ts
 - 首次统一检查 Ruff 通过、pytest 527 通过/1 失败，定位为旧知识库权限测试假设目标必在第一页。仅修正测试为逐页断言并加入 20 个排序靠前公共库，保留权限和即时撤销检查；最终统一验收结果另记，不把首次失败算通过。
 - 当前模式为本地验收 + GitHub PR，云端 CI 未运行；反向代理/公网断连仍留待 016/017 部署验收。
 - 最终 `node scripts/dev.mjs check` 退出 0：Ruff、528 项 pytest（61.72s）、两次迁移 upgrade、ESLint、TypeScript、71 项 Vitest、构建、18 项通用 E2E（15.5s）与 1 项聊天 E2E（12.6s）均通过。环境：Windows、Node 24.11.0、uv 0.12.17、Python 3.12.14、Docker 29.8.0、独立 PostgreSQL/pgvector；冻结依赖。现有 Starlette/Node 弃用及颜色环境警告未影响退出结果。日志为本机 .local/check-final.log，云端 CI 未运行。
+
+- 通过上述完整验收的代码提交：3273b0ba8110efa880c26d685d3676de49e183d8；后续此记录提交仅修改任务文档，按 WORKFLOW 10.1 核对格式、链接和事实，复用该代码验证。
