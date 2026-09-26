@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-011 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-009 |
 | 并行可行性 | 可与 010 并行；只在反馈模块新增实体，chat 共用字段/路由聚合由指定整合者串行修改 |
 | 负责目录 | `backend/app/modules/feedback/`、`frontend/src/features/feedback/`、聊天反馈入口 |
@@ -49,7 +49,7 @@ npm run test -- --run src/features/feedback/FeedbackControl.test.ts
 npm run lint
 npm run typecheck
 npm run build
-npm run test:e2e -- e2e/feedback.spec.ts
+npm run test:e2e -- --config playwright.chat.config.ts feedback.spec.ts
 ```
 
 ## 已知问题与外部阻塞
@@ -58,6 +58,13 @@ npm run test:e2e -- e2e/feedback.spec.ts
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未实施；没有反馈提交/处理测试结果。
+- 2026-09-26 按用户七项批次授权开始；依赖009功能PR #19及收尾PR #20已合入，基点32c82516918f22ee009b1254f91df726b5d2e46d。独立worktree：C:/Users/Administrator/.codex/worktrees/todo-011-feedback/aiSoftwareAttempt；分支feat/todo-011-feedback。root协调共享文件和最终验收/PR，分工实现独立模块。
+- 执行本机 .local/feedback-plan.md；仅本人完整助手消息可评价，重复提交幂等、真实修改后重开，管理员处理；反馈保留并按当前权限投影原回答。验收结果待记录。
 - 按 [WORKFLOW](../WORKFLOW.md) 记录验证与评审；分支到 `in_review`，合入权威 main 且检查通过后统一更新 `done`。
+
+### 2026-09-26 后端实施与专项记录
+
+- Feedback 独立实体唯一(user_id,message_id)，仅本人 complete 助手回复可评价；源版本仅取服务端存储引用的身份字段。相同 POST/PATCH/处理重试幂等，真实修改重开并清理旧处理信息；软删会话后保留反馈统计与处理记录，原用户不可继续读写，管理员也不返回已删原回答。
+- API 已接提交/本人读取/修改及管理员列表、详情、处理/重开。现存原回答复用 chat.visible_messages 当前授权投影；评论/处理说明采用严格文本校验、仅作为反馈数据，不写回知识或训练。审计与业务变更同事务，不含评论/处理说明/引文原文。
+- Schema 测试 7 项先因缺失实现失败后通过；实际 HTTP 提交及处理行为先为404，再实现至41项通过。补审计写入失败的创建/处理回滚、第二连接提交账号停用/降级、并发作者修改/管理员处理及任意角色仅评价自己回答后，`.venv/Scripts/python.exe -m pytest tests/feedback -q --tb=short`（backend 目录）49项通过（9.71s），Ruff check/format通过。均使用真实 PostgreSQL 随机隔离 schema；未调用云模型。
+- 011 迁移开发阶段暂接009，仅用于测试临时 schema。public 开发库保持009，待010实际合入后整合其迁移并将尚未发布011接到010，再做真实升级和统一验收，避免已标记011的库漏掉010表。前端、E2E和独立集成评审仍待完成。

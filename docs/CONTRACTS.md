@@ -219,6 +219,17 @@ GenerationUsage 保留每次已接受请求的身份、会话、消息、UTC acc
 
 AuditEvent 至少有 actor_id、action、target_type/id、outcome、request_id、created_at、脱敏metadata。身份/知识/转人工/反馈修改任务实现时同时写审计事件；todo-012负责统一查询、统计和后台页面，不能等它才开始记录审计。todo-001提供 `core/models.py` 的AuditEvent和 `core/audit.py` 的 `record_audit(db, *, actor_id, action, target_type, target_id, outcome, request_id, metadata)`，加入调用方事务；actor_id为可空UUID，日志不依赖尚未实现的User表。基础迁移创建审计表，测试直接验证写入，避免另引消息系统。登录失败等无业务事务动作使用自己的短事务记录。
 
+### 011 已实现接入细则
+
+反馈只接受消息所属用户对 complete 的 assistant 回复评价；当前有效 user/agent/admin 均只能评价自己的回复，不能借管理员或客服读取权限代评。关闭会话可评价，软删会话不再向原用户提供反馈读写；既有反馈记录保留供管理员处理和统计。反馈不改知识库、索引或训练数据。
+
+rating 为 up/down；comment 可省略或空串，有内容时去首尾空白且最多 2000 字，纯空白、NUL、无效 Unicode、null 及额外字段拒绝。每用户每消息唯一，POST 初次 201；相同规范化内容重试 200 返回既有记录，不重复写审计；不同内容重试 409，使用 PATCH /feedback/{id} 修改。修改必须含 rating/comment 至少一项；真实内容变化重新置 open 并清除旧处理说明、处理者和处理时间，相同请求不变更时间/审计。
+
+GET /messages/{id}/feedback 返回本人已有反馈或 null，仍先校验消息归属及可评价状态。GET /admin/feedback 支持标准分页及 status/rating 筛选；GET /admin/feedback/{id} 返回详情。只有管理员能 PATCH 管理接口：resolved 必须有非空、有效且最多 2000 字的 resolution；open 清空处理字段且拒绝非空 resolution。相同处理重试幂等；修改已处理说明会记录本次处理者和时间。
+
+来源版本仅从服务端存储引用生成快照，保存 chunk/kb/source/revision/faq_version 身份，不复制引文、标题或答案。管理员查看现存原回答时复用当前聊天来源授权投影；会话已软删时 message_available=false 且不返回原回答。普通反馈响应不返回来源快照。前端使用文本展示评论和说明，反馈入口仅对本人已完成助手回复显示。
+
+统一 Conversation→Feedback 锁序保证并发提交与更新一致。feedback.create/update/resolve/reopen 与业务修改同事务记录，幂等重试不加事件；审计只存 ID、枚举及变更字段名，不存评论、处理说明或聊天原文。
 ## 8. 环境变量与测试约定
 
 业务变量：`APP_ENV, DATABASE_URL, SESSION_SECRET, UPLOAD_DIR, MODEL_PROVIDER, MODEL_BASE_URL, MODEL_API_KEY, MODEL_NAME, EMBEDDING_MODEL`。`SESSION_SECRET` 用于会话/CSRF相关签名；随机 session token 本身仍只存哈希。训练环境拥有独立配置，不借用生产API凭据。
