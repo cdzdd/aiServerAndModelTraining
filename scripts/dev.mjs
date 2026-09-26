@@ -38,6 +38,9 @@ switch (process.argv[2]) {
   case 'worker':
     run('uv', ['run', '--frozen', 'python', '-m', 'app.modules.ingestion.worker'], backend)
     break
+  case 'index-worker':
+    run('uv', ['run', '--frozen', 'python', '-m', 'app.modules.retrieval.indexing'], backend)
+    break
   case 'web':
     run('npm', ['run', 'dev'], frontend)
     break
@@ -53,6 +56,6 @@ switch (process.argv[2]) {
     }
     break
   default:
-    console.error('Usage: node scripts/dev.mjs <db-up|db-stop|api|web|worker|check>')
+    console.error('Usage: node scripts/dev.mjs <db-up|db-stop|api|web|worker|index-worker|check>')
     process.exit(1)
 }

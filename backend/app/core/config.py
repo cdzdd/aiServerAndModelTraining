@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     upload_dir: Path = Field(validation_alias="UPLOAD_DIR")
 
     embedding_tokenizer_path: str = Field(default="", validation_alias="EMBEDDING_TOKENIZER_PATH")
+    embedding_model_path: str = Field(default="", validation_alias="EMBEDDING_MODEL_PATH")
+    retrieval_threshold: float = Field(
+        default=0.65, ge=-1, le=1, validation_alias="RETRIEVAL_THRESHOLD"
+    )
     ingestion_parse_timeout: int = Field(
         default=60, ge=1, le=300, validation_alias="INGESTION_PARSE_TIMEOUT"
     )

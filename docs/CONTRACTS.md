@@ -105,7 +105,7 @@ Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,tex
 | Actor（auth） | user_id: UUID, role: user/agent/admin；由会话产生 |
 | LLMMessage（providers） | role: system/user/assistant, content: str |
 | LLMDelta（providers） | text: str, finish_reason: str或null；供应商 usage 可在结束时附带 |
-| SearchHit（retrieval） | chunk_id, kb_id, text, source_type: document/faq, source_id, title, page_number?, score, revision_id? |
+| SearchHit（retrieval） | chunk_id, kb_id, text, source_type: document/faq, source_id, title, page_number?, paragraph_number?, line_number?, score, revision_id?, faq_version? |
 | Citation（rag） | index: int, chunk_id, source_type, source_id, title, page_number?, quote |
 | AnswerEvent（rag） | type: delta/citations/done/error, payload: dict |
 
@@ -123,6 +123,14 @@ Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temper
 
 本任务无对外代理 API；真实云连接按用户明确授权执行受控 smoke，当前提供商与结果见 [todo-004](tasks/todo-004.md) 最新工作记录。单次成功不替代 017 发布前对实际部署配置的真实验收。
 Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: int = 5) -> list[SearchHit]`，异步调用。内部重新验证权限；空授权集合返回空候选，不能退化为全库。初期 score 是余弦相似度；混合检索后类型/含义变化必须更新评测与阈值，不能视为同一概率。
+
+### 007 已实现接入细则
+
+本地 embedding 使用 `BAAI/bge-small-zh-v1.5` 固定 revision `7999e1d3359715c523056ef9478215996d62a620`，512 维、CPU、L2 归一化。仅查询加官方前缀 `为这个句子生成表示以用于检索相关文章：`，文档/FAQ 不加；编码前检查实际 token 数（含特殊 token）不超过 512，超限拒绝，不能静默截断。模型只从 `EMBEDDING_MODEL_PATH` 的本地固定快照加载，首次下载在启动前显式执行；不从问答请求自动下载或运行远程模型代码。
+
+`RETRIEVAL_THRESHOLD` 默认 0.65（余弦分数），Top-K 默认 5、范围 1–20。此阈值只是初始设置，真实代表性语料和 013 评测前不宣称已校准。首版采用 PostgreSQL pgvector 精确查询，不引入近似索引。知识库权限、请求范围、启用状态和当前有效来源版本都在 SQL 候选集合中限定，再排序/限制数量。编码后重新查询权限，空授权范围返回空列表。当前可见有效向量的模型元数据不匹配时明确要求重建，不混用向量空间；无权库的元数据不能影响可见结果或错误。
+
+`node scripts/dev.mjs index-worker` 单独处理持久 index 任务；原 `worker` 仅处理 parse。索引批次在事务外编码并续租，最终重新检查租约令牌、知识库/来源状态及捕获版本，完整写入向量后才在同一事务激活文档或设置 FAQ indexed_version。文档重建保留已有 chunk ID，失败不破坏旧 active；FAQ 编辑使旧版本立即失效，并排入新版本索引。迁移为已有启用 FAQ 创建初始任务。首次加载和运行说明见 [scripts/README](../scripts/README.md)。
 
 RAG 接口：`stream_answer(actor: Actor, kb_ids: list[UUID], question: str, history: list[LLMMessage]) -> AsyncIterator[AnswerEvent]`。不依赖 Conversation ORM；由 chat 提供已过滤的历史，由 retrieval 验证知识范围。todo-008 可以在 todo-009 尚未开发时独立测试。
 

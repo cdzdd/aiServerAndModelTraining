@@ -72,3 +72,17 @@ uv run --directory backend --frozen python -c "from pathlib import Path; from hu
 把下载目录中 `tokenizer.json` 的**绝对路径**填到 `.env` 的 `EMBEDDING_TOKENIZER_PATH`。路径可指向本机其他已验证的只读模型缓存，但数据库、上传与测试输出仍必须隔离。模型修订与 512 维输出依据见 [契约](../docs/CONTRACTS.md)。普通自动化测试使用固定 tokenizer fixture；真实 tokenizer/模型检查另记录，不能混为一谈。
 
 解析子进程有时间与内存限制；扫描 PDF 无文本时明确失败，不执行 OCR。重复上传按同库内容去重；替换版本不会提前取代旧的有效版本。下载每次都校验当前身份、知识库权限和文档状态，不提供公共文件路径。
+
+## 6. 本地向量索引与检索（todo-007）
+
+后端冻结依赖包含 SentenceTransformers 5.2.0、Transformers 4.57.6 与 PyTorch 2.9.1；Windows/Linux 的 Torch 来自官方 CPU 索引，不需要 CUDA。使用 `uv sync --frozen --extra dev --directory backend` 安装，首次安装需要下载模型运行依赖。模型本身仍按上一节固定修订单独下载。
+
+把模型目录绝对路径填入 `.env` 的 `EMBEDDING_MODEL_PATH`，`EMBEDDING_TOKENIZER_PATH` 指向该目录内的 tokenizer.json。只读模型缓存可以跨 worktree 共用；数据库、上传目录与写入输出各自隔离。模型文件会在首次加载时核验，不接受任意同名模型目录。
+
+分别运行 `node scripts/dev.mjs worker`（解析）与 `node scripts/dev.mjs index-worker`（向量索引）。两者都使用当前 worktree 的环境；完成解析的文档先显示待索引，只有向量全部写入、有效版本切换成功才显示已建立索引。失败后管理页面可重试，旧有效版本继续检索；FAQ 新增/编辑自动创建对应版本索引任务。
+
+需要处理一项任务后退出时，在 backend 目录运行 `uv run --frozen python -m app.modules.retrieval.indexing --once`。常驻 worker 不会无限自动重试失败任务。更换 embedding 模型需明确迁移并重建，本版本固定模型、修订和维度；错误元数据索引不会用于计算相似度。
+
+内部异步 `retrieval.service.search` 为后续 RAG 提供有权限的结果，无独立公开搜索 API。默认 Top-K 5、余弦阈值 `RETRIEVAL_THRESHOLD=0.65` 是初始值，需代表性问题集校准。普通测试使用固定向量并查询真实 pgvector；真实 BGE smoke 另记样本、查询、得分、耗时及限制，不能把固定向量测试当作模型质量验证。
+
+真实 BGE 专项检查显式运行（默认 pytest 不自动收集该较重 smoke）：在已配置专用 TEST_DATABASE_URL 和上述模型路径的 worktree，执行 `uv run --frozen --directory backend pytest tests/retrieval/smoke_real_model.py -q -s`。它在临时 schema 使用虚构中文资料，调用真实上传/解析/index handler/语义查询并验证撤权；输出 `.local/real-retrieval-smoke.json`，不调用云模型。默认阈值由 0.75 调整为 0.65 是因为此小样例的相关图书馆问题约 0.660，其他相关问题约 0.777/0.815，无关问题最高约 0.264；这不是代表性质量评测。
