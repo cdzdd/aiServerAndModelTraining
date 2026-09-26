@@ -58,3 +58,17 @@ node scripts/dev.mjs check
 依赖下载失败时先检查网络与已经配置的代理。需要代理的命令只临时设置 `HTTPS_PROXY`/`HTTP_PROXY`（或 npm 的 `--https-proxy`），不把个人代理写入仓库或全局配置。新装 uv 后当前旧终端可能找不到它；重开终端后重试。
 
 Docker Desktop 的 socket 报错不能通过重置数据库解决。保留日志和现有数据，先确认 Docker 服务是否能启动、测试容器能否运行；镜像下载失败和引擎启动失败应分别检查。
+
+## 5. 文档解析 worker（todo-006）
+
+上传 PDF/DOCX/TXT/Markdown 后由独立 worker 解析，单文件上限 20 MiB。API 不在请求中执行解析。使用同一 worktree 的数据库和上传目录，另开终端运行 `node scripts/dev.mjs worker`；停止 worker 后已保存任务不丢失，重启会重新领取租约过期任务。006 只领取 parse 任务，成功页面显示“解析完成，待建立索引”，index 任务由 007 处理。
+
+worker 启动前需要真实 tokenizer。以下命令下载项目指定公开模型的固定修订到本 worktree 的忽略目录（约 96 MB，MIT 许可；不会调用云模型）：
+
+```powershell
+uv run --directory backend --frozen python -c "from pathlib import Path; from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-small-zh-v1.5', revision='7999e1d3359715c523056ef9478215996d62a620', local_dir=str(Path('../.local/models/bge-small-zh-v1.5').resolve()), allow_patterns=['*.json','*.txt','model.safetensors','1_Pooling/config.json'])"
+```
+
+把下载目录中 `tokenizer.json` 的**绝对路径**填到 `.env` 的 `EMBEDDING_TOKENIZER_PATH`。路径可指向本机其他已验证的只读模型缓存，但数据库、上传与测试输出仍必须隔离。模型修订与 512 维输出依据见 [契约](../docs/CONTRACTS.md)。普通自动化测试使用固定 tokenizer fixture；真实 tokenizer/模型检查另记录，不能混为一谈。
+
+解析子进程有时间与内存限制；扫描 PDF 无文本时明确失败，不执行 OCR。重复上传按同库内容去重；替换版本不会提前取代旧的有效版本。下载每次都校验当前身份、知识库权限和文档状态，不提供公共文件路径。

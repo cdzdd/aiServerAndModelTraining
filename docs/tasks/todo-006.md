@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-006 |
-| 状态 | pending |
+| 状态 | in_review |
 | depends_on | todo-005 |
 | 并行可行性 | 可与独立部署工作并行；入库表、文档版本和 chunk 契约由本任务独占到合入 |
 | 负责目录 | `backend/app/modules/ingestion/`、文档存储适配、`frontend/src/features/knowledge/documents/`、入库迁移 |
@@ -20,15 +20,15 @@
 
 ## 分步执行
 
-- [ ] 核对依赖已合入，确认上传大小、允许类型、chunk 长度/重叠、任务重试和有效版本规则均有契约值。
-- [ ] 先写四种格式解析、空/扫描 PDF、恶意文件名、重复上传与跨库下载测试；运行确认缺少目标行为而失败。
-- [ ] 创建文档、版本、chunk、任务模型和迁移；任务 `kind=parse|index`，目标 document_id/faq_id 恰好一个存在、revision_id 可空。006 不切换 active_revision，旧有效版本继续服务。
-- [ ] 实现上传校验和受控存储；拒绝不支持类型/超限/路径穿越，下载通过权限路由或有授权且有限时的机制，不暴露静态公共目录。
-- [ ] 以 pypdf、python-docx 和标准文本读取实现解析；保留页码/段落或行号等来源定位。扫描件/空内容返回可理解错误，不误标为可检索。
-- [ ] 实现确定性切分和仅领取 parse 的 worker；解析成功保存候选 revision 的无 embedding chunks，设 parsed 并创建 index queued 任务；重试不产生重复候选 chunk/任务，失败不破坏旧有效版本。
-- [ ] 实现上传进度/任务状态/失败原因/重试页面；parsed 显示“解析完成，待建立索引”，不提前宣称 ready；上传/替换/停用/删除/重试同期写审计。
-- [ ] 用强制中断、重复领取、重新启动 worker 验证恢复行为；核对删除或撤权后的文件、chunk 和下载访问策略。
-- [ ] 执行集成与 E2E、评审权限和文件处理边界；记录真实结果并提交 `in_review`，按 WORKFLOW 合并收尾。
+- [x] 核对依赖已合入，确认上传大小、允许类型、chunk 长度/重叠、任务重试和有效版本规则均有契约值。
+- [x] 先写四种格式解析、空/扫描 PDF、恶意文件名、重复上传与跨库下载测试；运行确认缺少目标行为而失败。
+- [x] 创建文档、版本、chunk、任务模型和迁移；任务 `kind=parse|index`，目标 document_id/faq_id 恰好一个存在、revision_id 可空。006 不切换 active_revision，旧有效版本继续服务。
+- [x] 实现上传校验和受控存储；拒绝不支持类型/超限/路径穿越，下载通过权限路由或有授权且有限时的机制，不暴露静态公共目录。
+- [x] 以 pypdf、python-docx 和标准文本读取实现解析；保留页码/段落或行号等来源定位。扫描件/空内容返回可理解错误，不误标为可检索。
+- [x] 实现确定性切分和仅领取 parse 的 worker；解析成功保存候选 revision 的无 embedding chunks，设 parsed 并创建 index queued 任务；重试不产生重复候选 chunk/任务，失败不破坏旧有效版本。
+- [x] 实现上传进度/任务状态/失败原因/重试页面；parsed 显示“解析完成，待建立索引”，不提前宣称 ready；上传/替换/停用/删除/重试同期写审计。
+- [x] 用强制中断、重复领取、重新启动 worker 验证恢复行为；核对删除或撤权后的文件、chunk 和下载访问策略。
+- [x] 执行集成与 E2E、评审权限和文件处理边界；记录真实结果并提交 `in_review`，按 WORKFLOW 合并收尾。
 
 ## 验收与测试场景
 
@@ -63,6 +63,16 @@ npm run test:e2e -- e2e/documents.spec.ts
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未实施；没有上传、解析、恢复或下载验证结果。
+- 2026-09-26 已按批次授权原子领取；负责人为当前 Codex 对话，独立 worktree `C:/Users/Administrator/.codex/worktrees/todo-006-ingestion/aiSoftwareAttempt`，分支 `feat/todo-006-ingestion`，基点 `69184f19e76ed1675c494669e28ce81c4254eca5`。
+- 已完成上传、受控下载、四格式解析、原文切分、持久 parse worker 与管理页面；使用明确标注的虚构校园样例。本任务只产出 parsed 候选及 queued index 任务，索引与激活由 007 交付。
 - 依 [WORKFLOW](../WORKFLOW.md) 完成评审与证据记录后到 `in_review`；合入权威 main 且检查通过后统一标记 `done`。
+
+### 2026-09-26 本地验收与独立评审
+
+- 环境：Windows，Node 24.11.0、Python 3.12.14、uv 0.12.17；独立 Compose project `qa-todo-006-02eeb8`，API/Web/DB 端口 8116/5216/15446。冻结依赖、独立数据库及本地上传目录；秘密和模型不入库。
+- `node scripts/dev.mjs check`：退出 0；Ruff、迁移、前端 lint/typecheck/build 均通过，**223 pytest、48 Vitest、18 Playwright** 通过。浏览器用真实上传、真实 parse worker 和 BGE tokenizer 验证 parsed/待索引、受控下载、替换、停用与删除。原始日志 `.local/check-final.log`。
+- 专项验证：四格式中文与定位、20 MiB 限制和重复 Content-Type、跨库访问、两数据库会话并发停用/删除、worker 强制终止后的租约恢复、重复领取、写 chunk 事务回滚、旧 active 保留、Windows 512 MiB 子进程内存限额；`alembic check` 无模型漂移。桌面和 390px 移动截图人工核验无溢出。
+- BGE 使用 `BAAI/bge-small-zh-v1.5` 固定 revision `7999e1d3359715c523056ef9478215996d62a620`。官方模型为 **512 维**，已纠正架构/契约及 007 计划中的 384 维错误。真实 tokenizer 验证每段重新分词不超过 400 tokens；目标重叠 50 tokens，必要时回退至完整 WordPiece 词边界，实际重叠可略大于 50，保留原文。
+- 独立评审发现并已通过先失败后成功的回归关闭：缓存 ORM 对象导致并发停用状态遗漏、重复请求头绕过上传预检、旧下载 401 清除新会话、零 token 文本误标解析成功。独立复核亲自运行 9 项后端回归与 4 项客户端测试，全部通过，无剩余阻塞；报告 `.local/ingestion-full-review.md`。
+- 静态核验：`node --check scripts/dev.mjs`、`git diff --check` 与修改文档的本地链接检查通过。仅存在依赖弃用提示，无失败或跳过的验收项。
+- 限制：未运行云端 CI（按 WORKFLOW 10.1）；未验证 OCR、客户真实大文档、生产负载或 POSIX 内存限制运行效果；本任务无需调用 DeepSeek。当前保留 `in_review`，待功能及状态 PR 实际合并后收尾。

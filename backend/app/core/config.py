@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     session_secret: SecretStr = Field(validation_alias="SESSION_SECRET")
     upload_dir: Path = Field(validation_alias="UPLOAD_DIR")
 
+    embedding_tokenizer_path: str = Field(default="", validation_alias="EMBEDDING_TOKENIZER_PATH")
+    ingestion_parse_timeout: int = Field(
+        default=60, ge=1, le=300, validation_alias="INGESTION_PARSE_TIMEOUT"
+    )
+
     public_origin: str | None = Field(default=None, validation_alias="PUBLIC_ORIGIN")
 
     login_account_limit: int = Field(default=5, ge=1, validation_alias="LOGIN_ACCOUNT_LIMIT")

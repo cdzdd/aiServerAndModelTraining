@@ -86,7 +86,15 @@ IngestionJob：`id,kind,document_id?,faq_id?,revision_id?,state,attempts,lease_u
 
 FAQ在005编辑后标记version已变更；007补齐有效FAQ索引并消费后续变更，索引只写对应捕获版本，提交前核对version仍相同，否则重新排队。旧版本不匹配时不参与检索。
 
-Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,text,title,page_number?,embedding?,embedding_model?,embedding_version?`。document_id 与 faq_id 恰好一个存在。未索引向量为空；检索使用当前有效文档版本与版本一致的有效FAQ，旧向量不参加搜索。初始分段为最多400个模型token、重叠50个token，以模型tokenizer计数，并为检索前缀保留空间不超过模型512上限；tokenizer版本随模型固定。
+Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,text,title,page_number?,embedding?,embedding_model?,embedding_version?`。document_id 与 faq_id 恰好一个存在。未索引向量为空；检索使用当前有效文档版本与版本一致的有效FAQ，旧向量不参加搜索。初始分段为每片独立重分词后最多400个模型token、目标重叠50个token；重叠起点落在WordPiece词内时向前扩到完整词边界，实际重叠可略多于50但每片仍不得超过400，以固定模型tokenizer计数，并为检索前缀保留空间不超过模型512上限；tokenizer版本随模型固定。指定中文模型 `BAAI/bge-small-zh-v1.5` 固定修订 `7999e1d3359715c523056ef9478215996d62a620`，真实输出为512维（原计划384维为误记）；该值与512 token输入上限是两个独立约束。模型来源见 [官方配置](https://huggingface.co/BAAI/bge-small-zh-v1.5/blob/7999e1d3359715c523056ef9478215996d62a620/config.json)。
+
+### 006 已实现接入细则
+
+文档列表遵循标准分页。摘要/详情增加 `candidate_revision_id`、`active_revision`、`candidate_revision` 与 `latest_job`；版本摘要仅含 ID、文件名、内容 SHA-256、parser_version、创建时间，不返回存储路径。任务摘要含 kind/state/attempts/error_code/安全中文error_message及创建/完成时间。PATCH 仅接受严格布尔 `is_active`，不能直接设置 ready。管理员可读取停用文档摘要以恢复；停用或删除文档对所有人的下载均返回404，普通用户不能读取停用摘要。
+
+上传初始版本和替换版本均接受单个 multipart `file`，返回202 `{document_id,job_id,status:"uploaded"}`。同库同文件名同内容的重复上传复用候选版本/任务；已存在的历史内容不重复创建版本。授权下载优先返回当前有效版本，尚无有效版本时返回候选原文件；下载同样检查当前知识库及成员权限。DELETE 软删除，保留受控存储供持久化与历史审计，不公开静态文件路径。
+
+`node scripts/dev.mjs worker` 使用本worktree数据库和上传目录。parse任务有持久租约与每次领取的新令牌，过期可重领；旧worker即使恢复也不能提交覆盖新领取者。解析与chunk写入/index排队在提交阶段再次验证知识库、文档启用状态及候选版本。独立解析进程默认60秒超时、512MiB内存上限，文档最多2000页、提取文本最多200万字符；DOCX按原始段落/表格顺序保留位置。空/扫描PDF、损坏格式、资源超限有明确失败状态。模型配置、下载与运行步骤见 [开发说明](../scripts/README.md#5-文档解析-workertodo-006)。
 
 ## 4. 内部模块接口（todo-004/007/008/014）
 

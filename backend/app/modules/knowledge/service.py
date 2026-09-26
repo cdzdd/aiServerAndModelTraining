@@ -68,7 +68,12 @@ def check_version(actual: int, expected: int):
 
 
 def locked_kb(db: Session, kb_id: UUID, *, active=False):
-    kb = db.scalar(select(KnowledgeBase).where(KnowledgeBase.id == kb_id).with_for_update())
+    kb = db.scalar(
+        select(KnowledgeBase)
+        .where(KnowledgeBase.id == kb_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if kb is None or (active and not kb.is_active):
         raise AuthError(404, "NOT_FOUND", "资源不存在或不可见")
     return kb

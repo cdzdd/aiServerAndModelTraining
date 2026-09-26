@@ -20,6 +20,8 @@ from app.core.security import AuthError
 from app.modules.auth.limits import LoginLimiter
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import check_csrf
+from app.modules.ingestion.router import router as ingestion_router
+from app.modules.ingestion.upload_limit import UploadLimitMiddleware
 from app.modules.knowledge.router import router as knowledge_router
 
 request_logger = logging.getLogger("app.requests")
@@ -42,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             engine.dispose()
 
     app = FastAPI(title="Knowledge QA API", lifespan=lifespan)
+    app.add_middleware(UploadLimitMiddleware)
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -55,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.include_router(auth_router)
     app.include_router(knowledge_router)
+    app.include_router(ingestion_router)
 
     @app.exception_handler(AuthError)
     async def auth_error(request: Request, exc: AuthError):
