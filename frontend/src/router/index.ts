@@ -21,6 +21,8 @@ const routes:RouteRecordRaw[]=[
     {path:'knowledge',component:()=>import('../features/knowledge/KnowledgeListPage.vue')},
     {path:'knowledge/:id',component:()=>import('../features/knowledge/KnowledgeDetailPage.vue')},
     {path:'chat/:id?',component:()=>import('../features/chat/ChatPage.vue')},
+    {path:'handoffs',component:()=>import('../features/handoff/QueuePage.vue'),meta:{roles:['agent','admin']}},
+    {path:'handoffs/:handoffId',component:()=>import('../features/handoff/AgentConversationPage.vue'),meta:{roles:['agent','admin']}},
   ]},
   {path:'/:pathMatch(.*)*',component:()=>import('../app/StatePage.vue'),props:{kind:'not-found'},meta:{public:true}},
 ]

@@ -209,6 +209,17 @@ GenerationUsage 保留每次已接受请求的身份、会话、消息、UTC acc
 
 关闭的会话只读，继续提问创建新会话。无人接单时 queued 消息就是待处理留言，不伪造在线客服。
 
+### 010 已实现接入细则
+
+Handoff 唯一关联 Conversation，仅保存 requested_at、claimed_at/claimed_by_id、closed_at/closed_by_id；当前状态和客服归属仍以 Conversation.mode/assigned_agent_id 为准，不维护第二套状态。会话软删后交接记录保留用于受控统计。
+
+本人任意当前有效角色可申请自己的 bot 会话：首次 201，queued/human 重复申请 200 返回同一交接且不重复审计；closed 不重开。GET /handoffs 仅 agent/admin 可读，标准分页，仅返回 id、conversation_id、requested_at、state=queued，不含用户名、标题、问题、历史或知识来源。只有当前 agent 可领取；两个独立事务争抢仅一个成功，失败及重复领取为 409，未接单者不能读取会话内容。
+
+详情供本人、当前接单客服及管理员读取。human 由当前接单客服或管理员关闭；有关闭权限者重复关闭幂等，不重复审计。queued 不提前关闭，closed 不继续发送。管理员审阅/关闭不代表可冒充原用户或接单客服发送文字。
+
+写入按 User→Conversation→Handoff 一致锁序（与聊天/反馈写入一致，避免外键读取 User 与会话锁构成环），调用 chat.transition_mode 使旧生成令牌失效并记录取消；业务事务成功提交后才取消进程中的上游。失败事务不提前取消。handoff.request/claim/close 与业务变更在同一事务写审计，元数据只含身份/资源 ID 和状态。queued/human 的双方文字沿用聊天入口，不启动 AI。
+
+用户等待页与接单工作台采用短轮询，关闭、切换会话、失权和卸载时停止并丢弃旧响应；等待队列不宣称客服在线。页面/浏览器测试复用真实认证及聊天接口，受控 RAG 仅供自动化输出，不新增生产测试开关。
 ## 7. 反馈、审计与统计（todo-011/012）
 
 - POST `/messages/{id}/feedback`：本人对助手消息提交 `{rating:"up|down",comment}`；每作者每消息一条，可用 PATCH `/feedback/{id}` 修改本人评价。

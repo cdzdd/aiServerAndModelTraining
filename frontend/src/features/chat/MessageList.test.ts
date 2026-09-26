@@ -22,3 +22,8 @@ it('does not offer revoked citations or present cancelled output as complete',()
   expect(wrapper.text()).toContain('已取消')
   expect(wrapper.text()).toContain('该回答所依据的资料当前不可访问')
 })
+
+it('labels the customer and support agent distinctly in shared history',()=>{
+  const wrapper=mount(MessageList,{props:{messages:[{...base,id:'customer',role:'user',content:'客户问题'},{...base,id:'agent',role:'agent',content:'客服回复'}]}})
+  expect(wrapper.findAll('.message-heading strong').map(value=>value.text())).toEqual(['用户','客服'])
+})
