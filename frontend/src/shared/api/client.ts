@@ -4,6 +4,7 @@ interface RequestOptions { method?: string; body?: unknown; authenticated?: bool
 export function createApiClient(onUnauthorized: () => void) {
   let csrfToken: string | null = null
   let version = 0
+  const activeStreams=new Set<AbortController>()
   async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const current = version
     const changed = () => new ApiError(0, 'SESSION_CHANGED', '登录状态已变化，请重试。')
@@ -89,5 +90,55 @@ export function createApiClient(onUnauthorized: () => void) {
       throw new ApiError(0,'NETWORK_ERROR','网络连接失败，请检查连接后重试。')
     } finally {clearTimeout(timeout)}
   }
-  return {request,upload,download,setCsrfToken(token: string | null) { csrfToken=token; version++ }}
+  async function* stream(path:string,body:unknown,signal:AbortSignal):AsyncGenerator<Uint8Array> {
+    const current=version
+    const changed=()=>new ApiError(0,'SESSION_CHANGED','登录状态已变化，请重试。')
+    if(!csrfToken) {
+      const result=await request<{csrf_token:string}>('/auth/csrf',{authenticated:false})
+      if(current!==version) throw changed()
+      csrfToken=result.csrf_token
+    }
+    const controller=new AbortController()
+    const abort=()=>controller.abort()
+    if(signal.aborted) abort()
+    else signal.addEventListener('abort',abort,{once:true})
+    activeStreams.add(controller)
+    const timeout=setTimeout(abort,60_000)
+    let reader:ReadableStreamDefaultReader<Uint8Array>|undefined
+    try {
+      const response=await fetch('/api/v1'+path,{
+        method:'POST',credentials:'same-origin',signal:controller.signal,
+        headers:{Accept:'text/event-stream','Content-Type':'application/json','X-CSRF-Token':csrfToken},
+        body:JSON.stringify(body),
+      })
+      if(current!==version) throw changed()
+      if(!response.ok) {
+        const payload=await response.json().catch(()=>undefined)
+        if(current!==version) throw changed()
+        if(response.status===401) onUnauthorized()
+        if(payload?.error?.code==='CSRF_FAILED') csrfToken=null
+        throw new ApiError(response.status,payload?.error?.code ?? 'HTTP_ERROR',payload?.error?.message ?? '请求失败，请稍后重试。',payload?.error?.details)
+      }
+      if(!response.body) throw new ApiError(0,'STREAM_PROTOCOL','回答流中断，请刷新历史后重试。')
+      reader=response.body.getReader()
+      while(true) {
+        const part=await reader.read()
+        if(current!==version) throw changed()
+        if(part.done) break
+        yield part.value
+      }
+    } catch(error) {
+      if(current!==version) throw changed()
+      if(error instanceof ApiError) throw error
+      if(signal.aborted) throw new ApiError(0,'CANCELLED','已停止生成。')
+      if(controller.signal.aborted) throw new ApiError(0,'STREAM_TIMEOUT','回答超时，请刷新历史后重试。')
+      throw new ApiError(0,'NETWORK_ERROR','网络连接失败，请检查连接后重试。')
+    } finally {
+      clearTimeout(timeout)
+      signal.removeEventListener('abort',abort)
+      activeStreams.delete(controller)
+      if(reader) {await reader.cancel().catch(()=>{});reader.releaseLock()}
+    }
+  }
+  return {request,upload,download,stream,setCsrfToken(token: string | null) { csrfToken=token; version++;for(const controller of activeStreams)controller.abort() }}
 }

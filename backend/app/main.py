@@ -20,9 +20,16 @@ from app.core.security import AuthError
 from app.modules.auth.limits import LoginLimiter
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import check_csrf
+from app.modules.chat.router import router as chat_router
+from app.modules.chat.runtime import ChatRuntime
+from app.modules.chat.service import recover_generations
 from app.modules.ingestion.router import router as ingestion_router
 from app.modules.ingestion.upload_limit import UploadLimitMiddleware
 from app.modules.knowledge.router import router as knowledge_router
+from app.modules.providers.factory import create_provider
+from app.modules.rag.service import RAGService
+from app.modules.retrieval.embedding import BGEEmbedder
+from app.modules.retrieval.service import RetrievalService
 
 request_logger = logging.getLogger("app.requests")
 
@@ -39,9 +46,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
+            try:
+                await run_in_threadpool(
+                    recover_generations, app.state.session_factory, app.state.chat_clock()
+                )
+                app.state.chat_ready = True
+            except SQLAlchemyError:
+                # Liveness remains available, but no chat traffic starts after failed recovery.
+                logging.getLogger("app.lifecycle").error('{"event":"chat_recovery_failed"}')
             yield
         finally:
-            engine.dispose()
+            try:
+                await app.state.chat_runtime.shutdown()
+            finally:
+                engine.dispose()
 
     app = FastAPI(title="Knowledge QA API", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware)
@@ -50,6 +68,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
 
     app.state.auth_clock = lambda: datetime.now(UTC)
+    app.state.chat_clock = lambda: datetime.now(UTC)
+    app.state.chat_ready = False
+    app.state.chat_runtime = ChatRuntime(max_active=settings.chat_global_concurrency)
+    retrieval = RetrievalService(
+        app.state.session_factory,
+        BGEEmbedder(settings.embedding_model_path),
+        threshold=settings.retrieval_threshold,
+    )
+    app.state.chat_rag = RAGService(retrieval.search, retrieval.validate_hits, create_provider())
     app.state.login_limiter = LoginLimiter(
         account_limit=settings.login_account_limit,
         ip_limit=settings.login_ip_limit,
@@ -59,6 +86,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(knowledge_router)
     app.include_router(ingestion_router)
+    app.include_router(chat_router)
 
     @app.exception_handler(AuthError)
     async def auth_error(request: Request, exc: AuthError):
@@ -126,6 +154,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health/ready")
     def readiness(request: Request):
+        if not app.state.chat_ready:
+            return error_response(request, 503, "DEPENDENCY_UNAVAILABLE", "服务启动恢复尚未完成")
         try:
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))

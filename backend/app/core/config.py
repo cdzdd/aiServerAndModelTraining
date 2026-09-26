@@ -34,6 +34,16 @@ class Settings(BaseSettings):
         default=60, ge=1, le=300, validation_alias="INGESTION_PARSE_TIMEOUT"
     )
 
+    chat_requests_per_minute: int = Field(
+        default=10, ge=1, validation_alias="CHAT_REQUESTS_PER_MINUTE"
+    )
+    chat_requests_per_day: int = Field(
+        default=60, ge=1, validation_alias="CHAT_REQUESTS_PER_DAY"
+    )
+    chat_global_concurrency: int = Field(
+        default=2, ge=1, validation_alias="CHAT_GLOBAL_CONCURRENCY"
+    )
+
     public_origin: str | None = Field(default=None, validation_alias="PUBLIC_ORIGIN")
 
     login_account_limit: int = Field(default=5, ge=1, validation_alias="LOGIN_ACCOUNT_LIMIT")

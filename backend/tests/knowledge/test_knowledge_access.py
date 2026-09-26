@@ -2,12 +2,38 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import text
+from sqlalchemy import insert, text
+
+from app.modules.knowledge.models import KnowledgeBase
 
 from .conftest import create_faq, create_kb, csrf, members
 
 
-def test_scoped_lists_details_and_immediate_revocation(client, admin, reader):
+def all_knowledge(client, path="/api/v1/knowledge-bases"):
+    items, page = [], 1
+    while True:
+        response = client.get(path, params={"page": page, "page_size": 20})
+        assert response.status_code == 200, response.text
+        result = response.json()
+        items.extend(result["items"])
+        if page * result["page_size"] >= result["total"]:
+            assert len(items) == result["total"]
+            assert len({item["id"] for item in items}) == len(items)
+            return items
+        page += 1
+
+
+def test_scoped_lists_details_and_immediate_revocation(client, admin, reader, migrated_engine):
+    # Other tests commit public KBs into this session's isolated schema. Ensure this
+    # test also exercises visibility when its own KBs are beyond the first page.
+    with migrated_engine.begin() as db:
+        db.execute(
+            insert(KnowledgeBase),
+            [
+                {"name": f"000 unrelated public {index:02}", "visibility": "public"}
+                for index in range(20)
+            ],
+        )
     other, person = reader
     allowed = create_kb(client)
     denied = create_kb(client)
@@ -16,8 +42,7 @@ def test_scoped_lists_details_and_immediate_revocation(client, admin, reader):
     granted = members(client, allowed, [person["id"]])
     assert granted.status_code == 200
     assert granted.json()["version"] == 2
-    visible = other.get("/api/v1/knowledge-bases").json()
-    ids = {item["id"] for item in visible["items"]}
+    ids = {item["id"] for item in all_knowledge(other)}
     assert {allowed["id"], public["id"]} <= ids
     assert denied["id"] not in ids
     assert other.get(f"/api/v1/knowledge-bases/{allowed['id']}").status_code == 200
@@ -30,6 +55,7 @@ def test_scoped_lists_details_and_immediate_revocation(client, admin, reader):
     assert members(client, {**allowed, "version": 2}, []).status_code == 200
     assert other.get(f"/api/v1/knowledge-bases/{allowed['id']}").status_code == 404
     assert other.get(f"/api/v1/knowledge-bases/{allowed['id']}/faqs").status_code == 404
+    assert allowed["id"] not in {item["id"] for item in all_knowledge(other)}
     assert other.get("/api/v1/auth/me").status_code == 200
 
 
@@ -106,11 +132,9 @@ def test_disable_blocks_all_readers_but_admin_can_restore(client, admin, reader)
     for c in (client, other):
         assert c.get(path).status_code == 404
         assert c.get(path + "/faqs").status_code == 404
-        assert kb["id"] not in {
-            item["id"] for item in c.get("/api/v1/knowledge-bases").json()["items"]
-        }
-    managed = client.get("/api/v1/admin/knowledge-bases?page_size=100").json()
-    assert any(item["id"] == kb["id"] and not item["is_active"] for item in managed["items"])
+        assert kb["id"] not in {item["id"] for item in all_knowledge(c)}
+    managed = all_knowledge(client, "/api/v1/admin/knowledge-bases")
+    assert any(item["id"] == kb["id"] and not item["is_active"] for item in managed)
     assert (
         client.patch(
             path, json={"is_active": True, "expected_version": 2}, headers=csrf(client)

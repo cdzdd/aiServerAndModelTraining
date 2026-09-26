@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { createApiClient } from './client'
 import { ApiError } from './errors'
 
-afterEach(()=>vi.unstubAllGlobals())
+afterEach(()=>{vi.unstubAllGlobals();vi.useRealTimers()})
 
 it('uploads FormData with CSRF, cookies and actual progress without setting JSON content type',async()=>{
   const headers:Record<string,string>={}
@@ -69,4 +69,50 @@ it('does not clear a new session when an old download error body arrives late',a
   finishBody({error:{code:'UNAUTHENTICATED',message:'会话过期'}})
   expect(await result).toMatchObject({code:'SESSION_CHANGED'})
   expect(unauthorized).not.toHaveBeenCalled()
+})
+
+it('streams POST bytes with CSRF and rejects chunks after session replacement',async()=>{
+  let options!:RequestInit
+  let reads=0
+  vi.stubGlobal('fetch',async(_url:string,init:RequestInit)=>{
+    options=init
+    return {ok:true,status:200,body:{getReader:()=>({read:async()=>++reads===1?{done:false,value:new Uint8Array([1,2])}:{done:false,value:new Uint8Array([3])},cancel:async()=>{},releaseLock:()=>{}})}}
+  })
+  const client=createApiClient(()=>{})
+  client.setCsrfToken('old')
+  const iterator=client.stream('/conversations/c/messages/stream',{content:'你好',client_message_id:'key'},new AbortController().signal)[Symbol.asyncIterator]()
+  expect(await iterator.next()).toEqual({done:false,value:new Uint8Array([1,2])})
+  expect(options.credentials).toBe('same-origin')
+  expect(new Headers(options.headers).get('X-CSRF-Token')).toBe('old')
+  expect(JSON.parse(options.body as string)).toEqual({content:'你好',client_message_id:'key'})
+  client.setCsrfToken('new')
+  await expect(iterator.next()).rejects.toMatchObject({code:'SESSION_CHANGED'})
+})
+
+it('stream response 401 clears the current session',async()=>{
+  vi.stubGlobal('fetch',async()=>({ok:false,status:401,json:async()=>({error:{code:'UNAUTHENTICATED',message:'未登录'}})}))
+  const unauthorized=vi.fn(),client=createApiClient(unauthorized)
+  client.setCsrfToken('csrf')
+  const iterator=client.stream('/conversations/c/messages/stream',{content:'x'},new AbortController().signal)
+  await expect(iterator.next()).rejects.toMatchObject({status:401,code:'UNAUTHENTICATED'})
+  expect(unauthorized).toHaveBeenCalledOnce()
+})
+
+it('keeps a stream alive past the JSON timeout and ends it at the 60-second total deadline',async()=>{
+  vi.useFakeTimers()
+  let streamSignal!:AbortSignal
+  vi.stubGlobal('fetch',async(_url:string,options:RequestInit)=>{
+    streamSignal=options.signal!
+    return {ok:true,status:200,body:{getReader:()=>({
+      read:()=>new Promise((_resolve,reject)=>streamSignal.addEventListener('abort',()=>reject(new DOMException('aborted','AbortError')),{once:true})),
+      cancel:async()=>{},releaseLock:()=>{},
+    })}}
+  })
+  const client=createApiClient(()=>{})
+  client.setCsrfToken('csrf')
+  const pending=client.stream('/conversations/c/messages/stream',{content:'x'},new AbortController().signal).next().catch(error=>error)
+  await vi.advanceTimersByTimeAsync(16_000)
+  expect(streamSignal.aborted).toBe(false)
+  await vi.advanceTimersByTimeAsync(44_000)
+  expect(await pending).toMatchObject({code:'STREAM_TIMEOUT'})
 })

@@ -10,8 +10,8 @@ const baseURL = `http://127.0.0.1:${webPort}`
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: '**/chat.spec.ts',
-  fullyParallel: true,
+  testMatch: '**/chat.spec.ts',
+  fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: 'list',
@@ -19,7 +19,7 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     {
-      command: `uv run --frozen --directory ../backend uvicorn app.main:create_app --factory --no-access-log --host 127.0.0.1 --port ${apiPort}`,
+      command: `uv run --frozen --directory ../backend uvicorn tests.chat.e2e_app:create_app --factory --no-access-log --host 127.0.0.1 --port ${apiPort}`,
       url: `http://127.0.0.1:${apiPort}/health/ready`,
       reuseExistingServer: false,
       timeout: 60_000,
