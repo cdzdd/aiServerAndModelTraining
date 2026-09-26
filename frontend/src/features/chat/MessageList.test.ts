@@ -23,6 +23,17 @@ it('does not offer revoked citations or present cancelled output as complete',()
   expect(wrapper.text()).toContain('该回答所依据的资料当前不可访问')
 })
 
+it('shows feedback only for owner-visible completed assistant replies',()=>{
+  const wrapper=mount(MessageList,{props:{canFeedback:true,messages:[base,{...base,id:'cancelled',status:'cancelled'},{...base,id:'agent',role:'agent'}]}})
+  expect(wrapper.findAll('.feedback-control')).toHaveLength(1)
+  expect(wrapper.find('.feedback-control').attributes('aria-label')).toContain('m')
+})
+
+it('defaults feedback controls off for the agent workbench',()=>{
+  const wrapper=mount(MessageList,{props:{messages:[base]}})
+  expect(wrapper.find('.feedback-control').exists()).toBe(false)
+})
+
 it('labels the customer and support agent distinctly in shared history',()=>{
   const wrapper=mount(MessageList,{props:{messages:[{...base,id:'customer',role:'user',content:'客户问题'},{...base,id:'agent',role:'agent',content:'客服回复'}]}})
   expect(wrapper.findAll('.message-heading strong').map(value=>value.text())).toEqual(['用户','客服'])

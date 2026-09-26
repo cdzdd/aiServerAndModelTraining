@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-011 |
-| 状态 | pending |
+| 状态 | in_review |
 | depends_on | todo-009 |
 | 并行可行性 | 可与 010 并行；只在反馈模块新增实体，chat 共用字段/路由聚合由指定整合者串行修改 |
 | 负责目录 | `backend/app/modules/feedback/`、`frontend/src/features/feedback/`、聊天反馈入口 |
@@ -49,7 +49,7 @@ npm run test -- --run src/features/feedback/FeedbackControl.test.ts
 npm run lint
 npm run typecheck
 npm run build
-npm run test:e2e -- e2e/feedback.spec.ts
+npm run test:e2e -- --config playwright.chat.config.ts feedback.spec.ts
 ```
 
 ## 已知问题与外部阻塞
@@ -58,6 +58,24 @@ npm run test:e2e -- e2e/feedback.spec.ts
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未实施；没有反馈提交/处理测试结果。
+- 2026-09-26 按用户七项批次授权开始；依赖009功能PR #19及收尾PR #20已合入，基点32c82516918f22ee009b1254f91df726b5d2e46d。独立worktree：C:/Users/Administrator/.codex/worktrees/todo-011-feedback/aiSoftwareAttempt；分支feat/todo-011-feedback。root协调共享文件和最终验收/PR，分工实现独立模块。
+- 执行本机 .local/feedback-plan.md；仅本人完整助手消息可评价，重复提交幂等、真实修改后重开，管理员处理；反馈保留并按当前权限投影原回答。验收结果待记录。
 - 按 [WORKFLOW](../WORKFLOW.md) 记录验证与评审；分支到 `in_review`，合入权威 main 且检查通过后统一更新 `done`。
+
+### 2026-09-26 后端实施与专项记录
+
+- Feedback 独立实体唯一(user_id,message_id)，仅本人 complete 助手回复可评价；源版本仅取服务端存储引用的身份字段。相同 POST/PATCH/处理重试幂等，真实修改重开并清理旧处理信息；软删会话后保留反馈统计与处理记录，原用户不可继续读写，管理员也不返回已删原回答。
+- API 已接提交/本人读取/修改及管理员列表、详情、处理/重开。现存原回答复用 chat.visible_messages 当前授权投影；评论/处理说明采用严格文本校验、仅作为反馈数据，不写回知识或训练。审计与业务变更同事务，不含评论/处理说明/引文原文。
+- Schema 测试 7 项先因缺失实现失败后通过；实际 HTTP 提交及处理行为先为404，再实现至41项通过。补审计写入失败的创建/处理回滚、第二连接提交账号停用/降级、并发作者修改/管理员处理及任意角色仅评价自己回答后，`.venv/Scripts/python.exe -m pytest tests/feedback -q --tb=short`（backend 目录）49项通过（9.71s），Ruff check/format通过。均使用真实 PostgreSQL 随机隔离 schema；未调用云模型。
+- 开发阶段011暂接009且仅应用于临时测试 schema；010 的功能 PR #21 / 收尾 PR #22 实际合入后，已整合 origin/main 301f99e，将尚未发布011改接010。public 开发库真实执行009→010→011，重复 upgrade head 与 alembic check 均通过，迁移图仅一个011 head。整合提交2f974186be9c03c4bd60c4357ee4ac827d63ef75；反馈+人工专项后端79项通过（13.37s），相关前端39项及类型检查通过。真实反馈E2E、跨模块并发回归、独立完整评审与统一验收仍待完成。
+### 2026-09-26 集成与浏览器专项验收
+
+- 新增真实PG两连接跨模块并发回归：管理员关闭人工会话与处理旧AI回答反馈，分别验证两个操作先取得锁；通过 pg_blocking_pids 确认 User 锁等待，两项均通过且状态/审计一致。后端独立评审另实测同时创建不同评价仅一行一审计，以及删除会话后等待中的反馈提交404；相关19项测试通过（5.53s）。
+- 前端14项组件测试、类型检查和ESLint通过；真实浏览器 feedback.spec.ts 1项通过，覆盖提问→评价→管理员处理→本人回看→修改重开→再次提问知识不变、他人404/403。桌面和390px手机截图已检查，无横向溢出。此专项使用真实认证/API/PostgreSQL及专用可复现RAG测试fixture，不代表新增云模型调用。
+- 独立评审发现管理员失权后旧反馈内容仍显示，已修复401/403/404清理、同ID角色变化和过期请求防护并加入回归；评审者原始失败用例已通过。完整统一检查及最终评审记录随后补充，当前尚未合并。
+### 2026-09-26 最终本地验收与独立评审
+
+- 验收代码提交：3d08f8d69011e3fa5b054062a8b44492903636aa，已整合权威main 301f99e6845a1b8673f1ac7f511135cea09fb914。Windows、Node24.11.0、Python3.12.14、uv0.12.17、Docker29.8.0；冻结依赖安装，隔离PostgreSQL15451/API8121/Web5221。
+- `node scripts/dev.mjs check` 退出0：Ruff、609项pytest（75.87s）、Alembic连续两次upgrade、ESLint、类型检查、103项Vitest、生产构建、18项基础Playwright（15.5s）和4项聊天/人工/反馈Playwright（38.2s）全部通过。原始日志留在本worktree `.local/check-final.log`；既有Starlette/AnyIO与Node弃用提示不影响退出结果。
+- 独立评审者未参与011实现，完整检查32个变更文件，对3d08f8d出具APPROVED。权限清理修复后3项独立组件复现通过；另有19项后端专项及2组独立真实PG边界验证。文件SHA256与命令保存在 `.local/feedback-full-review.md`。无剩余评审阻断。
+- 仍采用WORKFLOW10.1本地验收+GitHub PR；云端CI未运行，未伪写成功检查。本次专项无新增云调用，模型真实接通证据沿用008/009独立记录。此后仅验收文档更改复用上述代码检查；功能PR与main合并状态待实际结果追加。

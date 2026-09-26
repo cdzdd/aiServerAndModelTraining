@@ -10,7 +10,7 @@ const baseURL = `http://127.0.0.1:${webPort}`
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['**/chat.spec.ts', '**/handoff.spec.ts'],
+  testMatch: ['**/chat.spec.ts', '**/handoff.spec.ts', '**/feedback.spec.ts'],
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

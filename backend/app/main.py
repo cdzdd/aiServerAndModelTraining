@@ -23,6 +23,7 @@ from app.modules.auth.service import check_csrf
 from app.modules.chat.router import router as chat_router
 from app.modules.chat.runtime import ChatRuntime
 from app.modules.chat.service import recover_generations
+from app.modules.feedback.router import router as feedback_router
 from app.modules.handoff.router import router as handoff_router
 from app.modules.ingestion.router import router as ingestion_router
 from app.modules.ingestion.upload_limit import UploadLimitMiddleware
@@ -88,6 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(knowledge_router)
     app.include_router(ingestion_router)
     app.include_router(chat_router)
+    app.include_router(feedback_router)
     app.include_router(handoff_router)
 
     @app.exception_handler(AuthError)

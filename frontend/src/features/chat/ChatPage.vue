@@ -176,7 +176,7 @@ onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout
         <p v-if="conversation.mode==='queued'" class="muted">消息将作为待处理留言保存。</p>
         <p v-if="conversation.mode==='closed'" class="muted">会话已关闭，仅可阅读历史。</p>
         <div class="actions"><ElButton :disabled="messagesLoading" @click="loadSelected(selectedId)">刷新历史</ElButton><ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton><ElButton v-if="conversation.mode==='bot' && conversation.user_id===userId" :disabled="handoffBusy" @click="handoff">{{ handoffBusy?'申请中…':'申请人工客服' }}</ElButton></div>
-        <MessageList :messages="messages" @citations="citations=$event" />
+        <MessageList :can-feedback="conversation?.user_id===userId" :messages="messages" @citations="citations=$event" />
         <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
         <form v-if="canSend" class="composer" @submit.prevent="send()"><label for="chat-message">消息内容</label><textarea id="chat-message" v-model="draft" aria-label="消息内容" maxlength="2000" rows="4" :disabled="sending" />
           <div class="actions"><ElButton type="primary" native-type="submit" :disabled="sending">{{ conversation.mode==='bot'?'发送问题':'发送留言' }}</ElButton><ElButton v-if="sending && conversation.mode==='bot'" @click="stop">停止生成</ElButton><ElButton v-if="lastFailed && !sending && conversation.mode==='bot'" @click="send(lastFailed)">重试提问</ElButton></div>
