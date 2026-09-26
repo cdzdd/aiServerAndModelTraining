@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-010 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-009 |
 | 并行可行性 | 可与 011 并行；chat 共享模型/路由聚合改动必须串行协调，本任务拥有交接状态机 |
 | 负责目录 | `backend/app/modules/handoff/`、`frontend/src/features/handoff/`、必要 chat 状态衔接 |
@@ -28,7 +28,7 @@
 - [x] 实现客服回复、关闭和管理员允许的管理行为；所有内容查询复用 009 授权，写入转人工/接单/关闭审计事件。
 - [x] 实现用户等待状态、客服队列和会话工作台；用户继续发来的文字能被接单客服看到，显示清楚当前对话主体。
 - [x] 执行并发数据库测试与双浏览器角色 E2E；独立评审状态竞争、最少信息与审计完整性，修复后重跑受影响检查。
-- [ ] 记录真实命令和结果，提交 `in_review`；按 WORKFLOW 合并并统一更新状态。
+- [x] 记录真实命令和结果，提交 `in_review`；按 WORKFLOW 合并并统一更新状态。
 
 ## 验收与测试场景
 
@@ -78,3 +78,5 @@ npm run test:e2e -- --config playwright.chat.config.ts handoff.spec.ts
 - 最终 `node scripts/dev.mjs check` 退出0：Ruff、558项pytest（65.27s）、两次迁移upgrade、ESLint、TypeScript、92项Vitest、构建、18项通用Playwright（15.5s）与3项聊天/接管Playwright（28.5s）全部通过。Windows、Node24.11.0、Python3.12.14、uv0.12.17、Docker29.8.0及隔离PostgreSQL/pgvector，冻结依赖；原始日志`.local/check-final.log`。既有Starlette/Node弃用及颜色变量警告未影响退出结果。
 - 本地验收 + GitHub PR模式；云端CI未运行。该任务未新增DeepSeek调用，真实公网代理/外部客服系统均非本任务范围；功能PR实际合并后另建状态收尾PR。
 - 通过完整本地验收的代码提交：1d4ecd5a688ab9e390dcdbe0ced0f2803e51f613；后续此条仅补文档，核对格式/链接/事实后复用该代码检查，PR头将另记录。
+
+- 功能 PR [#21](https://github.com/cdzdd/aiServerAndModelTraining/pull/21) 已于 09/26/2026 08:18:08 普通 squash 合入权威 main，功能合并 SHA：a245012006885ed220966ece8a46f76a4229ace9。合并树与已验收 PR 头 ba7f4674cf73492599787a5cbc56eb69fce474d1 一致；本分支仅将本任务收尾为 done，按文档静态检查复用已完成代码验收。
