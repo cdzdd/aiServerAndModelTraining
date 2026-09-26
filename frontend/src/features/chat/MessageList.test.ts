@@ -33,3 +33,8 @@ it('defaults feedback controls off for the agent workbench',()=>{
   const wrapper=mount(MessageList,{props:{messages:[base]}})
   expect(wrapper.find('.feedback-control').exists()).toBe(false)
 })
+
+it('labels the customer and support agent distinctly in shared history',()=>{
+  const wrapper=mount(MessageList,{props:{messages:[{...base,id:'customer',role:'user',content:'客户问题'},{...base,id:'agent',role:'agent',content:'客服回复'}]}})
+  expect(wrapper.findAll('.message-heading strong').map(value=>value.text())).toEqual(['用户','客服'])
+})

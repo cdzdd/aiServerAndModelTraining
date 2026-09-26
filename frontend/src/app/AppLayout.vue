@@ -30,6 +30,7 @@ async function logout() {
         <RouterLink to="/knowledge">知识库</RouterLink>
         <RouterLink to="/chat">问答会话</RouterLink>
         <RouterLink v-if="session.state.user.role==='admin'" to="/admin/feedback">回答反馈</RouterLink>
+        <RouterLink v-if="session.state.user.role==='agent'||session.state.user.role==='admin'" to="/handoffs">人工客服队列</RouterLink>
       </nav>
       <main class="workspace"><p v-if="error" role="alert" class="error">{{ error }}</p><RouterView /></main>
     </div>

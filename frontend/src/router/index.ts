@@ -23,6 +23,8 @@ const routes:RouteRecordRaw[]=[
     {path:'chat/:id?',component:()=>import('../features/chat/ChatPage.vue')},
     {path:'admin/feedback',component:()=>import('../features/feedback/FeedbackListPage.vue'),meta:{roles:['admin']}},
     {path:'admin/feedback/:feedbackId',component:()=>import('../features/feedback/FeedbackDetail.vue'),meta:{roles:['admin']}},
+    {path:'handoffs',component:()=>import('../features/handoff/QueuePage.vue'),meta:{roles:['agent','admin']}},
+    {path:'handoffs/:handoffId',component:()=>import('../features/handoff/AgentConversationPage.vue'),meta:{roles:['agent','admin']}},
   ]},
   {path:'/:pathMatch(.*)*',component:()=>import('../app/StatePage.vue'),props:{kind:'not-found'},meta:{public:true}},
 ]

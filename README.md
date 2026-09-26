@@ -4,7 +4,7 @@
 
 ## 当前状态
 
-本仓库提供 FastAPI、Vue 3 和 PostgreSQL/pgvector 基础工程，包括健康检查、审计基础、数据库迁移、测试与 CI。已实现注册/登录、会话、用户管理、角色/资源授权，以及多知识库、成员授权和 FAQ 管理；文档上传、受控下载、后台解析与可恢复入库任务已加入；本地 BGE 向量索引、权限过滤检索和带引用/拒答的内部 RAG 服务已实现；聊天页面、持久历史、引用展示和停止生成已接入，公开网站部署尚未实现，任务进展以任务文件为准。
+本仓库提供 FastAPI、Vue 3 和 PostgreSQL/pgvector 基础工程，包括健康检查、审计基础、数据库迁移、测试与 CI。已实现注册/登录、会话、用户管理、角色/资源授权，以及多知识库、成员授权和 FAQ 管理；文档上传、受控下载、后台解析与可恢复入库任务已加入；本地 BGE 向量索引、权限过滤检索和带引用/拒答的内部 RAG 服务已实现；聊天页面、持久历史、引用展示和停止生成已接入；人工接管、客服排队/接单、双向留言与关闭已加入；回答评价与管理员反馈处理已接入，公开网站部署尚未实现，任务进展以任务文件为准。
 
 GitHub 仓库：[cdzdd/aiServerAndModelTraining](https://github.com/cdzdd/aiServerAndModelTraining)。首次规划基线已经同步；后续功能通过 PR 验证与合并。
 
@@ -55,4 +55,4 @@ node scripts/dev.mjs check
 
 ## 规划文件和运行文件
 
-`backend/`、`frontend/`、`infra/` 和 `scripts/` 是 todo-001 的工程基础；`docs/tasks/` 中其余任务描述未来功能，不能把规划中的接口当作已实现功能。具体测试结果、阻塞与合并记录见 [todo-001](docs/tasks/todo-001.md)。
+`backend/`、`frontend/`、`infra/` 和 `scripts/` 从 todo-001 工程基础逐项扩展。实际功能范围、测试结果、阻塞与合并记录以 [任务索引](todo.md) 链接的各任务文件为准；pending 任务中的规划接口不代表已实现。

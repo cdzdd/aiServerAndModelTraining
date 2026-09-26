@@ -6,7 +6,7 @@ import FeedbackControl from '../feedback/FeedbackControl.vue'
 
 withDefaults(defineProps<{messages:MessageView[];canFeedback?:boolean}>(),{canFeedback:false})
 const emit=defineEmits<{citations:[items:Citation[]]}>()
-const roleLabels={user:'我',assistant:'智能助手',agent:'客服',system:'系统'}
+const roleLabels={user:'用户',assistant:'智能助手',agent:'客服',system:'系统'}
 const statusLabels={generating:'生成中…',complete:'',failed:'生成失败',cancelled:'已取消'}
 </script>
 <template>

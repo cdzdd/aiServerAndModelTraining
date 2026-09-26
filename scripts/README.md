@@ -115,3 +115,4 @@ uv run --frozen --directory backend pytest tests/rag/smoke_real_rag.py -q -s
 已授权真实云验证时，可复用第 7 节的 `RAG_SMOKE_CONFIG`，显式运行 `uv run --frozen --directory backend pytest tests/chat/smoke_real_chat.py -q -s`。它保留真实应用 RAG/检索与认证/聊天路由，完成上传解析、真实 BGE 索引、首问/追问、持久历史、重复键及撤权投影检查，输出 `.local/real-chat-smoke.json`。默认统一检查不收集此文件，不调用云模型。
 
 反馈浏览器专项沿用聊天专用入口：`npm run test:e2e -- --config playwright.chat.config.ts feedback.spec.ts`（在 frontend 目录）。采用真实认证、聊天、数据库及反馈处理接口；仅回答输出为测试工厂，统一 check 包含该场景。
+人工接管浏览器专项沿用聊天专用入口：`npm run test:e2e -- --config playwright.chat.config.ts handoff.spec.ts`（在 frontend 目录）。该配置运行真实认证、数据库及生产交接路由，模型输出来自测试工厂；统一 check 同时包含聊天和人工接管场景。

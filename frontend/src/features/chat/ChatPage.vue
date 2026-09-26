@@ -6,6 +6,7 @@ import { session } from '../auth/session'
 import { ApiError, errorMessage } from '../../shared/api/errors'
 import { createConversation, deleteConversation, getConversation, listAvailableKnowledge, listConversations, listMessages, postText, streamQuestion, type ConversationView, type MessageView } from './api'
 import { decodeChatEvents, type Citation } from './stream'
+import { requestHandoff } from '../handoff/api'
 import ConversationList from './ConversationList.vue'
 import MessageList from './MessageList.vue'
 import CitationPanel from './CitationPanel.vue'
@@ -16,7 +17,8 @@ const conversations=ref<ConversationView[]>([]),conversationPage=ref(1),conversa
 const conversation=ref<ConversationView|null>(null),messages=ref<MessageView[]>([]),messagePage=ref(1),messagesLoading=ref(false),olderLoading=ref(false)
 const error=ref(''),notice=ref(''),draft=ref(''),sending=ref(false),lastFailed=ref<string|null>(null),citations=ref<Citation[]|null>(null)
 const creating=ref(false),newOpen=ref(false),available=ref<{id:string;name:string}[]>([]),kbPage=ref(1),kbTotal=ref(0),kbLoading=ref(false),selectedKbs=ref<string[]>([])
-let listVersion=0,detailVersion=0,knowledgeVersion=0,streamVersion=0,activeStream:AbortController|null=null,historyTimer:ReturnType<typeof setTimeout>|undefined
+const handoffBusy=ref(false)
+let listVersion=0,detailVersion=0,knowledgeVersion=0,streamVersion=0,handoffScope=0,instanceActive=true,olderExpanded=false,activeStream:AbortController|null=null,historyTimer:ReturnType<typeof setTimeout>|undefined
 const userId=computed(()=>session.state.user?.id ?? '')
 const canSend=computed(()=>{
   const item=conversation.value,user=session.state.user
@@ -44,18 +46,25 @@ async function loadSelected(id:string|null) {
   try {
     const [item,first]=await Promise.all([getConversation(id),listMessages(id)])
     const lastPage=Math.max(1,Math.ceil(first.total/first.page_size))
-    const history=lastPage===1?first:await listMessages(id,lastPage)
+    const start=olderExpanded && conversation.value?.id===id?Math.min(messagePage.value,lastPage):lastPage
+    const pages=await Promise.all(Array.from({length:lastPage-start+1},(_,index)=>{
+      const target=start+index
+      return target===1?Promise.resolve(first):listMessages(id,target)
+    }))
     if(current!==detailVersion) return
-    conversation.value=item;messages.value=history.items;messagePage.value=lastPage;citations.value=null
-    if(!sending.value && messages.value.some(value=>value.status==='generating')) historyTimer=setTimeout(()=>{if(selectedId.value===id && session.state.user)void loadSelected(id)},2000)
-  } catch(cause) {if(current===detailVersion)error.value=errorMessage(cause)}
+    conversation.value=item;messages.value=pages.flatMap(page=>page.items).filter((value,index,all)=>all.findIndex(item=>item.id===value.id)===index);messagePage.value=start;citations.value=null
+    if(!sending.value) {
+      const delay=messages.value.some(value=>value.status==='generating')?2000:item.mode==='queued' || item.mode==='human'?3000:0
+      if(delay) historyTimer=setTimeout(()=>{if(selectedId.value===id && session.state.user)void loadSelected(id)},delay)
+    }
+  } catch(cause) {if(current===detailVersion) {error.value=errorMessage(cause);if(cause instanceof ApiError && (cause.status===403 || cause.status===404)) {conversation.value=null;messages.value=[];citations.value=null}}}
   finally {if(current===detailVersion)messagesLoading.value=false}
 }
 async function older() {
   const id=selectedId.value,target=messagePage.value-1,current=detailVersion
   if(!id || target<1 || olderLoading.value) return
   olderLoading.value=true
-  try {const result=await listMessages(id,target);if(current===detailVersion) {const seen=new Set(messages.value.map(value=>value.id));messages.value=[...result.items.filter(value=>!seen.has(value.id)),...messages.value];messagePage.value=target}}
+  try {const result=await listMessages(id,target);if(current===detailVersion) {const seen=new Set(messages.value.map(value=>value.id));messages.value=[...result.items.filter(value=>!seen.has(value.id)),...messages.value];messagePage.value=target;olderExpanded=true}}
   catch(cause){if(current===detailVersion)error.value=errorMessage(cause)}
   finally {olderLoading.value=false}
 }
@@ -85,6 +94,21 @@ async function remove(id:string) {
 function optimistic(id:string,role:'user'|'assistant',content:string,status:MessageView['status']):MessageView {
   return {id,conversation_id:selectedId.value!,role,author_id:role==='user'?userId.value:null,content,status,citations:[],client_message_id:null,in_reply_to_id:null,answer_status:null,evidence_level:null,intent:null,latency_ms:null,error_code:null,created_at:new Date().toISOString(),evidence_hidden:false}
 }
+async function handoff() {
+  const item=conversation.value,id=selectedId.value
+  if(!item || !id || item.mode!=='bot' || item.user_id!==userId.value || handoffBusy.value) return
+  const owner=userId.value,scope=handoffScope
+  const valid=()=>instanceActive && scope===handoffScope && selectedId.value===id && userId.value===owner
+  handoffBusy.value=true;error.value=''
+  try {
+    await requestHandoff(id)
+    if(!valid()) return
+    cancelStream()
+    await loadSelected(id)
+    if(valid()) await loadConversations(conversationPage.value)
+  } catch(cause) {if(valid()) error.value=errorMessage(cause)}
+  finally {if(valid()) handoffBusy.value=false}
+}
 async function send(again?:string) {
   const item=conversation.value,id=selectedId.value
   if(!item || !id || !canSend.value || sending.value) return
@@ -92,7 +116,8 @@ async function send(again?:string) {
   if(!content || content.length>2000) {error.value='消息需为 1–2000 个字符。';return}
   const key=crypto.randomUUID(),current=++streamVersion
   clearTimeout(historyTimer)
-  draft.value='';lastFailed.value=null;error.value='';notice.value='';sending.value=true
+  if(item.mode==='bot') draft.value=''
+  lastFailed.value=null;error.value='';notice.value='';sending.value=true
   try {
     if(item.mode==='bot') {
       const controller=new AbortController()
@@ -115,7 +140,7 @@ async function send(again?:string) {
       if(!done) throw new ApiError(0,'STREAM_PROTOCOL','回答流中断，请刷新历史后重试。')
     } else {
       const saved=await postText(id,content,key)
-      if(current===streamVersion) messages.value=[...messages.value,saved]
+      if(current===streamVersion) {messages.value=[...messages.value,saved];draft.value=''}
     }
   } catch(cause) {
     if(current===streamVersion) {lastFailed.value=content;error.value=cause instanceof ApiError && cause.code==='CANCELLED'?'已停止生成；可手动重试。':errorMessage(cause)}
@@ -123,10 +148,10 @@ async function send(again?:string) {
     if(current===streamVersion) {activeStream=null;sending.value=false;await loadSelected(id);await loadConversations(conversationPage.value)}
   }
 }
-watch(selectedId,id=>{cancelStream();clearTimeout(historyTimer);conversation.value=null;messages.value=[];citations.value=null;error.value='';notice.value='';lastFailed.value=null;void loadSelected(id)},{immediate:true})
-watch(()=>[session.state.user?.id,session.state.user?.role],()=>{cancelStream();clearTimeout(historyTimer)})
+watch(selectedId,id=>{handoffScope++;handoffBusy.value=false;cancelStream();clearTimeout(historyTimer);olderExpanded=false;conversation.value=null;messages.value=[];citations.value=null;error.value='';notice.value='';lastFailed.value=null;void loadSelected(id)},{immediate:true})
+watch(()=>[session.state.user?.id,session.state.user?.role],()=>{handoffScope++;handoffBusy.value=false;cancelStream();clearTimeout(historyTimer);detailVersion++;conversation.value=null;messages.value=[];citations.value=null})
 onMounted(()=>{void loadConversations()})
-onUnmounted(()=>{cancelStream();clearTimeout(historyTimer);listVersion++;detailVersion++;knowledgeVersion++})
+onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout(historyTimer);listVersion++;detailVersion++;knowledgeVersion++})
 </script>
 <template>
   <header class="page-heading"><p class="eyebrow">知识与服务</p><h1>问答与会话</h1><p class="muted">选择可访问的知识库发起会话。回答、来源和历史以当前权限为准。</p></header>
@@ -150,7 +175,7 @@ onUnmounted(()=>{cancelStream();clearTimeout(historyTimer);listVersion++;detailV
         <div class="chat-heading"><h2>{{ conversation.title }}</h2><span class="status-tag">{{ conversation.mode==='bot'?'智能问答':conversation.mode==='queued'?'等待客服':conversation.mode==='human'?'人工处理中':'已关闭' }}</span></div>
         <p v-if="conversation.mode==='queued'" class="muted">消息将作为待处理留言保存。</p>
         <p v-if="conversation.mode==='closed'" class="muted">会话已关闭，仅可阅读历史。</p>
-        <div class="actions"><ElButton :disabled="messagesLoading" @click="loadSelected(selectedId)">刷新历史</ElButton><ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton></div>
+        <div class="actions"><ElButton :disabled="messagesLoading" @click="loadSelected(selectedId)">刷新历史</ElButton><ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton><ElButton v-if="conversation.mode==='bot' && conversation.user_id===userId" :disabled="handoffBusy" @click="handoff">{{ handoffBusy?'申请中…':'申请人工客服' }}</ElButton></div>
         <MessageList :can-feedback="conversation?.user_id===userId" :messages="messages" @citations="citations=$event" />
         <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
         <form v-if="canSend" class="composer" @submit.prevent="send()"><label for="chat-message">消息内容</label><textarea id="chat-message" v-model="draft" aria-label="消息内容" maxlength="2000" rows="4" :disabled="sending" />
