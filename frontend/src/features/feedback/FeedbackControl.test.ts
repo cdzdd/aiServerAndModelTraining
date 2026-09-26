@@ -51,3 +51,15 @@ it('discards a late response after the message changes',async()=>{
   await nextTick()
   expect(wrapper.text()).not.toContain('已核对')
 })
+
+it('reloads an existing row after a conflicting create so the owner can edit it',async()=>{
+  vi.mocked(getOwnFeedback).mockResolvedValueOnce(null).mockResolvedValueOnce(saved)
+  vi.mocked(submitFeedback).mockRejectedValue(new ApiError(409,'FEEDBACK_EXISTS','已有反馈'))
+  const wrapper=mount(FeedbackControl,{props:{messageId:'m'}})
+  await flushPromises()
+  await wrapper.get('input[value="up"]').setValue()
+  await wrapper.get('button[aria-label="提交反馈"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.find('button[aria-label="保存反馈修改"]').exists()).toBe(true)
+  expect(wrapper.get('[role="alert"]').text()).toContain('反馈已存在')
+})

@@ -2,7 +2,7 @@
 import { onUnmounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { session } from '../auth/session'
-import { errorMessage } from '../../shared/api/errors'
+import { ApiError, errorMessage } from '../../shared/api/errors'
 import { listFeedback, type FeedbackView } from './api'
 
 const items=ref<FeedbackView[]>([]),total=ref(0),page=ref(1)
@@ -16,10 +16,16 @@ async function load(target=page.value) {
     const result=await listFeedback(target,status.value,rating.value)
     if(!alive || current!==scope) return
     items.value=result.items;total.value=result.total;page.value=result.page
-  } catch(cause) {if(alive && current===scope) error.value=errorMessage(cause)}
+  } catch(cause) {if(alive && current===scope) {
+    if(cause instanceof ApiError && [401,403,404].includes(cause.status)) {items.value=[];total.value=0}
+    error.value=errorMessage(cause)
+  }}
   finally {if(alive && current===scope) loading.value=false}
 }
-watch(()=>[status.value,rating.value,session.state.user?.id],()=>load(1),{immediate:true})
+watch(()=>[status.value,rating.value,session.state.user?.id,session.state.user?.role],(value,oldValue)=>{
+  if(oldValue && (oldValue[2]!==value[2] || oldValue[3]!==value[3]) && session.state.user?.role!=='admin') {scope++;items.value=[];total.value=0;loading.value=false;error.value='';return}
+  load(1)
+},{immediate:true})
 </script>
 <template>
   <header class="page-heading"><p class="eyebrow">服务反馈</p><h1>反馈处理</h1><p class="muted">查看用户评价并记录处理结果。</p></header>

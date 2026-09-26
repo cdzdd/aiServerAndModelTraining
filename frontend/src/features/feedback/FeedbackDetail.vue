@@ -2,21 +2,25 @@
 import { onUnmounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { session } from '../auth/session'
-import { errorMessage } from '../../shared/api/errors'
+import { ApiError, errorMessage } from '../../shared/api/errors'
 import { getFeedbackDetail, resolveFeedback, type FeedbackDetailView } from './api'
 
 const route=useRoute()
-const detail=ref<FeedbackDetailView|null>(null),loading=ref(false),busy=ref(false),error=ref(''),notice=ref(''),resolution=ref('')
+const detail=ref<FeedbackDetailView|null>(null),loading=ref(false),busy=ref(false),error=ref(''),notice=ref(''),resolution=ref(''),refresh=ref(0)
 let scope=0,alive=true
 onUnmounted(()=>{alive=false;scope++})
-watch(()=>[route.params.feedbackId,session.state.user?.id],async()=>{
+watch(()=>[route.params.feedbackId,session.state.user?.id,session.state.user?.role,refresh.value],async(value,oldValue)=>{
   const current=++scope,id=String(route.params.feedbackId??'')
   loading.value=true;detail.value=null;error.value='';notice.value='';busy.value=false;resolution.value=''
+  if(oldValue && (oldValue[1]!==value[1] || oldValue[2]!==value[2]) && session.state.user?.role!=='admin') {loading.value=false;return}
   try {
     const result=await getFeedbackDetail(id)
     if(!alive || current!==scope) return
     detail.value=result;resolution.value=result.feedback.resolution
-  } catch(cause) {if(alive && current===scope) error.value=errorMessage(cause)}
+  } catch(cause) {if(alive && current===scope) {
+    if(cause instanceof ApiError && [401,403,404].includes(cause.status)) {detail.value=null;resolution.value=''}
+    error.value=errorMessage(cause)
+  }}
   finally {if(alive && current===scope) loading.value=false}
 },{immediate:true})
 async function update(status:'open'|'resolved') {
@@ -28,13 +32,16 @@ async function update(status:'open'|'resolved') {
     const result=await resolveFeedback(id,{status,resolution:status==='resolved'?resolution.value:''})
     if(!alive || current!==scope) return
     detail.value={...detail.value,feedback:result};resolution.value=result.resolution;notice.value=status==='resolved'?'反馈已处理。':'反馈已重新打开。'
-  } catch(cause) {if(alive && current===scope) error.value=errorMessage(cause)}
+  } catch(cause) {if(alive && current===scope) {
+    if(cause instanceof ApiError && [401,403,404].includes(cause.status)) {detail.value=null;resolution.value='';scope++}
+    error.value=errorMessage(cause)
+  }}
   finally {if(alive && current===scope) busy.value=false}
 }
 </script>
 <template>
   <header class="page-heading"><p class="eyebrow">服务反馈</p><h1>反馈详情</h1><p><RouterLink to="/admin/feedback">返回反馈列表</RouterLink></p></header>
-  <p v-if="error" role="alert" class="error">{{ error }}</p><p v-if="notice" role="status" class="success">{{ notice }}</p>
+  <p v-if="error" role="alert" class="error">{{ error }}</p><button v-if="error && !detail" type="button" :disabled="loading" @click="refresh++">重试加载</button><p v-if="notice" role="status" class="success">{{ notice }}</p>
   <section v-if="loading" class="panel">正在加载反馈…</section>
   <template v-else-if="detail">
     <section class="panel detail"><h2>{{ detail.feedback.rating==='up'?'有帮助':'没帮助' }} · {{ detail.feedback.status==='open'?'待处理':'已处理' }}</h2>
