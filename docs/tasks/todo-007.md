@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-007 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-006 |
 | 并行可行性 | 本任务拥有 embedding 与检索 schema；008/013 在本任务合入后消费或扩展 |
 | 负责目录 | `backend/app/modules/retrieval/`、向量迁移、入库索引衔接与检索测试 |
@@ -72,3 +72,9 @@ uv run alembic heads
 - 虚构校园问题：图书馆/食堂/补卡 Top-1 得分约 0.660/0.777/0.815 且命中预期来源；无关热水器问题最高 0.264，返回空。0.75 初始候选阈值漏掉图书馆问题，调整为 **0.65** 后全部通过。模型加载约 4.58 秒，3 项索引约 0.19 秒，热查询约 21–30 毫秒；仅小样例功能测量，不是代表性质量/吞吐基准。
 - 独立评审发现 P2：文档停用期间索引取消，恢复后未呈现重试入口。修复为优先保留失败状态和有效版本指针；无旧版/旧 active/当前版本重建三类回归先 3 failed，修后通过。独立复核亲自运行 4 项恢复测试通过、无剩余阻塞，报告 `.local/retrieval-full-review.md` 含受审文件哈希。
 - 限制：阈值尚未用用户代表性语料校准；精确查询未做大规模性能验收；本任务未调用 DeepSeek，无生产部署。云端 CI 未运行，按 WORKFLOW 10.1 保留真实本地证据和普通 PR 合并。
+
+### 功能合并与状态收尾
+
+- 功能 PR [#15](https://github.com/cdzdd/aiServerAndModelTraining/pull/15) 于 `2026-09-26T07:00:08Z` 实际 MERGED，普通 squash 合并 SHA `bc6b4debea33bb47ac39ee3b9fef0b3ddb8def76`。
+- 已验证提交 `3c28307a26a7cf9f2ee5899a987aed0236742cc9`，功能合并完整树与该提交一致。上述最终统一检查、真实 BGE smoke 和独立评审适用；云端 CI 未运行。
+- 本状态分支 `docs/todo-007-close` 仅修改本任务，核对 diff、Markdown 链接及 GitHub 实际合并事实；无代码变更，不重复应用测试。本状态 PR 实际合入后权威 main 上任务为 done。
