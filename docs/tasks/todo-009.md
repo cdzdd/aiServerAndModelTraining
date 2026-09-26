@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-009 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-008、todo-003 |
 | 并行可行性 | 可与 013、014 并行；本任务拥有 chat 模型和状态机，其他任务通过 RAG/provider 边界协作 |
 | 负责目录 | `backend/app/modules/chat/`、`frontend/src/features/chat/`、聊天迁移与 E2E |
@@ -67,7 +67,7 @@ npm run test:e2e -- --config playwright.chat.config.ts
 ## 工作记录与完成标准
 
 - 2026-09-26 按用户七项批次授权续领；worktree `C:/Users/Administrator/.codex/worktrees/todo-009-chat/aiSoftwareAttempt`，分支 `feat/todo-009-chat`，基点 `64c100b66b666bda0e3196fefe74c1a4e903cd29`，依赖 003/008 已实际合入。
-- 执行本机 `.local/chat-plan.md`；后端持久化、流式接口、前端分工实施，根代理协调共享迁移/配置与统一验收。限额按已接受的 RAG 请求计数（一次改写+回答仍一次），失败/取消不退还，不冒充云供应商调用计费。正文以安全文本显示；当前权限失效的历史引用隐藏整条助手证据并排除出模型历史。管理员可审阅/受控删除，不代用户发起 AI。详细验收证据见下文；功能与状态收尾尚待真实 PR 合并。
+- 执行本机 `.local/chat-plan.md`；后端持久化、流式接口、前端分工实施，根代理协调共享迁移/配置与统一验收。限额按已接受的 RAG 请求计数（一次改写+回答仍一次），失败/取消不退还，不冒充云供应商调用计费。正文以安全文本显示；当前权限失效的历史引用隐藏整条助手证据并排除出模型历史。管理员可审阅/受控删除，不代用户发起 AI。详细验收证据见下文；功能已合入，状态收尾按本节最后记录执行。
 - 按 [WORKFLOW](../WORKFLOW.md) 保存事件/状态验证和评审证据；功能分支 `in_review`，合入权威 main 且检查通过后统一更新 `done`。
 
 ### 2026-09-26 实施和专项验证
@@ -83,3 +83,5 @@ npm run test:e2e -- --config playwright.chat.config.ts
 - 最终 `node scripts/dev.mjs check` 退出 0：Ruff、528 项 pytest（61.72s）、两次迁移 upgrade、ESLint、TypeScript、71 项 Vitest、构建、18 项通用 E2E（15.5s）与 1 项聊天 E2E（12.6s）均通过。环境：Windows、Node 24.11.0、uv 0.12.17、Python 3.12.14、Docker 29.8.0、独立 PostgreSQL/pgvector；冻结依赖。现有 Starlette/Node 弃用及颜色环境警告未影响退出结果。日志为本机 .local/check-final.log，云端 CI 未运行。
 
 - 通过上述完整验收的代码提交：3273b0ba8110efa880c26d685d3676de49e183d8；后续此记录提交仅修改任务文档，按 WORKFLOW 10.1 核对格式、链接和事实，复用该代码验证。
+
+- 功能 PR [#19](https://github.com/cdzdd/aiServerAndModelTraining/pull/19) 已于 09/26/2026 07:51:04 普通 squash 合入权威 main，功能合并 SHA：444d1a9fda37b57eb696571e7cf1ee9a521d764f。合并树与已验收 PR 头 844c904d33857509710257e18ea2271e6d730ca5 一致；本分支仅将任务状态收尾为 done，静态核验文档，不重跑无代码变化的应用测试。
