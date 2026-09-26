@@ -37,6 +37,57 @@ export function createApiClient(onUnauthorized: () => void) {
       throw new ApiError(0, 'NETWORK_ERROR', '网络连接失败，请检查连接后重试。')
     } finally { clearTimeout(timeout) }
   }
-  return {request, setCsrfToken(token: string | null) { csrfToken=token; version++ }}
+  async function upload<T>(path:string,body:FormData,onProgress:(percent:number)=>void):Promise<T> {
+    const current=version
+    if(!csrfToken) {
+      const result=await request<{csrf_token:string}>('/auth/csrf',{authenticated:false})
+      if(current!==version) throw new ApiError(0,'SESSION_CHANGED','登录状态已变化，请重试。')
+      csrfToken=result.csrf_token
+    }
+    return new Promise<T>((resolve,reject)=>{
+      const xhr=new XMLHttpRequest()
+      xhr.open('POST','/api/v1'+path)
+      xhr.withCredentials=true
+      xhr.timeout=60_000
+      xhr.setRequestHeader('Accept','application/json')
+      xhr.setRequestHeader('X-CSRF-Token',csrfToken!)
+      xhr.upload.onprogress=event=>{if(event.lengthComputable)onProgress(Math.round(event.loaded*100/event.total))}
+      xhr.onerror=xhr.ontimeout=xhr.onabort=()=>reject(new ApiError(0,'NETWORK_ERROR','网络连接失败，请检查连接后重试。'))
+      xhr.onload=()=>{
+        if(current!==version) {reject(new ApiError(0,'SESSION_CHANGED','登录状态已变化，请重试。'));return}
+        let payload
+        try {payload=JSON.parse(xhr.responseText)} catch {payload=undefined}
+        if(xhr.status<200 || xhr.status>=300) {
+          if(xhr.status===401) onUnauthorized()
+          if(payload?.error?.code==='CSRF_FAILED') csrfToken=null
+          reject(new ApiError(xhr.status,payload?.error?.code ?? 'HTTP_ERROR',payload?.error?.message ?? '请求失败，请稍后重试。',payload?.error?.details))
+          return
+        }
+        resolve(payload as T)
+      }
+      xhr.send(body)
+    })
+  }
+  async function download(path:string):Promise<Blob> {
+    const current=version
+    const controller=new AbortController()
+    const timeout=setTimeout(()=>controller.abort(),60_000)
+    try {
+      const response=await fetch('/api/v1'+path,{credentials:'same-origin',headers:{Accept:'application/octet-stream'},signal:controller.signal})
+      if(current!==version) throw new ApiError(0,'SESSION_CHANGED','登录状态已变化，请重试。')
+      if(!response.ok) {
+        const payload=await response.json().catch(()=>undefined)
+        if(current!==version) throw new ApiError(0,'SESSION_CHANGED','登录状态已变化，请重试。')
+        if(response.status===401) onUnauthorized()
+        throw new ApiError(response.status,payload?.error?.code ?? 'HTTP_ERROR',payload?.error?.message ?? '请求失败，请稍后重试。',payload?.error?.details)
+      }
+      const blob=await response.blob()
+      if(current!==version) throw new ApiError(0,'SESSION_CHANGED','登录状态已变化，请重试。')
+      return blob
+    } catch(error) {
+      if(error instanceof ApiError) throw error
+      throw new ApiError(0,'NETWORK_ERROR','网络连接失败，请检查连接后重试。')
+    } finally {clearTimeout(timeout)}
+  }
+  return {request,upload,download,setCsrfToken(token: string | null) { csrfToken=token; version++ }}
 }
-

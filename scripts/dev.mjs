@@ -35,6 +35,9 @@ switch (process.argv[2]) {
     run('uv', ['run', '--frozen', 'uvicorn', 'app.main:create_app', '--factory', '--no-proxy-headers', '--no-access-log', '--host', '127.0.0.1', '--port', port], backend)
     break
   }
+  case 'worker':
+    run('uv', ['run', '--frozen', 'python', '-m', 'app.modules.ingestion.worker'], backend)
+    break
   case 'web':
     run('npm', ['run', 'dev'], frontend)
     break
@@ -50,6 +53,6 @@ switch (process.argv[2]) {
     }
     break
   default:
-    console.error('Usage: node scripts/dev.mjs <db-up|db-stop|api|web|check>')
+    console.error('Usage: node scripts/dev.mjs <db-up|db-stop|api|web|worker|check>')
     process.exit(1)
 }

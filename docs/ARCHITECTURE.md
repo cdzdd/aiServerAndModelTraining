@@ -25,7 +25,7 @@
 | 业务服务 | Python 3.12、uv lockfile、FastAPI、SQLAlchemy 2、Alembic |
 | 数据库 | PostgreSQL 16、pgvector；确切镜像版本在 todo-001 验证后固定，不使用漂移的 latest |
 | 文档 | pypdf、python-docx；普通文本用标准库读取 |
-| 检索 | sentence-transformers、bge-small-zh-v1.5，384 维向量，初期精确余弦检索 |
+| 检索 | sentence-transformers、bge-small-zh-v1.5，512 维向量，初期精确余弦检索 |
 | 模型 | 统一 provider 接口；Mock / 一家已配置云端服务 / Ollama，具体云模型由用户配置 |
 | 部署 | Linux、Docker Compose、Caddy；web/api/worker/db，训练不放进常驻业务容器 |
 | 测试 | pytest、Ruff、Vitest、Vue Test Utils、Playwright；GitHub Actions |

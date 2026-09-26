@@ -7,6 +7,7 @@ import { errorMessage } from '../../shared/api/errors'
 import { disableFaq, getKnowledge, indexLabel, listFaqs, saveFaq, type Faq, type KnowledgeBase, type Members } from './api'
 import FaqEditor from './FaqEditor.vue'
 import MemberEditor from './MemberEditor.vue'
+import DocumentList from './documents/DocumentList.vue'
 const route=useRoute(),admin=computed(()=>session.state.user?.role==='admin')
 const kb=ref<KnowledgeBase|null>(null),faqs=ref<Faq[]>([]),page=ref(1),total=ref(0),loading=ref(false),saving=ref(false)
 const error=ref(''),message=ref(''),editing=ref(false),selected=ref<Faq|undefined>(),membersOpen=ref(false)
@@ -48,6 +49,7 @@ watch(()=>route.params.id,()=>{message.value='';saving.value=false;void load()},
     <div v-if="admin" class="actions"><ElButton type="primary" :disabled="saving" @click="edit()">新增 FAQ</ElButton><ElButton :disabled="saving" @click="membersOpen=true;editing=false">管理成员</ElButton><ElButton :disabled="saving" @click="load(page)">刷新内容</ElButton></div>
     <FaqEditor v-if="admin && editing" :key="selected?.id ?? 'new'" :kb-id="kb.id" :faq="selected" @saving="saving=$event" @saved="saved" @cancel="editing=false" />
     <MemberEditor v-if="admin && membersOpen" :key="kb.id" :kb-id="kb.id" @saving="saving=$event" @saved="membersSaved" @cancel="membersOpen=false" />
+    <DocumentList :key="kb.id" :kb-id="kb.id" />
     <section class="faq-list" aria-label="常见问题">
       <p v-if="!faqs.length" class="panel">暂无常见问题。</p>
       <article v-for="faq in faqs" :key="faq.id" class="panel faq-card">
