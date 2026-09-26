@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-008 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-007、todo-004 |
 | 并行可行性 | RAG 编排由本任务独占；合入后 009、013、014 可从稳定接口并行扩展 |
 | 负责目录 | `backend/app/modules/rag/`、RAG 契约测试与提示词版本记录 |
@@ -69,4 +69,4 @@ uv run ruff check .
 - 真实场景包含中文首问、追问、食堂、FAQ、文档恶意指令、无关问题、无权知识库、BGE 超长输入和生成期来源变化。后三个无需回答的检索场景未调用云模型；来源变化仅 error/SOURCE_CHANGED，无旧内容。脱敏证据 `.local/real-rag-smoke-first.json`、`.local/real-rag-smoke.json`，配置及密钥均被忽略。
 - 独立代理完成全量代码评审，P1 修复后以原复现重新验证；结论无未解决 Critical/Important 问题，详见本机 `.local/rag-full-review.md`。评审另实际运行身份复核 4 passed、提示词边界/预算 19 passed。
 - 当前本地验收 + GitHub PR 模式；云端 CI 未运行，不声称通过。仍需代表性资料集做 013 质量评测及 017 部署验证；本任务真实小样例不等于生产质量评估。内部服务尚不包含 009 会话 API/UI。
-- 已完成实现与验收，等待功能 PR 和状态 PR 实际合入；合并信息在收尾补记。
+- 功能分支 `feat/todo-008-rag`，已验证提交 `f3d607ba2c3746ab4d2085366e74c7fb8721f322`；[功能 PR #17](https://github.com/cdzdd/aiServerAndModelTraining/pull/17) 于 2026-09-26T07:18:46Z 实际合入，功能合并 SHA `461e90a7a77a4af16acf1ac1b6d85405e49ca740`。合并后确认远端 main 与已验证功能提交树一致。本状态收尾仅修改本任务文档。
