@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import aclosing
 from uuid import UUID
 
+from app.core.request_context import log_failure
 from app.modules.auth.schemas import Actor
 from app.modules.providers.errors import MESSAGES as PROVIDER_MESSAGES
 from app.modules.providers.errors import ProviderError
@@ -48,7 +49,7 @@ ERROR_MESSAGES = {
 def _error(code: str) -> AnswerEvent:
     if code not in ERROR_MESSAGES:
         code = "RAG_UNAVAILABLE"
-    logger.warning("rag_failure code=%s prompt_version=%s", code, PROMPT_VERSION)
+    log_failure(logger, "rag_failure", code, prompt_version=PROMPT_VERSION)
     return AnswerEvent(type="error", payload={"code": code, "message": ERROR_MESSAGES[code]})
 
 
@@ -156,7 +157,7 @@ class RAGService:
         except RAGError as exc:
             if exc.code != "INVALID_CITATION":
                 raise
-            logger.warning("rag_refusal code=INVALID_CITATION prompt_version=%s", PROMPT_VERSION)
+            log_failure(logger, "rag_refusal", "INVALID_CITATION", prompt_version=PROMPT_VERSION)
             return _events(NO_ANSWER, usages=usages)
         if status == "no_answer":
             return _events(NO_ANSWER, usages=usages)

@@ -238,7 +238,7 @@ def test_response_cleanup_releases_slot_even_when_iterator_close_fails():
                 raise RuntimeError("upstream close failed")
 
         class Generation:
-            reservation = SimpleNamespace(conversation_id=cid)
+            reservation = SimpleNamespace(conversation_id=cid, request_id=str(uuid4()))
 
             def events(self):
                 return Iterator()

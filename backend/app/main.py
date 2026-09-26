@@ -1,4 +1,3 @@
-import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -16,7 +15,9 @@ from starlette.exceptions import HTTPException
 from app.core.config import Settings
 from app.core.database import create_db_engine
 from app.core.errors import error_response
+from app.core.request_context import configure_logging, log_failure, log_http, request_id_context
 from app.core.security import AuthError
+from app.modules.analytics.router import router as analytics_router
 from app.modules.auth.limits import LoginLimiter
 from app.modules.auth.router import router as auth_router
 from app.modules.auth.service import check_csrf
@@ -39,14 +40,11 @@ request_logger = logging.getLogger("app.requests")
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings if settings is not None else Settings()
     engine = create_db_engine(settings)
-    request_logger.setLevel(logging.INFO)
-    if not request_logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter("%(message)s"))
-        request_logger.addHandler(handler)
+    configure_logging()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        recovery_operation_id = uuid4()
         try:
             try:
                 await run_in_threadpool(
@@ -55,7 +53,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 app.state.chat_ready = True
             except SQLAlchemyError:
                 # Liveness remains available, but no chat traffic starts after failed recovery.
-                logging.getLogger("app.lifecycle").error('{"event":"chat_recovery_failed"}')
+                log_failure(
+                    logging.getLogger("app.lifecycle"),
+                    "chat_recovery_failed",
+                    "CHAT_RECOVERY_FAILED",
+                    request_id=None,
+                    operation_id=recovery_operation_id,
+                )
             yield
         finally:
             try:
@@ -85,6 +89,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         window_seconds=settings.login_window_seconds,
         max_entries=settings.login_max_entries,
     )
+    app.include_router(analytics_router)
     app.include_router(auth_router)
     app.include_router(knowledge_router)
     app.include_router(ingestion_router)
@@ -103,34 +108,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except ValueError:
             request_id = str(uuid4())
         request.state.request_id = request_id
+        token = request_id_context.set(request_id)
         try:
-            if request.url.path.startswith("/api/v1/") and request.method not in (
-                "GET",
-                "HEAD",
-                "OPTIONS",
-            ):
-                await run_in_threadpool(check_csrf, request)
-            response = await call_next(request)
-        except AuthError as exc:
-            response = error_response(request, exc.status, exc.code, exc.message)
-        except Exception:
-            response = error_response(request, 500, "INTERNAL_ERROR", "服务暂时不可用")
-        response.headers["X-Request-ID"] = request_id
-        if request.url.path.startswith("/api/v1/"):
-            response.headers["Cache-Control"] = "no-store"
-        route = request.scope.get("route")
-        request_logger.info(
-            json.dumps(
-                {
-                    "event": "http_request",
-                    "request_id": request_id,
-                    "method": request.method,
-                    "route": getattr(route, "path", "<unmatched>"),
-                    "status_code": response.status_code,
-                }
+            try:
+                if request.url.path.startswith("/api/v1/") and request.method not in (
+                    "GET",
+                    "HEAD",
+                    "OPTIONS",
+                ):
+                    await run_in_threadpool(check_csrf, request)
+                response = await call_next(request)
+            except AuthError as exc:
+                response = error_response(request, exc.status, exc.code, exc.message)
+            except Exception:
+                response = error_response(request, 500, "INTERNAL_ERROR", "服务暂时不可用")
+            response.headers["X-Request-ID"] = request_id
+            if request.url.path.startswith("/api/v1/"):
+                response.headers["Cache-Control"] = "no-store"
+            route = request.scope.get("route")
+            log_http(
+                request_logger,
+                request_id=request_id,
+                method=request.method,
+                route=getattr(route, "path", "<unmatched>"),
+                status_code=response.status_code,
+                error_code=getattr(request.state, "error_code", None),
             )
-        )
-        return response
+            return response
+        finally:
+            request_id_context.reset(token)
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException):
