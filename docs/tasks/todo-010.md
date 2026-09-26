@@ -77,3 +77,4 @@ npm run test:e2e -- --config playwright.chat.config.ts handoff.spec.ts
 - `/root/review_rag` 全范围独立评审 APPROVED，无未解决重要问题；报告 `.local/handoff-full-review.md` 保存复现与29个文件版本。前端最终组件专项31项、typecheck/lint通过，真实人工接管浏览器2项通过；全量检查额外覆盖最终标签断言。
 - 最终 `node scripts/dev.mjs check` 退出0：Ruff、558项pytest（65.27s）、两次迁移upgrade、ESLint、TypeScript、92项Vitest、构建、18项通用Playwright（15.5s）与3项聊天/接管Playwright（28.5s）全部通过。Windows、Node24.11.0、Python3.12.14、uv0.12.17、Docker29.8.0及隔离PostgreSQL/pgvector，冻结依赖；原始日志`.local/check-final.log`。既有Starlette/Node弃用及颜色变量警告未影响退出结果。
 - 本地验收 + GitHub PR模式；云端CI未运行。该任务未新增DeepSeek调用，真实公网代理/外部客服系统均非本任务范围；功能PR实际合并后另建状态收尾PR。
+- 通过完整本地验收的代码提交：1d4ecd5a688ab9e390dcdbe0ced0f2803e51f613；后续此条仅补文档，核对格式/链接/事实后复用该代码检查，PR头将另记录。
