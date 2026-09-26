@@ -73,3 +73,9 @@ npm run test:e2e -- --config playwright.chat.config.ts feedback.spec.ts
 - 新增真实PG两连接跨模块并发回归：管理员关闭人工会话与处理旧AI回答反馈，分别验证两个操作先取得锁；通过 pg_blocking_pids 确认 User 锁等待，两项均通过且状态/审计一致。后端独立评审另实测同时创建不同评价仅一行一审计，以及删除会话后等待中的反馈提交404；相关19项测试通过（5.53s）。
 - 前端14项组件测试、类型检查和ESLint通过；真实浏览器 feedback.spec.ts 1项通过，覆盖提问→评价→管理员处理→本人回看→修改重开→再次提问知识不变、他人404/403。桌面和390px手机截图已检查，无横向溢出。此专项使用真实认证/API/PostgreSQL及专用可复现RAG测试fixture，不代表新增云模型调用。
 - 独立评审发现管理员失权后旧反馈内容仍显示，已修复401/403/404清理、同ID角色变化和过期请求防护并加入回归；评审者原始失败用例已通过。完整统一检查及最终评审记录随后补充，当前尚未合并。
+### 2026-09-26 最终本地验收与独立评审
+
+- 验收代码提交：3d08f8d69011e3fa5b054062a8b44492903636aa，已整合权威main 301f99e6845a1b8673f1ac7f511135cea09fb914。Windows、Node24.11.0、Python3.12.14、uv0.12.17、Docker29.8.0；冻结依赖安装，隔离PostgreSQL15451/API8121/Web5221。
+- `node scripts/dev.mjs check` 退出0：Ruff、609项pytest（75.87s）、Alembic连续两次upgrade、ESLint、类型检查、103项Vitest、生产构建、18项基础Playwright（15.5s）和4项聊天/人工/反馈Playwright（38.2s）全部通过。原始日志留在本worktree `.local/check-final.log`；既有Starlette/AnyIO与Node弃用提示不影响退出结果。
+- 独立评审者未参与011实现，完整检查32个变更文件，对3d08f8d出具APPROVED。权限清理修复后3项独立组件复现通过；另有19项后端专项及2组独立真实PG边界验证。文件SHA256与命令保存在 `.local/feedback-full-review.md`。无剩余评审阻断。
+- 仍采用WORKFLOW10.1本地验收+GitHub PR；云端CI未运行，未伪写成功检查。本次专项无新增云调用，模型真实接通证据沿用008/009独立记录。此后仅验收文档更改复用上述代码检查；功能PR与main合并状态待实际结果追加。
