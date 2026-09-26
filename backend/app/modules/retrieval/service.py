@@ -11,6 +11,7 @@ from app.core.database import create_db_engine
 from app.modules.auth.schemas import Actor
 from app.modules.retrieval.embedding import BGEEmbedder
 from app.modules.retrieval.repository import has_visible_scope, search_candidates
+from app.modules.retrieval.repository import validate_hits as validate_source_hits
 from app.modules.retrieval.schemas import RetrievalError, SearchHit
 
 
@@ -34,6 +35,16 @@ class RetrievalService:
                 top_k=top_k,
                 threshold=self.threshold,
             )
+
+    def _validate_hits(self, actor, kb_ids, hits):
+        with self.session_factory() as db:
+            return validate_source_hits(db, actor, kb_ids, hits)
+
+    async def validate_hits(
+        self, actor: Actor, kb_ids: list[UUID], hits: list[SearchHit]
+    ) -> bool:
+        # The generation phase holds no DB session; this session sees current permissions.
+        return await asyncio.to_thread(self._validate_hits, actor, list(kb_ids), list(hits))
 
     async def search(
         self,
@@ -76,3 +87,7 @@ async def search(
     top_k: int = 5,
 ) -> list[SearchHit]:
     return await get_retrieval_service().search(actor, kb_ids, query, top_k)
+
+
+async def validate_hits(actor: Actor, kb_ids: list[UUID], hits: list[SearchHit]) -> bool:
+    return await get_retrieval_service().validate_hits(actor, kb_ids, hits)

@@ -2,9 +2,10 @@
 
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, exists, or_, select
 from sqlalchemy.orm import Session
 
+from app.modules.auth.models import User
 from app.modules.auth.schemas import Actor
 from app.modules.ingestion.models import Chunk, Document, DocumentRevision
 from app.modules.knowledge.models import FAQ, KnowledgeBase
@@ -100,3 +101,38 @@ def search_candidates(
         )
         for chunk, similarity in db.execute(ranked)
     ]
+
+
+def validate_hits(
+    db: Session, actor: Actor, kb_ids: list[UUID], hits: list[SearchHit]
+) -> bool:
+    """Recheck current authority and exact source snapshots without embedding work."""
+    if not hits or not kb_ids:
+        return False
+    candidates = active_candidates(actor, kb_ids).where(
+        # Revalidate the caller in this same statement: a stale admin Actor cannot
+        # retain privileges after demotion, and disabled users cannot receive text.
+        exists().where(
+            User.id == actor.user_id,
+            User.is_active.is_(True),
+            User.role == actor.role,
+        ),
+        Chunk.id.in_([hit.chunk_id for hit in hits]),
+        Chunk.embedding_model == MODEL_ID,
+        Chunk.embedding_version == MODEL_REVISION,
+    )
+    current = {chunk.id: chunk for chunk in db.scalars(candidates)}
+    fields = (
+        "kb_id", "text", "title", "revision_id", "faq_version",
+        "page_number", "paragraph_number", "line_number",
+    )
+    for hit in hits:
+        chunk = current.get(hit.chunk_id)
+        if chunk is None:
+            return False
+        source_type = "document" if chunk.document_id else "faq"
+        if hit.source_type != source_type or hit.source_id != (chunk.document_id or chunk.faq_id):
+            return False
+        if any(getattr(hit, field) != getattr(chunk, field) for field in fields):
+            return False
+    return True

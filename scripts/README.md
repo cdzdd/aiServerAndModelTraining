@@ -86,3 +86,22 @@ uv run --directory backend --frozen python -c "from pathlib import Path; from hu
 内部异步 `retrieval.service.search` 为后续 RAG 提供有权限的结果，无独立公开搜索 API。默认 Top-K 5、余弦阈值 `RETRIEVAL_THRESHOLD=0.65` 是初始值，需代表性问题集校准。普通测试使用固定向量并查询真实 pgvector；真实 BGE smoke 另记样本、查询、得分、耗时及限制，不能把固定向量测试当作模型质量验证。
 
 真实 BGE 专项检查显式运行（默认 pytest 不自动收集该较重 smoke）：在已配置专用 TEST_DATABASE_URL 和上述模型路径的 worktree，执行 `uv run --frozen --directory backend pytest tests/retrieval/smoke_real_model.py -q -s`。它在临时 schema 使用虚构中文资料，调用真实上传/解析/index handler/语义查询并验证撤权；输出 `.local/real-retrieval-smoke.json`，不调用云模型。默认阈值由 0.75 调整为 0.65 是因为此小样例的相关图书馆问题约 0.660，其他相关问题约 0.777/0.815，无关问题最高约 0.264；这不是代表性质量评测。
+
+## 7. RAG 内部服务（todo-008）
+
+`rag.service.stream_answer(actor, kb_ids, question, history)` 消费现有 provider 和授权检索，返回 delta/citations/done/error。008 不新增公开问答接口或会话存储；聊天页面与持久历史在 009 接入。
+
+首版只展示模型选择且经服务端核实的原文摘录。引用校验、当前权限/版本复核完成前不展示上游内容；首段出现较晚。无证据时明确说明无依据；模型截断、超时或资料变化时返回错误。改写和回答共用 60 秒与最多 512 输出 tokens，无透明重试。默认 `.env` 仍为 Mock，不能把其固定文字当作真实知识答案。
+
+真实云 smoke 使用本 worktree 忽略目录中的独立配置，显式选择已授权的提供商和模型；不改默认测试模式，不把密钥写入命令行、Git 或前端。DeepSeek 的 `MODEL_DISABLE_THINKING=true` 沿用已验证配置，实际输入/输出 usage 有则记录，缺失保持未知。测试中的虚构资料与样例回答不代表生产知识质量。
+
+已授权真实云调用后，将独立云配置存入本 worktree 的 `.local/deepseek-rag.env`（不得提交），在 PowerShell 显式运行：
+
+```powershell
+$env:RAG_SMOKE_CONFIG = Join-Path (Get-Location) '.local/deepseek-rag.env'
+$env:HF_HUB_OFFLINE = '1'
+$env:TRANSFORMERS_OFFLINE = '1'
+uv run --frozen --directory backend pytest tests/rag/smoke_real_rag.py -q -s
+```
+
+该专项默认不会被 pytest 收集。它使用临时数据库 schema、虚构资料、真实上传/解析/BGE/检索与 DeepSeek，覆盖引用、多轮、FAQ、资料内恶意指令、无依据、越权、超长查询和生成期间来源变化。输出 `.local/real-rag-smoke.json`，含实际调用次数、usage 和逐例延时。云服务测试需要调用授权；不要通过普通统一检查隐式触发。

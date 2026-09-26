@@ -106,7 +106,7 @@ Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,tex
 | LLMMessage（providers） | role: system/user/assistant, content: str |
 | LLMDelta（providers） | text: str, finish_reason: str或null；供应商 usage 可在结束时附带 |
 | SearchHit（retrieval） | chunk_id, kb_id, text, source_type: document/faq, source_id, title, page_number?, paragraph_number?, line_number?, score, revision_id?, faq_version? |
-| Citation（rag） | index: int, chunk_id, source_type, source_id, title, page_number?, quote |
+| Citation（rag） | index: int, chunk_id, kb_id, source_type, source_id, title, page_number?, paragraph_number?, line_number?, revision_id?, faq_version?, quote |
 | AnswerEvent（rag） | type: delta/citations/done/error, payload: dict |
 
 Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temperature: float) -> AsyncIterator[LLMDelta]`。异步生成器，不接收数据库会话或用户权限。实现 `MockProvider`、`CloudProvider`、`OllamaProvider`，由配置选择。统一超时/取消、429/5xx、无有效输出处理；不把不同协议的错误内容直接展示给用户。
@@ -134,7 +134,19 @@ Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: 
 
 RAG 接口：`stream_answer(actor: Actor, kb_ids: list[UUID], question: str, history: list[LLMMessage]) -> AsyncIterator[AnswerEvent]`。不依赖 Conversation ORM；由 chat 提供已过滤的历史，由 retrieval 验证知识范围。todo-008 可以在 todo-009 尚未开发时独立测试。
 
-`done` payload：`{answer_status: "answered|clarify|no_answer", evidence_level: "sufficient|limited|none", intent: "knowledge|complaint|handoff|other"}`。明确转人工意图交由 chat/handoff 执行状态变更，RAG 不自行写会话状态。
+`done` payload：`{answer_status: "answered|clarify|no_answer", evidence_level: "sufficient|limited|none", intent: "knowledge|complaint|handoff|other"}`。明确转人工意图交由 chat/handoff 执行状态变更，RAG 不自行写会话状态。done 可附带 `usage: {prompt_tokens?,completion_tokens?,total_tokens?}|null`；仅使用真实上游 usage，多阶段某字段缺失则该合计保持 null，不按字数估算，不把缺失当零。
+
+### 008 已实现接入细则
+
+首版为抽取式证据回答：模型只选择本轮证据的来源编号与连续原文，服务端严格校验后生成回答和引用，不直接展示模型自由摘要。模型原始响应先缓冲，验证完成才发 delta/citations/done，因此首段会晚于上游首 token；不以逐字延时伪造实时流。未知编号、伪造引文和额外自由答案字段会被拒绝，不生成假引用。
+
+引用元数据由当前 SearchHit 提供，包含 kb_id、文档 revision_id 或 FAQ faq_version 与定位。发送任何证据前，通过 retrieval.validate_hits 复用当前 SQL 权限/有效版本谓词再次核验；同一 SQL 同时要求用户仍有效且当前角色未变；撤权、用户停用/改角色、来源停用、删除或版本改变返回安全 SOURCE_CHANGED 错误，不输出旧原文。该接口为新短会话只读查询，不跨模型调用持数据库锁。
+
+提示词版本 `rag-extractive-v1`，问题 1–2000 字符；历史只接收调用方已授权的完整 user/assistant 轮次，最近最多 3 轮。system 历史不受信任。回答提示词同时保留原问题与改写后的独立查询；后者仅恢复指代，不作为事实证据，两者都计入体积预算。问题不截断；证据超出输入预算时丢弃最低排名的完整片段并同步来源映射。输入按序列化消息内容的 UTF-8 字节限制为 12000，属于保守体积上限而非 DeepSeek 精确 token 计数。当前 DeepSeek 配置容量依据见 [官方模型文档](https://api-docs.deepseek.com/quick_start/pricing/)；BGE 自身仍用真实 tokenizer 检查 512 上限，超过时请求用户缩短问题。
+
+改写、检索、答复及发送前核验共用 60 秒期限；无历史时答复最多 512 输出 tokens，有改写时最多 128+384。所有模型流有明确关闭/取消，失败无透明重试；不完整、截断、过滤或超时不能以成功 done 结束。文档/历史仅作为不可信数据，不进入 system 权限或工具调用；本模块不写会话或人工接管状态。
+
+明确转人工/投诉/简单问候使用固定安全说明；否定转人工和询问投诉渠道仍按知识问题处理。空证据不调用答复模型，返回无依据说明。默认 MockProvider 的固定联调文字不能冒充合规知识回答；自动化 RAG 测试注入受控 provider，真实 DeepSeek 检查另行显式运行并记录。
 
 ## 5. 会话与流式输出（todo-009）
 
