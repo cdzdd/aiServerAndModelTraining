@@ -36,9 +36,9 @@ it('shows active and candidate versions separately and calls parsed pending inde
   expect(wrapper.text()).not.toContain('删除文档')
 })
 
-it('admin can retry failed parsing and receives an error on a failed write',async()=>{
+it.each([['parse','重试解析'],['index','重试索引']])('admin can retry failed %s and receives an error on a failed write',async(kind,label)=>{
   session.api.setCsrfToken('csrf')
-  const failed={...document,status:'failed',active_revision_id:null,active_revision:null,candidate_revision:null,latest_job:{...document.latest_job,state:'failed',kind:'parse',error_code:'NO_TEXT',error_message:'未提取到文本'}}
+  const failed={...document,status:'failed',active_revision_id:null,active_revision:null,candidate_revision:null,latest_job:{...document.latest_job,state:'failed',kind,error_code:'NO_TEXT',error_message:'未提取到文本'}}
   const calls:string[]=[]
   vi.stubGlobal('fetch',async(url:string,options:RequestInit={})=>{
     calls.push((options.method??'GET')+' '+url)
@@ -50,7 +50,7 @@ it('admin can retry failed parsing and receives an error on a failed write',asyn
   const wrapper=mount(DocumentList,{props:{kbId}})
   await flushPromises()
   expect(wrapper.text()).toContain('未提取到文本')
-  await wrapper.get('button[aria-label="重试解析"]').trigger('click')
+  await wrapper.get('button[aria-label="'+label+'"]').trigger('click')
   await flushPromises()
   expect(calls).toContain('POST /api/v1/documents/'+document.id+'/reindex')
   expect(wrapper.get('[role="alert"]').text()).toContain('已有任务正在执行')
@@ -75,4 +75,29 @@ it('shows a download authorization error in the document panel',async()=>{
   await wrapper.get('button[aria-label="下载原文件"]').trigger('click')
   await flushPromises()
   expect(wrapper.get('[role="alert"]').text()).toContain('没有访问权限')
+})
+
+it('refreshes a queued index until ready and stops polling after completion', async()=>{
+  vi.useFakeTimers({toFake:['setTimeout','clearTimeout']})
+  let calls=0
+  vi.stubGlobal('fetch',async()=>{
+    calls++
+    const item=calls===1?document:{...document,status:'ready',active_revision_id:document.candidate_revision_id,active_revision:document.candidate_revision,latest_job:{...document.latest_job,state:'succeeded'}}
+    return new Response(JSON.stringify({items:[item],total:1,page:1,page_size:20}))
+  })
+  const wrapper=mount(DocumentList,{props:{kbId}})
+  try {
+    await flushPromises()
+    expect(wrapper.text()).toContain('解析完成，待建立索引')
+    await vi.advanceTimersByTimeAsync(5000)
+    await flushPromises()
+    expect(calls).toBe(2)
+    expect(wrapper.text()).toContain('已建立索引')
+    expect(wrapper.text()).not.toContain('新版本处理')
+    await vi.advanceTimersByTimeAsync(10000)
+    expect(calls).toBe(2)
+  } finally {
+    wrapper.unmount()
+    vi.useRealTimers()
+  }
 })

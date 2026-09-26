@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
@@ -56,6 +57,10 @@ class Chunk(Base):
         CheckConstraint(
             "(document_id IS NOT NULL) <> (faq_id IS NOT NULL)", name="chunk_one_source"
         ),
+        CheckConstraint(
+            "embedding IS NULL OR (embedding_model IS NOT NULL AND embedding_version IS NOT NULL)",
+            name="chunk_embedding_metadata",
+        ),
         UniqueConstraint("revision_id", "chunk_index", name="chunk_revision_index"),
         UniqueConstraint("faq_id", "faq_version", "chunk_index", name="chunk_faq_index"),
     )
@@ -73,7 +78,7 @@ class Chunk(Base):
     page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     paragraph_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     line_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Vector storage and indexed model metadata are added by 007.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(512), nullable=True)
     embedding_model: Mapped[str | None] = mapped_column(String(200), nullable=True)
     embedding_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
 

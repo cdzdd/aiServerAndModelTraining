@@ -8,11 +8,21 @@ from app.core.audit import record_audit
 from app.core.security import AuthError
 from app.modules.auth.schemas import Actor
 from app.modules.ingestion.models import Chunk, Document, DocumentRevision, IngestionJob
-from app.modules.ingestion.parsers import ERROR_MESSAGES
+from app.modules.ingestion.parsers import ERROR_MESSAGES as PARSE_ERROR_MESSAGES
 from app.modules.ingestion.schemas import DocumentSummary, JobSummary, RevisionSummary
 from app.modules.ingestion.storage import store_upload
 from app.modules.knowledge.permissions import require_read
 from app.modules.knowledge.service import locked_kb, paginate
+
+ERROR_MESSAGES = {
+    **PARSE_ERROR_MESSAGES,
+    "MODEL_UNAVAILABLE": "向量模型尚不可用，请联系管理员后重试",
+    "MODEL_INTEGRITY": "向量模型文件不完整或版本不符，请联系管理员",
+    "INVALID_INPUT": "索引内容无有效文本，请检查后重新上传",
+    "TOKEN_LIMIT": "索引片段超过模型长度上限，请检查分段设置",
+    "ENCODE_FAILED": "向量生成失败，请稍后重新索引",
+    "INVALID_OUTPUT": "向量模型输出无效，请联系管理员后重试",
+}
 
 
 def get_document(db: Session, actor: Actor, document_id: UUID, *, lock=False):
@@ -178,14 +188,14 @@ def patch_document(db, request, actor, document_id, enabled):
         document.status = "disabled"
     elif document.status == "disabled":
         job = latest_job(db, document)
-        if job and job.kind == "index":
+        if job and job.state == "failed":
+            document.status = "failed"
+        elif job and job.kind == "index":
             document.status = (
                 "ready"
                 if document.active_revision_id == document.candidate_revision_id
                 else "parsed"
             )
-        elif job and job.state == "failed":
-            document.status = "failed"
         else:
             document.status = "uploaded"
     audit(db, request, actor, document, "enable" if enabled else "disable")

@@ -18,6 +18,7 @@ from app.modules.knowledge.schemas import (
     KnowledgePatch,
     MembersInput,
 )
+from app.modules.retrieval.jobs import enqueue_faq_index
 
 
 def readable_knowledge_bases(actor: Actor):
@@ -93,10 +94,23 @@ def update_knowledge(
 ):
     kb = locked_kb(db, kb_id)
     check_version(kb.version, data.expected_version)
+    was_active = kb.is_active
     changes = data.model_dump(exclude_unset=True, exclude={"expected_version"})
     for key, value in changes.items():
         setattr(kb, key, value)
     kb.version += 1
+    if kb.is_active and not was_active:
+        for faq in db.scalars(
+            select(FAQ)
+            .where(
+                FAQ.kb_id == kb.id,
+                FAQ.is_active.is_(True),
+                (FAQ.indexed_version.is_(None)) | (FAQ.indexed_version != FAQ.version),
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ):
+            enqueue_faq_index(db, faq, retry_failed=True)
     audit(
         db,
         request,
@@ -162,6 +176,7 @@ def create_faq(db: Session, request: Request, actor: Actor, kb_id: UUID, data: F
     faq = FAQ(kb_id=kb_id, **data.model_dump())
     db.add(faq)
     db.flush()
+    enqueue_faq_index(db, faq)
     audit(db, request, actor, "faq.create", faq, {"kb_id": str(kb_id), "version": faq.version})
     db.commit()
     return faq
@@ -179,7 +194,12 @@ def update_faq(
     if kb_id is None:
         raise AuthError(404, "NOT_FOUND", "资源不存在或不可见")
     locked_kb(db, kb_id, active=True)
-    faq = db.scalar(select(FAQ).where(FAQ.id == faq_id).with_for_update())
+    faq = db.scalar(
+        select(FAQ)
+        .where(FAQ.id == faq_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if data is not None:
         check_version(faq.version, data.expected_version)
         changes = data.model_dump(exclude_unset=True, exclude={"expected_version"})
@@ -191,6 +211,7 @@ def update_faq(
         setattr(faq, key, value)
     faq.version += 1
     faq.updated_at = datetime.now(UTC)
+    enqueue_faq_index(db, faq)
     audit(
         db,
         request,
