@@ -116,3 +116,24 @@ uv run --frozen --directory backend pytest tests/rag/smoke_real_rag.py -q -s
 
 反馈浏览器专项沿用聊天专用入口：`npm run test:e2e -- --config playwright.chat.config.ts feedback.spec.ts`（在 frontend 目录）。采用真实认证、聊天、数据库及反馈处理接口；仅回答输出为测试工厂，统一 check 包含该场景。
 人工接管浏览器专项沿用聊天专用入口：`npm run test:e2e -- --config playwright.chat.config.ts handoff.spec.ts`（在 frontend 目录）。该配置运行真实认证、数据库及生产交接路由，模型输出来自测试工厂；统一 check 同时包含聊天和人工接管场景。
+
+
+## 9. 管理统计、审计与运行日志（todo-012）
+
+管理员导航中的“管理统计”和“审计记录”使用只读接口。统计按上海时区日期筛选，展示区间内记录当前结果，并单列不受日期限制的当前人工排队与文档状态。已受理问答次数不是供应商调用次数；缺失token显示未知或已知部分，费用在缺少逐请求价格/完整用量时显示未知。完整口径见[契约](../docs/CONTRACTS.md)。审计只返回允许的元数据，不提供原始聊天导出。
+
+统一check最后串行运行统计浏览器专项：在frontend目录可单跑 `npm run test:e2e -- --config playwright.analytics.config.ts`。该配置使用独立随机schema和常规生产应用工厂；启动恢复结束后插入可手算的虚构指标数据，测试真实认证、统计和审计API/UI。只清理自己建立的测试schema，不修改开发public表，也不调用云模型。运行前仍需释放本worktree API/Web端口。
+
+应用请求和领域错误向标准流输出结构化安全事件。HTTP/SSE可按request_id关联；后台解析/索引按job_id和一次租约operation_id关联，不把后台失败假称为HTTP请求。日志保留错误类别，不记录密码、Cookie、Authorization、输入问题、文档正文、提供商响应正文或异常repr。已有持久审计是数据库记录，不能用日志文本补造漏记历史。
+
+开发与容器日志必须有界。将来采用Docker部署时，可在实际服务配置中显式选择如下轮转设置（示例，当前说明不会自动改变容器或主机进程）：
+
+```yaml
+logging:
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+```
+
+该设置控制每个容器标准输出/错误日志文件；直接从终端启动的API/worker不受它管理，生产进程管理器须分别配置输出轮转和磁盘限额。持久AuditEvent的保留期限、备份及访问策略在部署验收时确定；012不擅自删除审计或设置生产保留天数。自动化浏览器trace与截图只用于本地虚构测试数据，保存在忽略目录，不作为生产原始聊天日志。

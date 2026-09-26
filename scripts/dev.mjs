@@ -55,6 +55,7 @@ switch (process.argv[2]) {
       run('npm', ['run', script, ...(script === 'test' ? ['--', '--run'] : [])], frontend)
     }
     run('npm', ['run', 'test:e2e', '--', '--config', 'playwright.chat.config.ts'], frontend)
+    run('npm', ['run', 'test:e2e', '--', '--config', 'playwright.analytics.config.ts'], frontend)
     break
   default:
     console.error('Usage: node scripts/dev.mjs <db-up|db-stop|api|web|worker|index-worker|check>')

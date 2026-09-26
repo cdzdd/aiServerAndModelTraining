@@ -1,5 +1,6 @@
 """Recoverable index-only worker; expensive encoding never holds database locks."""
 
+import logging
 import sys
 import time
 from datetime import UTC, datetime, timedelta
@@ -9,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import Settings
 from app.core.database import create_db_engine
+from app.core.request_context import configure_logging, log_failure
 from app.modules.ingestion.chunking import load_tokenizer, split_sections
 from app.modules.ingestion.models import Chunk, Document, IngestionJob
 from app.modules.ingestion.parsers import ParseError, Section
@@ -192,9 +194,21 @@ def process_job(factory, settings, claimed, *, embedder, tokenizer=None):
         job.lease_until = None
         job.lease_token = None
         db.commit()
+    if code:
+        log_failure(
+            logging.getLogger(__name__),
+            "ingestion_job_failed",
+            code,
+            request_id=None,
+            operation_id=claimed.lease_token,
+            job_id=claimed.id,
+            kind=claimed.kind,
+            attempt=claimed.attempts,
+        )
 
 
 def main():
+    configure_logging()
     settings = Settings()
     embedder = BGEEmbedder(settings.embedding_model_path)
     embedder.load()

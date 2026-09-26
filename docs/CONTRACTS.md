@@ -224,9 +224,9 @@ Handoff 唯一关联 Conversation，仅保存 requested_at、claimed_at/claimed_
 
 - POST `/messages/{id}/feedback`：本人对助手消息提交 `{rating:"up|down",comment}`；每作者每消息一条，可用 PATCH `/feedback/{id}` 修改本人评价。
 - GET `/admin/feedback`：管理员分页筛选；PATCH `/admin/feedback/{id}` 设置 `status:"open|resolved", resolution`。
-- GET `/admin/audit-events`：管理员查询；GET `/admin/stats?from=...&to=...`：访问/问答次数、独立用户数、热门问题、无答案比例、转人工量、评价满意度、平均耗时。
+- GET `/admin/audit-events`：管理员查询；GET `/admin/stats?from=...&to=...`：成功登录次数、已受理问答请求、独立提问用户、热门问题、无答案比例、人工接管、评价满意度、耗时与入库状态。
 
-统计口径：回答数量只计已结束的助手生成；无答案率=no_answer/(answered+clarify+no_answer)；满意度=up/(up+down)，没有评价时为 null；错误和取消另列，不能当满意。日界线使用业务展示时区 Asia/Shanghai，数据库时间仍为UTC。
+统计以持久业务记录为准：已受理问答请求不等于供应商调用次数，成功登录次数不等于HTTP访问量。已完成回复、失败、取消与生成中分别统计；无答案率只在有分类的完整回复中计算，满意度只按实际评价计算。日界线使用 Asia/Shanghai，数据库时间仍为UTC；详细分母、时间口径及未知值规则见下文。
 
 AuditEvent 至少有 actor_id、action、target_type/id、outcome、request_id、created_at、脱敏metadata。身份/知识/转人工/反馈修改任务实现时同时写审计事件；todo-012负责统一查询、统计和后台页面，不能等它才开始记录审计。todo-001提供 `core/models.py` 的AuditEvent和 `core/audit.py` 的 `record_audit(db, *, actor_id, action, target_type, target_id, outcome, request_id, metadata)`，加入调用方事务；actor_id为可空UUID，日志不依赖尚未实现的User表。基础迁移创建审计表，测试直接验证写入，避免另引消息系统。登录失败等无业务事务动作使用自己的短事务记录。
 
@@ -241,6 +241,27 @@ GET /messages/{id}/feedback 返回本人已有反馈或 null，仍先校验消�
 来源版本仅从服务端存储引用生成快照，保存 chunk/kb/source/revision/faq_version 身份，不复制引文、标题或答案。管理员查看现存原回答时复用当前聊天来源授权投影；会话已软删时 message_available=false 且不返回原回答。普通反馈响应不返回来源快照。前端使用文本展示评论和说明，反馈入口仅对本人已完成助手回复显示。
 
 统一 User→Conversation→Feedback 锁序保证并发提交与更新一致。feedback.create/update/resolve/reopen 与业务修改同事务记录，幂等重试不加事件；审计只存 ID、枚举及变更字段名，不存评论、处理说明或聊天原文。
+
+### 012 统计与审计契约
+
+所有统计/审计接口仅当前有效管理员可用，匿名401、普通用户/客服403，响应no-store，读取不新增审计事件。统计使用独立只读REPEATABLE READ事务，在同一快照复核管理员并返回as_of；不改变业务状态或全应用隔离级别。
+
+`from`/`to`必须同时提供或同时省略；提供时接受带时区ISO8601并归一为UTC，要求from<to且不超过366天。全部查询使用半开区间[from,to)。省略时取上海时区含当天的最近30个自然日，起点为29天前零点、终点为次日零点。响应range回显UTC边界及timezone=Asia/Shanghai；每日趋势按上海日期分组并补零，部分自然日也只计入区间内数据。
+
+- `logins.successful`仅计区间内auth.login成功审计；`generations.accepted/distinct_users`按GenerationUsage.accepted_at筛选记录及唯一提问用户。关联每条用量自己的assistant_message_id，complete/failed/cancelled/generating分列，不通过finish/recover审计重复计数。
+- `answered/clarify/no_answer`只在complete中分类，缺失分类单列unclassified_complete。no_answer_ratio返回numerator、denominator、value，分母为前三类之和；空分母value=null。latency只汇总complete中已知latency_ms的平均数、sample_count和missing_count，无已知样本为null。
+- `tokens`只统计这些受理记录对应的终态回复；prompt/completion/total字段分别提供value、known_sum、known_count、missing_count、coverage。任一终态缺失该字段则完整value=null，已知部分不当作完整用量；无终态记录时value/coverage=null，真实已知零仍为0。不得将prompt+completion推算成total。生成中单列pending_count。没有逐请求模型价格归属及完整usage时cost.amount=null、status=unknown，界面显示费用未知。
+- `handoffs.period`按requested_at/claimed_at/closed_at各自事件时间计数，不宣称同一漏斗；`handoffs.current`为as_of时未软删会话的queued/human数量，与所选区间无关。
+- `feedback`按created_at筛选记录、展示as_of时当前rating/status，保留软删会话的反馈。编辑不增加总条数，真实编辑后重开会改变这些记录的当前处理结果。satisfaction=up/(up+down)，空分母null。
+- `ingestion.period_jobs`按任务created_at、kind(parse/index)与当前state分组，重试仍是同一任务；`current_documents`为当前全部文档状态，含disabled/deleted，与日期区间无关。FAQ索引计入index任务，不伪造成文档。
+- `popular_questions`按这些受理记录的原用户问题精确文本分组，次数降序、完整文本升序取前10；一次也计入。返回最多200字符preview、count、truncated，不带用户身份、答案或引文。软删会话从文本列表排除，数字历史仍保留。问题仅以管理员页面普通文本展示，不放进日志或图表HTML。
+
+以上记录的可变状态是as_of所见结果，不重建历史to时刻的状态；界面明确区分“区间内记录的当前结果”和“当前状态”。前端只格式化服务端比例，不另算分母。
+
+GET `/admin/audit-events`支持标准page/page_size及from/to、action、outcome、actor_id、target_type、target_id精确筛选，按created_at/id倒序；GET `/admin/audit-events/{id}`返回相同安全投影的单条详情。动作/类型等筛选只接受有界标识字符串，身份/资源按UUID，不支持正文搜索。metadata先按已知action选键，再验证UUID、枚举、计数或字段名数组，未知/类型不符的值丢弃；不原样输出JSONB。摘要来自固定动作映射，旧数据中非安全顶层标识也不原样展示。评论、处理说明、姓名、凭据、聊天及提供商错误正文不进入查询结果。
+
+结构化日志仅记录安全事件、错误码及关联标识：HTTP使用经UUID校验的request_id，异步流沿用对应请求；后台入库使用job_id与真实lease operation_id，生命周期失败使用独立operation_id，不伪造HTTP请求。日志不输出请求体、Cookie、Authorization、模型/文档/聊天正文或异常repr。持久审计与运行日志分开管理，轮转说明见scripts/README.md，生产留存策略随部署确定。
+
 ## 8. 环境变量与测试约定
 
 业务变量：`APP_ENV, DATABASE_URL, SESSION_SECRET, UPLOAD_DIR, MODEL_PROVIDER, MODEL_BASE_URL, MODEL_API_KEY, MODEL_NAME, EMBEDDING_MODEL`。`SESSION_SECRET` 用于会话/CSRF相关签名；随机 session token 本身仍只存哈希。训练环境拥有独立配置，不借用生产API凭据。

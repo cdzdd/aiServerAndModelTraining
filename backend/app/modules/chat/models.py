@@ -85,6 +85,7 @@ class GenerationUsage(Base):
     __table_args__ = (
         UniqueConstraint("user_message_id", name="generation_usage_request"),
         Index("ix_generation_usage_user_accepted", "user_id", "accepted_at"),
+        Index("ix_generation_usage_accepted", "accepted_at"),
     )
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))

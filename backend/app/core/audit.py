@@ -23,6 +23,8 @@ _SENSITIVE_KEY_PARTS = (
     "question",
     "answer",
     "body",
+    "comment",
+    "resolution",
 )
 
 

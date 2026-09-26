@@ -1,4 +1,5 @@
 import json
+import logging
 import subprocess
 import sys
 import time
@@ -10,6 +11,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import Settings
 from app.core.database import create_db_engine
+from app.core.request_context import configure_logging, log_failure
 from app.modules.auth import models as auth_models  # noqa: F401
 from app.modules.ingestion.chunking import split_sections
 from app.modules.ingestion.models import Chunk, Document, DocumentRevision, IngestionJob
@@ -165,9 +167,21 @@ def process_job(factory, settings, claimed, *, tokenizer=None):
         job.lease_until = None
         job.lease_token = None
         db.commit()
+    if code:
+        log_failure(
+            logging.getLogger(__name__),
+            "ingestion_job_failed",
+            code,
+            request_id=None,
+            operation_id=claimed.lease_token,
+            job_id=claimed.id,
+            kind=claimed.kind,
+            attempt=claimed.attempts,
+        )
 
 
 def main():
+    configure_logging()
     settings = Settings()
     engine = create_db_engine(settings)
     factory = sessionmaker(engine, expire_on_commit=False)

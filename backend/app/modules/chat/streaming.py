@@ -10,6 +10,7 @@ import anyio
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import StreamingResponse
 
+from app.core.request_context import log_failure
 from app.modules.auth.schemas import Actor
 from app.modules.auth.service import find_session
 from app.modules.chat import service
@@ -144,7 +145,12 @@ class GenerationStream:
                 try:
                     await run_in_threadpool(self._finish, "failed", error_code="GENERATION_FAILED")
                 except Exception:
-                    logger.error("chat_finalization_failed")
+                    log_failure(
+                        logger,
+                        "chat_finalization_failed",
+                        "CHAT_FINALIZATION_FAILED",
+                        request_id=self.reservation.request_id,
+                    )
             yield failure()
 
     async def close(self):
@@ -153,7 +159,12 @@ class GenerationStream:
                 await run_in_threadpool(self._finish, "cancelled", error_code="CANCELLED")
             except Exception:
                 # Startup recovery owns any row whose terminal transaction could not commit.
-                logger.error("chat_cancellation_persistence_failed")
+                log_failure(
+                    logger,
+                    "chat_cancellation_persistence_failed",
+                    "CHAT_CANCELLATION_PERSISTENCE_FAILED",
+                    request_id=self.reservation.request_id,
+                )
 
 
 class ChatStreamingResponse(StreamingResponse):
@@ -182,7 +193,12 @@ class ChatStreamingResponse(StreamingResponse):
                         try:
                             await self.body_iterator.aclose()
                         except Exception:
-                            logger.error("chat_stream_close_failed")
+                            log_failure(
+                                logger,
+                                "chat_stream_close_failed",
+                                "CHAT_STREAM_CLOSE_FAILED",
+                                request_id=self.generation.reservation.request_id,
+                            )
                         finally:
                             try:
                                 await self.generation.close()
