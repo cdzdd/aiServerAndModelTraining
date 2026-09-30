@@ -13,6 +13,7 @@ import time
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -109,9 +110,7 @@ def build_index(factory, dataset, settings, embedder):
                 KnowledgeBase(
                     id=kb_id,
                     name=name,
-                    visibility="restricted"
-                    if name.endswith("restricted")
-                    else "public",
+                    visibility="restricted" if name.endswith("restricted") else "public",
                 )
             )
         db.flush()
@@ -177,9 +176,7 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
         "error": None,
     }
     try:
-        outcome = await retriever.search_detailed(
-            actor, kb_ids, case["retrieval_query"], top_k=5
-        )
+        outcome = await retriever.search_detailed(actor, kb_ids, case["retrieval_query"], top_k=5)
         hits = outcome.hits
         row["hits"] = [hit.model_dump(mode="json") for hit in hits]
         row["retrieved_sources"] = [
@@ -209,9 +206,7 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
 
             rag = RAGService(traced_search, retriever.validate_hits, provider)
             history = [LLMMessage(**message) for message in case["history"]]
-            async for event in rag.stream_answer(
-                actor, kb_ids, case["question"], history
-            ):
+            async for event in rag.stream_answer(actor, kb_ids, case["question"], history):
                 if event.type == "delta":
                     row["answer_text"] += event.payload["text"]
                 elif event.type == "citations":
@@ -222,15 +217,11 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
                 elif event.type == "error":
                     row["error"] = event.payload["code"]
                     row["answer_status"] = "error"
-            row["generation_hits"] = [
-                hit.model_dump(mode="json") for hit in generation_hits
-            ]
+            row["generation_hits"] = [hit.model_dump(mode="json") for hit in generation_hits]
             hit_map = {str(hit.chunk_id): hit for hit in generation_hits}
             for citation in row["citations"]:
                 source_id = citation["source_id"]
-                row["citation_sources"].append(
-                    source_map.get(stable_uuid(source_id), source_id)
-                )
+                row["citation_sources"].append(source_map.get(stable_uuid(source_id), source_id))
                 hit = hit_map.get(citation["chunk_id"])
                 mapped = bool(
                     hit
@@ -267,9 +258,7 @@ def stable_uuid(value):
 
 
 async def run_cases(dataset, split, factory, actor, kbs, retriever, provider):
-    source_map = {
-        stable_id(source["id"]): source["id"] for source in dataset["sources"]
-    }
+    source_map = {stable_id(source["id"]): source["id"] for source in dataset["sources"]}
     rows = []
     for case in dataset["cases"]:
         if case["split"] == split:
@@ -325,6 +314,86 @@ def peak_memory():
     return peak if sys.platform == "darwin" else peak * 1024
 
 
+def select_generation_provider(settings, *, generate, local_openai=False):
+    if local_openai and not generate:
+        raise ValueError("--local-openai requires --generate")
+    if not generate:
+        return None
+    if local_openai:
+        if settings.model_provider != "cloud":
+            raise ValueError("local OpenAI protocol requires explicitly configured cloud adapter")
+        url = urlsplit(settings.model_base_url)
+        if (
+            url.scheme != "http"
+            or url.hostname not in {"127.0.0.1", "::1"}
+            or (url.username or url.password or url.query or url.fragment)
+        ):
+            raise ValueError("local OpenAI evaluation requires literal HTTP loopback only")
+    elif settings.model_provider != "ollama":
+        raise ValueError(
+            "generation requires explicitly configured local Ollama; Mock/cloud disallowed"
+        )
+    return create_provider(settings)
+
+
+def load_runtime_manifest(path):
+    raw = Path(path).read_bytes()
+    value = json.loads(raw)
+    if value.get("base_revision") != "cdbee75f17c01a7cc42f958dc650907174af0554":
+        raise ValueError("runtime manifest requires the fixed Qwen base revision")
+    if value.get("kind") not in {"base", "finetuned"}:
+        raise ValueError("runtime manifest kind must be base or finetuned")
+    for field in ["inference_config_sha256", "training_manifest_sha256"]:
+        digest = value.get(field, "")
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+        ):
+            raise ValueError("runtime manifest requires valid configuration/data hashes")
+    adapters = value.get("adapter_files_sha256")
+    if value["kind"] == "base" and adapters is not None:
+        raise ValueError("base runtime must not include adapter hashes")
+    if value["kind"] == "finetuned":
+        if (
+            not isinstance(adapters, dict)
+            or not adapters
+            or any(
+                name not in {"adapter_model.safetensors", "adapter_config.json"}
+                or not isinstance(digest, str)
+                or len(digest) != 64
+                or any(c not in "0123456789abcdef" for c in digest)
+                for name, digest in adapters.items()
+            )
+        ):
+            raise ValueError("finetuned runtime requires valid actual adapter hashes")
+    versions = value.get("runtime_versions", {})
+    if not isinstance(versions, dict):
+        raise ValueError("runtime_versions must be a package/version mapping")
+    versions = {
+        name: version
+        for name, version in versions.items()
+        if name
+        in {"torch", "transformers", "llamafactory", "bitsandbytes", "peft", "accelerate", "cuda"}
+        and isinstance(version, str)
+    }
+    return {
+        **{
+            field: value.get(field)
+            for field in [
+                "kind",
+                "base_revision",
+                "inference_config_sha256",
+                "training_manifest_sha256",
+                "adapter_files_sha256",
+                "runtime_versions",
+            ]
+        },
+        "runtime_versions": versions,
+        "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+    }
+
+
 def main():
     import yaml
 
@@ -332,26 +401,33 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--split", choices=["dev", "test"], default="dev")
     parser.add_argument("--generate", action="store_true")
+    parser.add_argument(
+        "--local-openai",
+        action="store_true",
+        help="Opt in to the private experiment bridge on literal HTTP loopback",
+    )
+    parser.add_argument("--runtime-manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     config_bytes = args.config.read_bytes()
     config = yaml.safe_load(config_bytes)
     dataset_path = ROOT / "experiments/evaluation/dataset.json"
     dataset = load_dataset(dataset_path)
+    model_settings = ModelSettings()
+    provider = select_generation_provider(
+        model_settings, generate=args.generate, local_openai=args.local_openai
+    )
+    if args.local_openai and args.runtime_manifest is None:
+        raise ValueError("local experiment evaluation requires --runtime-manifest")
+    runtime_manifest = (
+        load_runtime_manifest(args.runtime_manifest) if args.runtime_manifest else None
+    )
     settings = Settings()
     embedder = BGEEmbedder(settings.embedding_model_path)
     load_started = time.perf_counter()
     embedder.load()
     embedding_load_ms = (time.perf_counter() - load_started) * 1000
-    model_settings = ModelSettings()
-    if args.generate and model_settings.model_provider != "ollama":
-        raise ValueError(
-            "generation requires explicitly configured local Ollama; Mock/cloud disallowed"
-        )
-    provider = create_provider(model_settings) if args.generate else None
-    reranker = (
-        LocalCrossEncoder(settings.reranker_model_path) if config["rerank"] else None
-    )
+    reranker = LocalCrossEncoder(settings.reranker_model_path) if config["rerank"] else None
     with evaluation_database() as factory:
         index_started = time.perf_counter()
         actor, kbs = build_index(factory, dataset, settings, embedder)
@@ -366,9 +442,7 @@ def main():
         )
         reranker_warmup_ms = None
         if reranker:
-            warmup_case = next(
-                case for case in dataset["cases"] if case["split"] == "dev"
-            )
+            warmup_case = next(case for case in dataset["cases"] if case["split"] == "dev")
             warmup_hits = asyncio.run(
                 RetrievalService(factory, embedder, config["threshold"]).search(
                     actor,
@@ -382,15 +456,9 @@ def main():
                 # is separately covered by fallback tests. No final-test labels are consulted.
                 reranker.rank(warmup_case["retrieval_query"], warmup_hits)
             reranker_warmup_ms = (time.perf_counter() - warmup_started) * 1000
-        rows = asyncio.run(
-            run_cases(dataset, args.split, factory, actor, kbs, retriever, provider)
-        )
-    commit = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-    ).strip()
-    dirty = bool(
-        subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True)
-    )
+        rows = asyncio.run(run_cases(dataset, args.split, factory, actor, kbs, retriever, provider))
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True))
     report = {
         "metadata": {
             "created_at": datetime.now(UTC).isoformat(),
@@ -412,7 +480,10 @@ def main():
             "reranker_files_sha256": RERANK_FILES if reranker else None,
             "peak_process_working_set_bytes": peak_memory(),
             "prompt_version": PROMPT_VERSION,
-            "provider": model_settings.model_provider if args.generate else None,
+            "provider": ("local_openai" if args.local_openai else model_settings.model_provider)
+            if args.generate
+            else None,
+            "runtime_manifest": runtime_manifest,
             "generation_model": model_settings.model_id if args.generate else None,
             "generation_randomness": (
                 "RAG requests temperature=0; server determinism not guaranteed"
@@ -440,9 +511,7 @@ def main():
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(report["summary"], ensure_ascii=False))
-    return int(
-        bool(report["summary"]["error_count"] or report["summary"]["permission_leaks"])
-    )
+    return int(bool(report["summary"]["error_count"] or report["summary"]["permission_leaks"]))
 
 
 if __name__ == "__main__":
