@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-015 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-013、todo-014 |
 | 并行可行性 | 可与 010–012/017 的应用工作并行；独占本机训练 GPU 时协调 014 推理，禁止抢占同一资源导致错误性能结论 |
 | 负责目录 | `experiments/finetuning/`；不更改生产默认 provider，不把训练依赖加入业务运行环境 |
@@ -51,7 +51,7 @@ uv run --directory backend --frozen python -m pytest ../experiments/finetuning/t
 
 ## 已知问题与外部阻塞
 
-当前实现与本机实战没有未解决阻塞；独立复核已通过，等待 PR 与权威 main 合并收尾。数据为授权原创虚构校园材料，独立代理审核不等于人工业务审核。两条 validation 和 60 条教学评测不能证明真实业务泛化；带 history 的 10 题均 no_answer，微调 test 仍有 17 道误拒答。当前只展示独立本机微调 API，不更改网页默认基座，不自动启用 018。
+当前本机训练与实战已完成，独立复核通过，功能 PR 已实际合入权威 main；本文件按 WORKFLOW 以纯文档状态 PR 收尾。数据为授权原创虚构校园材料，独立代理审核不等于人工业务审核。两条 validation 和 60 条教学评测不能证明真实业务泛化；带 history 的 10 题均 no_answer，微调 test 仍有 17 道误拒答。当前只展示独立本机微调 API，不更改网页默认基座，不自动启用 018。
 
 首轮对照实际采样的问题已通过真实依赖回归修正并完成贪心重测，旧报告完整保留；测试集在纠错前已经见过，不声称完全未见。Windows comparison 汇总编码问题已从未损坏的原始四份报告用 UTF-8 重建。没有根据 test 调训练、提示词或检索。
 
@@ -66,4 +66,6 @@ uv run --directory backend --frozen python -m pytest ../experiments/finetuning/t
 - `node scripts/dev.mjs check` 在 49d3ded 完整退出 0：8 Node、741 后端、9 evaluation、46 finetuning、114 Vitest、18+4+1 Playwright，Ruff、前端 lint/typecheck/build、迁移升级及再次执行均通过；日志 `.local/full-check-015-greedy.txt`。首轮 Node 本地进程 smoke 曾一次短时失败，原样定点重跑及完整检查通过，原失败日志保留。最终仅增加文档/真实报告，按静态 UTF-8、链接、指标、哈希与 diff 核对验收；云端 CI 因项目既定账单限制未运行，不写成通过。
 - 2026-10-01 05:34 上海时区，微调私钥 API `127.0.0.1:11435` ready、016 网页 `127.0.0.1:5246` ready；Ollama 基座和 adapter 均实际加载保留运行，整卡快照总量/已用/空闲 16,303/9,661/6,335 MiB，含桌面等其他进程，不作并发生成/训练承诺。见 [本地运行记录](../../experiments/finetuning/reports/local-deployment-2026-10-01.json)。
 - 最终静态核对通过：14 个当前/历史 JSON 严格 UTF-8、120 当前 rows/38 quotes、summary/data/config/adapter/cache 哈希、27 本地链接、3 Python 示例语法与无私钥内容；独立最终审核 APPROVED，无剩余 P0/P1/P2。教程原样 SSE 示例在既有微调 API 实际返回 answered 选择 JSON、stop、prompt/completion/total=345/22/367、DONE，输出无私钥。
-- 配置、数据准备、实际制品清单、两篇报告和教程进入 `in_review`。独立代码/数据/报告审核与本地检查通过后由本轮协调代理提交 PR 并普通合入权威 main；功能合并 SHA、PR 与 `done` 只在实际合并后补写。没有把功能分支的状态当作 main 已完成。
+- 功能 [PR #33](https://github.com/cdzdd/aiServerAndModelTraining/pull/33) 于 2026-09-30T21:49:58Z 实际 MERGED，功能合并 SHA `0a83d167f63a43a08ce3ef740ecc441065921231`，对应已复核 PR head `c3f5767bca8996461af07ab059d178676d990623`。代码完整验收仍对应 `49d3ded90f34969122a841258f7dedd4af0c6cbf`；此后只有文档/真实报告，已完成 UTF-8、JSON、链接、示例、指标、哈希与 diff 静态核对，独立最终评审 APPROVED，无未解决 P0/P1/P2。
+
+- 本次状态收尾仅修改本任务文件：依据已完成的功能合并、真实训练/评测与本地验收记录更新为 `done`；不再训练、不切换网页模型、不启用 018 或公网发布。只有本纯文档状态 PR 实际合入后，权威 main 才完成收尾；云端 CI 仍未运行。
