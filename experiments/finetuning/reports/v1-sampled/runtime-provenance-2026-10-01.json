@@ -1,0 +1,44 @@
+{
+  "source_commit": "27bb52ee7e7a4497e18dfd686fe26501dc90eec3",
+  "collected_at": "2026-09-30T21:12:39.9999648Z",
+  "performance_scope": "Local observations; system background load not rigorously controlled. Full unified check ended before first base generation. No training/test tuning.",
+  "inference_configuration_difference": "Only adapter_name_or_path added for finetuned runtime; same HF/NF4/BF16/qwen3_nothink/SDPA/greedy",
+  "model_state": "Base API gracefully stopped after its two evaluations; trained adapter API currently available on127.0.0.1:11435",
+  "collection_scope": "Post-run coordinator evidence; start records and actual source/config checks, not automatic service model attestation",
+  "finetuned_process": {
+    "pid": 3353,
+    "started_at_utc": "2026-10-01T05:06:25.711458+08:00",
+    "cwd": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt",
+    "command": [
+      "experiments/finetuning/local_api.py",
+      "--config",
+      ".local/finetuning/configs/inference-finetuned.yaml",
+      "--key-file",
+      ".local/finetuning/api.key",
+      "--model-id",
+      "qwen3-4b-qlora-demo",
+      "--port",
+      "11435"
+    ],
+    "config_sha256": "7f710b2874cad5726b5e74ca49c35ac53642752d8f5db9391021beb626534ec4",
+    "source_commit": "27bb52ee7e7a4497e18dfd686fe26501dc90eec3"
+  },
+  "base_process": {
+    "pid": 3254,
+    "started_at_utc": "2026-10-01T05:00:09.963284+08:00",
+    "cwd": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt",
+    "command": [
+      "experiments/finetuning/local_api.py",
+      "--config",
+      ".local/finetuning/configs/inference-base.yaml",
+      "--key-file",
+      ".local/finetuning/api.key",
+      "--model-id",
+      "qwen3-4b-qlora-demo",
+      "--port",
+      "11435"
+    ],
+    "config_sha256": "14e646c34f7d7a6c784bb601efc270c1825da24500ea036fba6d6a739ae8f288",
+    "source_commit": "27bb52ee7e7a4497e18dfd686fe26501dc90eec3"
+  }
+}

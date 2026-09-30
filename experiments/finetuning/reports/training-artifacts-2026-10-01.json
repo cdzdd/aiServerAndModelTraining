@@ -1,0 +1,1616 @@
+{
+  "synthetic": true,
+  "human_reviewed": false,
+  "base": {
+    "repo_id": "Qwen/Qwen3-4B-Instruct-2507",
+    "revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+    "license": "Apache-2.0",
+    "files": [
+      {
+        "name": "LICENSE",
+        "bytes": 11343,
+        "sha256": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e"
+      },
+      {
+        "name": "README.md",
+        "bytes": 8168,
+        "sha256": "8e3dd0c3b5b11897cc71092ccfe517bb7a9783479baa3665aad73c8d1a2041cd"
+      },
+      {
+        "name": "config.json",
+        "bytes": 727,
+        "sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba"
+      },
+      {
+        "name": "generation_config.json",
+        "bytes": 238,
+        "sha256": "835fffe355c9438e7a25be099b3fccaa98350b83451f9fd2d99512e74f1ade48"
+      },
+      {
+        "name": "merges.txt",
+        "bytes": 1671839,
+        "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3"
+      },
+      {
+        "name": "model-00001-of-00003.safetensors",
+        "bytes": 3957900840,
+        "sha256": "75311d91bb08cf0b882913da464a1e722a31fb44db35208663487efb7a3d8ed6"
+      },
+      {
+        "name": "model-00002-of-00003.safetensors",
+        "bytes": 3987450520,
+        "sha256": "0b48adbb1f60e901153d91907ba11ce63bd4b8b584482e730f48808d055dfba1"
+      },
+      {
+        "name": "model-00003-of-00003.safetensors",
+        "bytes": 99630640,
+        "sha256": "7dd39ccca5e4de123c74c14af44c9bf2eb75df33b4614382af0134528e060d5d"
+      },
+      {
+        "name": "model.safetensors.index.json",
+        "bytes": 32819,
+        "sha256": "d6c42883a895dfef5b0080ed2116a1bcd764f558406b98923d675978a1abf29c"
+      },
+      {
+        "name": "tokenizer.json",
+        "bytes": 11422654,
+        "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+      },
+      {
+        "name": "tokenizer_config.json",
+        "bytes": 9377,
+        "sha256": "a62ff0a2472a0fa1b8eaabcb57c59b58afa42a22831dc141400b6e0cf2b65ce3"
+      },
+      {
+        "name": "vocab.json",
+        "bytes": 2776833,
+        "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    ],
+    "python": "3.12.3",
+    "packages": {
+      "torch": "2.9.1+cu128",
+      "torchvision": "0.24.1+cu128",
+      "torchaudio": "2.9.1+cu128",
+      "bitsandbytes": "0.50.2",
+      "llamafactory": "0.9.5",
+      "transformers": "4.57.6",
+      "peft": "0.18.1",
+      "accelerate": "1.11.0",
+      "datasets": "4.0.0",
+      "trl": "0.24.0"
+    }
+  },
+  "data_summary": {
+    "version": "campus-qlora-teaching-v1",
+    "synthetic": true,
+    "human_reviewed": false,
+    "statistics": {
+      "samples": {
+        "train": 8,
+        "validation": 2
+      },
+      "sources": 5,
+      "groups": 5
+    },
+    "files_sha256": {
+      "dataset_info.json": "24e1f260c76df52ff64f6c1348f62a672b1db23616ebfd903f06585fff539262",
+      "manifest.json": "024255b602eb9a7b69089431ff5966a68540f07403c06c0ae75a2cf1e4cb66ec",
+      "train.json": "662390ae3ff7e5f899a84d4144c8790dde286bfcac681f54369a5292ec15aefd",
+      "validation.json": "655130653a25a3187d7782c4731c0244cb119c28714f662d27ba335f0e987493"
+    },
+    "prompt_sha256": "ac5eacabcc4e137eb6342136cb264d888ece446b7b43f87c862c397062f6e764"
+  },
+  "tokenization": {
+    "template": "qwen3_nothink",
+    "cutoff_len": 1024,
+    "all_fit_without_truncation": true,
+    "rows": [
+      {
+        "split": "train",
+        "row": 0,
+        "tokens": 368,
+        "target_tokens": 23
+      },
+      {
+        "split": "train",
+        "row": 1,
+        "tokens": 366,
+        "target_tokens": 19
+      },
+      {
+        "split": "train",
+        "row": 2,
+        "tokens": 376,
+        "target_tokens": 23
+      },
+      {
+        "split": "train",
+        "row": 3,
+        "tokens": 373,
+        "target_tokens": 20
+      },
+      {
+        "split": "train",
+        "row": 4,
+        "tokens": 387,
+        "target_tokens": 30
+      },
+      {
+        "split": "train",
+        "row": 5,
+        "tokens": 382,
+        "target_tokens": 21
+      },
+      {
+        "split": "train",
+        "row": 6,
+        "tokens": 373,
+        "target_tokens": 23
+      },
+      {
+        "split": "train",
+        "row": 7,
+        "tokens": 368,
+        "target_tokens": 20
+      },
+      {
+        "split": "validation",
+        "row": 0,
+        "tokens": 399,
+        "target_tokens": 21
+      },
+      {
+        "split": "validation",
+        "row": 1,
+        "tokens": 403,
+        "target_tokens": 23
+      }
+    ]
+  },
+  "runs": [
+    {
+      "name": "smoke",
+      "observed": {
+        "started_at_utc": "2026-09-30T20:42:47.274700+00:00",
+        "config_path": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt/.local/finetuning/configs/qlora-smoke.yaml",
+        "config_sha256": "b0cc0b0c6636c8a8512424df9ae2db6de1a2df17fd0778cecdddb98511bb9418",
+        "source_commit": "2fade598fd9c7e7c51250aceb8d2e5832bee6847",
+        "measurement_scope": "same training process; elapsed includes model load/train/eval/save; CUDA peaks include all allocations in this process",
+        "cuda_free_before_bytes": 15738077184,
+        "cuda_total_bytes": 17066033152,
+        "status": "completed",
+        "elapsed_seconds": 79.64396526999917,
+        "cuda_peak_allocated_bytes": 4022468096,
+        "cuda_peak_reserved_bytes": 4418699264,
+        "finished_at_utc": "2026-09-30T20:44:10.695849+00:00"
+      },
+      "global_step": 2,
+      "log_history": [
+        {
+          "epoch": 0.5,
+          "grad_norm": 7.260960578918457,
+          "learning_rate": 5e-05,
+          "loss": 1.5457,
+          "step": 1
+        },
+        {
+          "epoch": 1.0,
+          "grad_norm": 6.273457050323486,
+          "learning_rate": 5e-05,
+          "loss": 1.274,
+          "step": 2
+        },
+        {
+          "epoch": 1.0,
+          "eval_loss": 1.180590271949768,
+          "eval_runtime": 0.2108,
+          "eval_samples_per_second": 9.487,
+          "eval_steps_per_second": 9.487,
+          "step": 2
+        }
+      ]
+    },
+    {
+      "name": "resume",
+      "observed": {
+        "started_at_utc": "2026-09-30T20:45:14.525971+00:00",
+        "config_path": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt/.local/finetuning/configs/qlora-resume.yaml",
+        "config_sha256": "8e4b522238e2eb8cecb7a4a26440f68c841e0d8ef8026794878eced3f389be47",
+        "source_commit": "2fade598fd9c7e7c51250aceb8d2e5832bee6847",
+        "measurement_scope": "same training process; elapsed includes model load/train/eval/save; CUDA peaks include all allocations in this process",
+        "cuda_free_before_bytes": 15738077184,
+        "cuda_total_bytes": 17066033152,
+        "status": "completed",
+        "elapsed_seconds": 58.04840451199925,
+        "cuda_peak_allocated_bytes": 4022468096,
+        "cuda_peak_reserved_bytes": 4418699264,
+        "finished_at_utc": "2026-09-30T20:46:15.247009+00:00"
+      },
+      "global_step": 4,
+      "log_history": [
+        {
+          "epoch": 0.5,
+          "grad_norm": 7.260960578918457,
+          "learning_rate": 5e-05,
+          "loss": 1.5457,
+          "step": 1
+        },
+        {
+          "epoch": 1.0,
+          "grad_norm": 6.273457050323486,
+          "learning_rate": 5e-05,
+          "loss": 1.274,
+          "step": 2
+        },
+        {
+          "epoch": 1.0,
+          "eval_loss": 1.180590271949768,
+          "eval_runtime": 0.2108,
+          "eval_samples_per_second": 9.487,
+          "eval_steps_per_second": 9.487,
+          "step": 2
+        },
+        {
+          "epoch": 1.5,
+          "grad_norm": 9.065526962280273,
+          "learning_rate": 5e-05,
+          "loss": 1.1453,
+          "step": 3
+        },
+        {
+          "epoch": 2.0,
+          "grad_norm": 2.698537588119507,
+          "learning_rate": 5e-05,
+          "loss": 1.2122,
+          "step": 4
+        },
+        {
+          "epoch": 2.0,
+          "eval_loss": 0.564604640007019,
+          "eval_runtime": 0.2121,
+          "eval_samples_per_second": 9.429,
+          "eval_steps_per_second": 9.429,
+          "step": 4
+        }
+      ]
+    },
+    {
+      "name": "train",
+      "observed": {
+        "started_at_utc": "2026-09-30T20:46:41.451140+00:00",
+        "config_path": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt/.local/finetuning/configs/qlora-train.yaml",
+        "config_sha256": "89c104fe2e861657b4ca9a36d81df2893bc99083e8d8b7f56628ee38e8aacefd",
+        "source_commit": "2fade598fd9c7e7c51250aceb8d2e5832bee6847",
+        "measurement_scope": "same training process; elapsed includes model load/train/eval/save; CUDA peaks include all allocations in this process",
+        "cuda_free_before_bytes": 15738077184,
+        "cuda_total_bytes": 17066033152,
+        "status": "completed",
+        "elapsed_seconds": 92.16847149899877,
+        "cuda_peak_allocated_bytes": 4022468096,
+        "cuda_peak_reserved_bytes": 4420796416,
+        "finished_at_utc": "2026-09-30T20:48:17.536165+00:00"
+      },
+      "global_step": 20,
+      "log_history": [
+        {
+          "epoch": 0.5,
+          "grad_norm": 7.253708362579346,
+          "learning_rate": 5e-05,
+          "loss": 1.5457,
+          "step": 1
+        },
+        {
+          "epoch": 1.0,
+          "grad_norm": 6.16865873336792,
+          "learning_rate": 5e-05,
+          "loss": 1.2725,
+          "step": 2
+        },
+        {
+          "epoch": 1.0,
+          "eval_loss": 1.1687744855880737,
+          "eval_runtime": 0.224,
+          "eval_samples_per_second": 8.927,
+          "eval_steps_per_second": 8.927,
+          "step": 2
+        },
+        {
+          "epoch": 1.5,
+          "grad_norm": 8.987839698791504,
+          "learning_rate": 5e-05,
+          "loss": 1.16,
+          "step": 3
+        },
+        {
+          "epoch": 2.0,
+          "grad_norm": 2.7217040061950684,
+          "learning_rate": 5e-05,
+          "loss": 1.2199,
+          "step": 4
+        },
+        {
+          "epoch": 2.0,
+          "eval_loss": 0.5603814125061035,
+          "eval_runtime": 0.2144,
+          "eval_samples_per_second": 9.33,
+          "eval_steps_per_second": 9.33,
+          "step": 4
+        },
+        {
+          "epoch": 2.5,
+          "grad_norm": 8.016279220581055,
+          "learning_rate": 5e-05,
+          "loss": 0.9215,
+          "step": 5
+        },
+        {
+          "epoch": 3.0,
+          "grad_norm": 5.7741594314575195,
+          "learning_rate": 5e-05,
+          "loss": 0.2,
+          "step": 6
+        },
+        {
+          "epoch": 3.0,
+          "eval_loss": 9.397402027389035e-05,
+          "eval_runtime": 0.2131,
+          "eval_samples_per_second": 9.385,
+          "eval_steps_per_second": 9.385,
+          "step": 6
+        },
+        {
+          "epoch": 3.5,
+          "grad_norm": 10.736872673034668,
+          "learning_rate": 5e-05,
+          "loss": 0.3449,
+          "step": 7
+        },
+        {
+          "epoch": 4.0,
+          "grad_norm": 1.0871180295944214,
+          "learning_rate": 5e-05,
+          "loss": 0.0022,
+          "step": 8
+        },
+        {
+          "epoch": 4.0,
+          "eval_loss": 2.75898928521201e-05,
+          "eval_runtime": 0.211,
+          "eval_samples_per_second": 9.48,
+          "eval_steps_per_second": 9.48,
+          "step": 8
+        },
+        {
+          "epoch": 4.5,
+          "grad_norm": 5.721604824066162,
+          "learning_rate": 5e-05,
+          "loss": 0.0699,
+          "step": 9
+        },
+        {
+          "epoch": 5.0,
+          "grad_norm": 0.00020279391901567578,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 10
+        },
+        {
+          "epoch": 5.0,
+          "eval_loss": 6.01757437834749e-06,
+          "eval_runtime": 0.214,
+          "eval_samples_per_second": 9.344,
+          "eval_steps_per_second": 9.344,
+          "step": 10
+        },
+        {
+          "epoch": 5.5,
+          "grad_norm": 3.9198734760284424,
+          "learning_rate": 5e-05,
+          "loss": 0.016,
+          "step": 11
+        },
+        {
+          "epoch": 6.0,
+          "grad_norm": 0.00023764620709698647,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 12
+        },
+        {
+          "epoch": 6.0,
+          "eval_loss": 6.2825238273944706e-06,
+          "eval_runtime": 0.21,
+          "eval_samples_per_second": 9.522,
+          "eval_steps_per_second": 9.522,
+          "step": 12
+        },
+        {
+          "epoch": 6.5,
+          "grad_norm": 0.00024827264132909477,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 13
+        },
+        {
+          "epoch": 7.0,
+          "grad_norm": 0.00029434438329190016,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 14
+        },
+        {
+          "epoch": 7.0,
+          "eval_loss": 6.158847554615932e-06,
+          "eval_runtime": 0.2281,
+          "eval_samples_per_second": 8.767,
+          "eval_steps_per_second": 8.767,
+          "step": 14
+        },
+        {
+          "epoch": 7.5,
+          "grad_norm": 0.0002766070538200438,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 15
+        },
+        {
+          "epoch": 8.0,
+          "grad_norm": 0.0003201854997314513,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 16
+        },
+        {
+          "epoch": 8.0,
+          "eval_loss": 7.500896572310012e-06,
+          "eval_runtime": 0.2133,
+          "eval_samples_per_second": 9.378,
+          "eval_steps_per_second": 9.378,
+          "step": 16
+        },
+        {
+          "epoch": 8.5,
+          "grad_norm": 0.00029966587317176163,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 17
+        },
+        {
+          "epoch": 9.0,
+          "grad_norm": 0.00040328153409063816,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 18
+        },
+        {
+          "epoch": 9.0,
+          "eval_loss": 7.647757229278795e-06,
+          "eval_runtime": 0.2257,
+          "eval_samples_per_second": 8.861,
+          "eval_steps_per_second": 8.861,
+          "step": 18
+        },
+        {
+          "epoch": 9.5,
+          "grad_norm": 0.0002904089633375406,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 19
+        },
+        {
+          "epoch": 10.0,
+          "grad_norm": 0.000500936817843467,
+          "learning_rate": 5e-05,
+          "loss": 0.0,
+          "step": 20
+        },
+        {
+          "epoch": 10.0,
+          "eval_loss": 9.016810508910567e-06,
+          "eval_runtime": 0.2102,
+          "eval_samples_per_second": 9.515,
+          "eval_steps_per_second": 9.515,
+          "step": 20
+        },
+        {
+          "epoch": 10.0,
+          "step": 20,
+          "total_flos": 658756874403840.0,
+          "train_loss": 0.33764393950561955,
+          "train_runtime": 42.4199,
+          "train_samples_per_second": 1.886,
+          "train_steps_per_second": 0.471
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "directory": "smoke/checkpoint-2",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "1c35e2be36a982b37ace41fb9f7e1ca185313332b08cefa06da4dcdbf1534307"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "7f8fae0647e6af51ead292a06b1709e8c6275728bd920715f5dcdb2b7941ad44"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "54408e4f32f1841e3fca9ecd7ba29d9c6d461692842f2dbc8f38a3b3f7a4f9c9"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "098b29492211804ab324a36f37466821d948280bb74fce4ba895c03f13ecd878"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "abceaf7c2ea285c26a62fad7b519e8e46ee2b9fd29f3f760cb56e21a34821b2f"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 1230,
+          "sha256": "eaf2a98fc596698aeef6b47dce4616cd14ae15ba92be33892aa32535de53c315"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "3099e1db7f38b70db2657a80461cbf3c024960280f663e4c5507b79a5ee39976"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "smoke/checkpoint-4",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "f05a864860d8f2d3987c7a71d0752b011cb6947e9d8421843490983c789253ce"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "f14f75137d65a06ba58d9caf9d1be9c98ad3d8f9f521a40ae594d8dc6b8a655c"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "c85b32bfdab4b994f8cabdfb3f2e45e2fa1b1935a865f53aaf93845f433608a4"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "a8e2011629d8bed3ef560fa11175cac55684c4e12a72634bb24abf767b6c7399"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "c730ad91fa336fd4272a08d29b2625bdd1ceacb59db9604db142558c776a4ec5"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 1704,
+          "sha256": "a27ece2bbb86e090bd699414300e43994fb7dc86b5cdb0741af4a9fd1525f952"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6673,
+          "sha256": "6e3ab163b295f32799a90c58da8bc5f7908256cd56d968030686c9e0b516be79"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-2",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "e26984b6a45276c4f03b6e0463e71be075875158e19b87ee33619d1cd452107e"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "80e7551253658540c6f02c739dd962a1885061aae7af4a7cbd46ea720ccf30b8"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "098b29492211804ab324a36f37466821d948280bb74fce4ba895c03f13ecd878"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "abceaf7c2ea285c26a62fad7b519e8e46ee2b9fd29f3f760cb56e21a34821b2f"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 1233,
+          "sha256": "0ad88f45709bdfb51682af6aa0f690bbd94c90e090d69f04a87887d9c43510c1"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-4",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "0359048014817a4862b4818827ae12ecc276ed9e1c29b7265dcc2513fb8f3eac"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "303e092542430caa434aab6a531c3b518f190c2b41f827ec2baa85039b1010d8"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "a8e2011629d8bed3ef560fa11175cac55684c4e12a72634bb24abf767b6c7399"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "c730ad91fa336fd4272a08d29b2625bdd1ceacb59db9604db142558c776a4ec5"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 1705,
+          "sha256": "eb8159b02e4f8f167535667519d8907e3dabfb29579daa30b7e2fe621ea8a8da"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-6",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "50eb0660bd73453338efdefb462509836eeb8f6b75d47ffd0beb262e29c56836"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "6f4fa1911579233e63698f2d965daee343f81949d9b05f01f861e36488021640"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "01f9a0f7843a37be87edd23f4e88aa93b38b95cc2c07503eeb1cf2e4632453a2"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "56bb9552535a7a43b6c8eb1d53659465bc1fa5e4fa9f080ac4821af391702cf1"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 2180,
+          "sha256": "b5b93abdb367a29dc6a0e4322b2f9a5a9918a5f3c886e70502bedd1c56c74dbb"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-8",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "e4c650a6fb9b472c2f0d3ef20a7e43336d3f4634cb45dc0869a367d7ab1b9807"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "c15a1444759ce83aef226d4a60286bf2e7037a699d225653778ed0f417bacc6f"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "fdc37bbd2e979f041dfbbb004a5c74bab6cdda159cb18116df728588515a9ef6"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "7a095c183c2a41053713f7030d256ad5fce89cca0e872a5a5df004fc07d2ca14"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 2655,
+          "sha256": "f9593803a790668b759bc3e83fe19b92cebbe72265f954cfa1ecf569bf468b99"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-10",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "9cdfa29b3a7242c4b8fcbfd67a466296f76082403f42bd61365d1a76f4fae6b6"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "f906fdf44d24a46f95da3a921f807ef9bbd89b90ca02cd764c10a8f188ed7064"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "17cd930da9783ca70bad4b9cdeee6a06c0acea8f34645a333c93341f487f66a3"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "c8ee450752998cacd5d8c69d29ac640be4efa897d5e56f9fcc9280882f627438"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 3135,
+          "sha256": "c625681e29e6d3c01436d0f17ae0bc70334ad3c98cca2210f57e2428704ba8ed"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-12",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "df1ef42c9d7a3c70d87bfe5dd3dc6f6f781c1e800f7fe2f7d5dcd49eb07e2878"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "fde59d72fc430448ef534b0a5fdc8a2dcc21c763be061176747ef204bad2643a"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "1255b82ec9f462fef6f8c2f4a8ee876c4b6d998a53c99546a4eddcc1aabaefc7"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "91a61f0ab95b6b5cc906666e162a747b78f1451506b53e5e63fe27c87da7347c"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 3616,
+          "sha256": "e35593b7977216250dc96d1671244aabe47f514c672d89bc4e8876a26305d94b"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-14",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "af6c6591e8147b7c0ae9c397cf32533b096fe6d8ef7b43e46564ef5168bf2bdf"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "d058c11ec68e8ddc86bdfb21202df28d3946d7057539d3d5b0ba683b69eb24ff"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "20ea3a198ff666cb4ace1c684b598fe43fc7c3c276b83efc553a1b787e12a304"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "e2c6940907f7bdd476a22be7246717a4794c11a78147851b33c8dd288a94ba5a"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 4100,
+          "sha256": "6fe448e354afaeb8149d2f4ed487f5f32f16c6d866b72b70197715f5d946abd6"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-16",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "f05fb292d42431da1b63d54c77c069e2679e07bfdf020d84d392071963014642"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "11a66040b6346f83de02f041a274d117bc69070ad00dfb36edb23058110b64dd"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "97f621c40c37c796d75663f728f7490ddcd9db068eaa82d92691bb9a37ff256f"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "a3850025fee3b6c91728bdab0ae873a3b12d7abe6a838a6d4c6162b6a58d9e3b"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 4582,
+          "sha256": "9cb7e869f8a725737d6c1053cf92a53c88375c1b7b76a4275e6445a5d50a27ca"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-18",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "b5aa4679853f3712afc509d8038de8297ee940323d9e3772311bbcf63605322e"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "eda0697bb5f05165c1115abae2ddf5bc1903773670ffe851f096168b94f9f577"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "9445552595536daf5bd8731be4eabb308bd26e76a3f4f0c20c4aa55fcf9ea202"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "d1578cc4bf0a70e27b36bccbc1eafe7fefd1b8f7e7aac140985b12c602a26f7c"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 5066,
+          "sha256": "7414a01038e510230ff9473d80aef3dde387c0e99e390632b19fde1a8a05f726"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train/checkpoint-20",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 5398,
+          "sha256": "9ea7475fe0fa237111ab6f2e9e615aa739afb314f135da56eab932fcd9512f98"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "83381c072f0df17e4541f91478d3f4aba278652eb843df8dc1fdaaf5e6825e26"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "optimizer.pt",
+          "bytes": 132545355,
+          "sha256": "809772389330237cc3ce0d3efad74f5e40b3c1778cad34d45fe55a3509584f15"
+        },
+        {
+          "name": "rng_state.pth",
+          "bytes": 14645,
+          "sha256": "ed3753ab7977739b8eda494dd72defae5750f7283141b11a8f562160ba4c1a23"
+        },
+        {
+          "name": "scheduler.pt",
+          "bytes": 1465,
+          "sha256": "1547c2a1dc4da9e3f7a7d917a0bf7cb13e74c6d8e5a8140bea407fed9c6d0908"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 5549,
+          "sha256": "cbf8b4f3d3a9820eccb66ce9f9a97a2dd248430d6a2f4c2fd5fa12a3007e2340"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    },
+    {
+      "directory": "train",
+      "adapter_tensor_count": 504,
+      "adapter_parameter_count": 16515072,
+      "adapter_tensors_all_finite": true,
+      "files": [
+        {
+          "name": "README.md",
+          "bytes": 2370,
+          "sha256": "d09e9880dc49eb3445ec51ebcc8055d2825867ec4956478d86a3e10e09ac1a89"
+        },
+        {
+          "name": "adapter_config.json",
+          "bytes": 1141,
+          "sha256": "b1f2f2ab02fb97611f51f21227a0653862db908153e53443c3cbf061ca345e1d"
+        },
+        {
+          "name": "adapter_model.safetensors",
+          "bytes": 66126768,
+          "sha256": "83381c072f0df17e4541f91478d3f4aba278652eb843df8dc1fdaaf5e6825e26"
+        },
+        {
+          "name": "added_tokens.json",
+          "bytes": 707,
+          "sha256": "c0284b582e14987fbd3d5a2cb2bd139084371ed9acbae488829a1c900833c680"
+        },
+        {
+          "name": "all_results.json",
+          "bytes": 345,
+          "sha256": "d139a7381cc9af2f550179cbf1f6f600402854a94885f5a41cf71628bbd50877"
+        },
+        {
+          "name": "chat_template.jinja",
+          "bytes": 2630,
+          "sha256": "64f85b198065d0fba2a81f37e10ed68161ce2c19a754c7100e67e0ca2ee9c326"
+        },
+        {
+          "name": "eval_results.json",
+          "bytes": 163,
+          "sha256": "620bf9dfdbe63fafd12a04421701bc72fcf41079d447f9f0ef99adb8dfc0afb2"
+        },
+        {
+          "name": "merges.txt",
+          "bytes": 1671853,
+          "sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5"
+        },
+        {
+          "name": "special_tokens_map.json",
+          "bytes": 613,
+          "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+        },
+        {
+          "name": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "name": "tokenizer_config.json",
+          "bytes": 5432,
+          "sha256": "bcab9fe0f4f56a0cffba7c916f943c376810d32c08f2cebf01f8b15849039d35"
+        },
+        {
+          "name": "train_results.json",
+          "bytes": 203,
+          "sha256": "251d5a50627677cebef56afdc5c584104811e703cc86b8bd2c8fadf53f8c5237"
+        },
+        {
+          "name": "trainer_log.jsonl",
+          "bytes": 4950,
+          "sha256": "35e8a4b43eae57868039269aef6c99e49505a048fc8310b5ca6b6cac1ec6d34e"
+        },
+        {
+          "name": "trainer_state.json",
+          "bytes": 5792,
+          "sha256": "d73f24653f9cc3a47cc77e531699184634d4f9f67a82872247d0e46d3c2fa97f"
+        },
+        {
+          "name": "training_args.bin",
+          "bytes": 6545,
+          "sha256": "e94778323b4513f273f9eeae3b5834022349ae47ee2bfda4f6849d0307e16c91"
+        },
+        {
+          "name": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+        }
+      ]
+    }
+  ],
+  "resume_scope": "planned normal stop at step2, explicitly restored checkpoint2 and trained through step4; not an induced process crash",
+  "validation_scope": "two synthetic formatting examples; validation loss is not production quality or generalization evidence"
+}

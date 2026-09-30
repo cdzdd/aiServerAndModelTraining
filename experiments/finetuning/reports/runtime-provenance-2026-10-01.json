@@ -1,0 +1,47 @@
+{
+  "verification_basis": "enforce_greedy in49d3ded + installed Transformers/PEFT real CPU generate-path regression + actual API logs confirm do_sample=False",
+  "base_process": {
+    "pid": 3592,
+    "started_at_utc": "2026-10-01T05:23:04.095164+08:00",
+    "cwd": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt",
+    "command": [
+      "experiments/finetuning/local_api.py",
+      "--config",
+      ".local/finetuning/configs/inference-base.yaml",
+      "--key-file",
+      ".local/finetuning/api.key",
+      "--model-id",
+      "qwen3-4b-qlora-demo",
+      "--port",
+      "11435"
+    ],
+    "config_sha256": "14e646c34f7d7a6c784bb601efc270c1825da24500ea036fba6d6a739ae8f288",
+    "source_commit": "49d3ded90f34969122a841258f7dedd4af0c6cbf"
+  },
+  "finetuned_process": {
+    "pid": 3657,
+    "started_at_utc": "2026-10-01T05:28:06.256345+08:00",
+    "cwd": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt",
+    "command": [
+      "experiments/finetuning/local_api.py",
+      "--config",
+      ".local/finetuning/configs/inference-finetuned.yaml",
+      "--key-file",
+      ".local/finetuning/api.key",
+      "--model-id",
+      "qwen3-4b-qlora-demo",
+      "--port",
+      "11435"
+    ],
+    "config_sha256": "7f710b2874cad5726b5e74ca49c35ac53642752d8f5db9391021beb626534ec4",
+    "source_commit": "49d3ded90f34969122a841258f7dedd4af0c6cbf"
+  },
+  "model_state": "Corrected base API gracefully stopped after dev/test; corrected trained adapter API currently available on127.0.0.1:11435",
+  "collection_scope": "Post-run coordinator evidence; actual launch/config/source checks plus independent CPU dependency verification, not automatic server model attestation",
+  "correction_scope": "Original sampled reports archived in v1-sampled; model cache/data/adapter/training/retrieval/prompt settings unchanged, no test-based tuning",
+  "inference_configuration_difference": "Only adapter_name_or_path differs; same HF/NF4/BF16/qwen3_nothink/SDPA/greedy",
+  "collected_at": "2026-09-30T21:32:40.2779917Z",
+  "source_commit": "49d3ded90f34969122a841258f7dedd4af0c6cbf",
+  "effective_generation_mode": "GREEDY_SEARCH",
+  "performance_scope": "Local observations; background system load not rigorously controlled. Complete check finished before base generation; no GPU training overlapped."
+}
