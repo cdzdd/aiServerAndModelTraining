@@ -1,0 +1,51 @@
+{
+  "collected_at": "2026-09-30T20:11:23.222883+00:00",
+  "collection_boundary": "Sidecar collected after all six real evaluation runs; not fields originally emitted by run_eval. Root configured this unchanged local model/config before evaluation; actual reports retain original metadata.",
+  "execution_code_commit": "c0d19f0cc9baaaae79abc8cacbf115c313839e1e",
+  "runtime_source_diff_from_commit_at_collection": false,
+  "source_paths": [
+    "backend/app",
+    "experiments/evaluation/*.py"
+  ],
+  "ollama_version": "0.35.0",
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+  "model_bytes": 2497293803,
+  "model_details": {
+    "parent_model": "",
+    "format": "gguf",
+    "family": "qwen3",
+    "families": [
+      "qwen3"
+    ],
+    "parameter_size": "4.0B",
+    "quantization_level": "Q4_K_M",
+    "context_length": 262144,
+    "embedding_length": 2560
+  },
+  "api_metadata_source": "Own loopback Ollama /api/version and /api/tags",
+  "settings_source": "This worktree private .env through ModelSettings; only whitelisted nonsecret fields recorded",
+  "settings": {
+    "provider": "ollama",
+    "ollama_num_ctx": 8192,
+    "thinking_field_sent": false,
+    "max_output_tokens": 512,
+    "connect_timeout_seconds": 10.0,
+    "read_timeout_seconds": 120.0,
+    "temperature": 0,
+    "answer_budget_without_history": 512,
+    "history_rewrite_then_answer_budget": [
+      128,
+      384
+    ],
+    "truncate": false,
+    "shift": false
+  },
+  "license": "Apache-2.0",
+  "original_hf_repository": "Qwen/Qwen3-4B-Instruct-2507",
+  "original_hf_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+  "identity_acceptance_report": "../../inference/reports/qwen3-4b-2026-10-01.md",
+  "synthetic_only": true,
+  "human_reviewed": false,
+  "generation_determinism": "temperature0 requests; no guarantee of GPU/server determinism"
+}

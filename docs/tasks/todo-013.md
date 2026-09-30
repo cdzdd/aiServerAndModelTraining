@@ -50,7 +50,7 @@ uv run python ../experiments/evaluation/run_eval.py --config ../experiments/eval
 uv run ruff check . ../experiments/evaluation
 ```
 
-以上配置和入口均在本任务实现，当前没有报告。真实模型评测需预算许可；报告必须区分固定检索测试与真实生成质量。
+以上配置和入口均已在本任务实现；用户授权的本地真实模型检索与生成报告见experiments/evaluation/reports。报告区分固定检索与完整RAG质量，未调用付费云模型。
 
 ## 已知问题与外部阻塞
 
@@ -58,8 +58,8 @@ uv run ruff check . ../experiments/evaluation
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未采集数据、未运行评测、无质量提升声明。
+- 负责人implement_013（root协调）；worktree与分支见下方实施记录，当前in_review；PR与合并由root接续。
+- 本轮已交付用户授权的60题虚构教学数据、真实检索与完整RAG逐题报告；没有质量提升或人工业务验收声明。
 - 按 [WORKFLOW](../WORKFLOW.md) 交付版本化数据说明、逐条结果、对照结论与评审；分支 `in_review`，合入权威 main 且检查通过后统一 `done`。
 
 ## 2026-10-01 本轮教学范围与实施记录
@@ -81,3 +81,13 @@ uv run ruff check . ../experiments/evaluation
 - root授权串行整合共享.env.example/CONTRACTS/scriptsdev到本分支，提交8d23104；统一check现包含评测9项与外目录Ruff，当前完整重跑中。
 
 - 最终统一验收 `node scripts/dev.mjs check` 已实际exit0（8d23104对应实现）：backend681、评测9、frontend114、E2E18+4+1；Ruff/ESLint/typecheck/build、两次Alembic upgrade完成。完整输出保留该worktree忽略目录的unified-check-final.log。检查后仅报告/文档追加，真实生成仍待014，状态保持in_review，不宣称已合并或生成质量已过。
+
+
+## 2026-10-01 014集成后的完整RAG验收
+
+- 014功能PR27与状态PR28已合入origin/main b6b5f9c2dd18536f77cacf6d70961586e6205d16；root同步本分支至c0d19f0cc9baaaae79abc8cacbf115c313839e1e。此为013六份真实生成报告的执行源码提交，不是013已合入main。
+- 在本worktree真实Ollama qwen3:4b-instruct-2507-q4_K_M（8192上下文、512输出、不发送think、temperature=0）串行运行dev/test × baseline/hybrid/rerank --generate，六份均exit0；BGE与真实CrossEncoder仍CPU。报告与事后运行身份旁证已版本化，资料和参数未改。
+- 三模式均dev回答6/14、误拒答8；test回答12/31、误拒答19。各0权限泄露/0上游错误/0应拒答误答/0恶意短语匹配；dev6/test12个实际引用来源精确率及原文映射1.0，不代表全部问题正确或无幻觉。纯检索test缺10/31参考题；完整RAG实际搜索16/31无候选，另1clarify、2生成/引用校验拒答。完整结果见evaluation/reports/decision.md，默认vector与关闭重排保留。
+- 首次合入014后统一check因provider测试fixture继承外部8192上下文失败：737通过/1失败，原日志保留.local/unified-check-after-014.log。4096进程覆盖下完整check exit0仅用于诊断，不作为解决方案。随后目标测试在8192环境复现RED；root授权仅fixture默认ollama_num_ctx=4096及model_disable_thinking=false两行，生产provider/真实报告不改。外部8192/thinking=true下providers105通过，backend目录Ruff通过；修复提交0a341005c1bd9019004d88326bdddd0936304d7d。
+- 修复后在0a341005c1bd9019004d88326bdddd0936304d7d对应实现使用实际.env8192、仅该check进程MODEL_PROVIDER=mock重跑完整node scripts/dev.mjs check，实际exit0：backend738、评测9、frontend114、E2E18+4+1；Ruff/ESLint/typecheck/build与重复迁移检查完成。完整原始输出保留.local/unified-check-after-014-fixture-fixed.log。六份真实生成在独立进程使用ollama，未用mock冒充效果。
+- 独立代理已复算12份v2报告360行/54引用无不一致，最终文案、数值和两行fixture定点复核均已通过。正式发布前真实业务资料与人工审核仍未完成；本轮教学交付依用户范围调整接受代理复核，不声称替代人工验收。013仍in_review，由root继续普通PR/合并/状态收尾。

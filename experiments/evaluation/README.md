@@ -60,3 +60,8 @@ uv run --frozen ruff check --config pyproject.toml . ../experiments/evaluation
 重排运行前校验六个固定快照文件SHA256（含1,112,206,140-byte safetensors）；报告模型ID/修订来自通过校验的已知快照常量，不接受配置文字冒充实际加载版本。RAG提示版本rag-extractive-v2保留retriever排序并从末尾丢弃超预算证据，避免按cosine重排撤销实验排名。
 
 v2独立代理定点复审已通过，6项初审问题关闭；共20评测来源与另4训练来源逐条核对。review_status在报告前最后冻结，文字状态不代表人工审核。所有参数保留v1的0.65/Top5/20候选/RRF60，v1已见最终数据的限制继续保留。
+
+
+2026-10-01完整RAG对照已在014合入后完成：冻结v2数据、同一本机 `qwen3:4b-instruct-2507-q4_K_M` 串行运行dev/test × baseline/hybrid/rerank六份*-rag.json。三模式一致：dev可答6/14、误拒答8；test可答12/31、误拒答19；各0泄露/0上游错误，已输出引用的来源精确率与原文映射均1.0。来源精确率不等于全部问答正确或无幻觉。纯检索test缺10/31参考题；完整RAG因原问题/历史改写不同，实际搜索16/31无候选，另1题clarify、2题生成/引用校验拒答。结果与残余问题详见[默认方案决定](reports/decision.md)，保持vector默认、重排关闭。
+
+执行源码提交为c0d19f0cc9baaaae79abc8cacbf115c313839e1e，首份dirty=false、其余五份因先前未提交报告dirty=true；执行源码一致。root采集的[运行身份旁证](reports/runtime-provenance-2026-10-01.json)记录模型tag digest、实际8192上下文/512输出预算/不发送think/temperature=0及014身份验证链接。旁证在六次评测后采集，不是运行器原始元信息；原始报告保持不改。全部仍为虚构教学资料与代理复核，未进行人工业务验收或生产质量验收。
