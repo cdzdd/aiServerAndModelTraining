@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-016 |
-| 状态 | pending |
+| 状态 | in_review |
 | depends_on | todo-001、todo-002、todo-003 |
 | 并行可行性 | 可与 005–008 业务开发并行；独占预发布环境的部署变更，不能两名执行者同时部署同一站点 |
 | 负责目录 | `infra/` 部署文件、容器构建文件、`scripts/deploy/`、`docs/operations/`、预发布 smoke |
@@ -58,6 +58,33 @@ npm run test:e2e -- e2e/preproduction.spec.ts
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未构建、未部署、没有公网地址或认证验收结果。
+- 2026-10-01 已领取本地阶段；独立 worktree `C:\Users\Administrator\.codex\worktrees\todo-016-local-runtime\aiSoftwareAttempt`，分支 `feat/todo-016-local-runtime`，根对话维护实时领取与正式评审/PR流程。
+- 本轮按用户明确授权停在本地运行版与使用说明；公网服务器、DNS、HTTPS、生产发布仍未执行。本地阶段证据见下文，不将本地认证等同公网 Secure Cookie 验收。
 - 按 [WORKFLOW](../WORKFLOW.md) 提交配置和真实预发布证据；功能分支 `in_review`，合入权威 main 且检查通过后统一置 `done`。
+
+## 2026-10-01 本地阶段实施与真实验证
+
+用户本轮只授权本地运行，公网采购、DNS、部署与生产发布排除在本轮。实施计划见 [todo-016-local-plan](todo-016-local-plan.md)，中文使用说明见 [local-run](../operations/local-run.md)。整体保持 `in_review`；原公网 HTTPS 验收仍为 pending，未合入 main，PR/最终集成证据由根对话补充。
+
+- 新增最小前后端镜像、固定实际解析的基础镜像 digest、`compose.local.yaml` 与 `Caddyfile.local`。只有 web 发布 `127.0.0.1:5246`；api/db 无宿主发布端口。一个 API 进程、独立 parse/index worker、持久 PostgreSQL/uploads 卷、只读固定 BGE 挂载、非 root 只读应用容器和 3×10 MB 容器日志轮转。
+- `node scripts/deploy/local-run.mjs build|start|stop|status|logs|admin|smoke` 为本地入口；先等待数据库、串行迁移再启动应用，失败不继续启动；stop 保留卷。start/smoke 同时核实宿主 URL，不能用内部 healthy 掩盖网页端口不可达。cloud 配置拒绝启动，不触发付费调用。
+- 本地 `.env`、端口与数据卷独立；PUBLIC_ORIGIN 固定本机 HTTP、APP_ENV 明确 development，原 production HTTPS/强会话密钥校验保留。Ollama 宿主受控入口与013/014最终集成仍待根对话完成，本阶段 Mock 不作为真实回答质量验收。
+- 小范围修正首页已经开放的功能入口与 frontend/README 的旧未开放文案；更新一条旧 auth-shell 断言验证真实客服入口。新首页入口使用不同名称，避免与侧栏定位歧义。
+
+实际运行记录（Windows，Node 24.11.0、Python 3.12.14、Docker Engine 29.8.0，基线0f5832279978983c959deff434990ca1b7ec7c9f加本分支改动）：
+
+| 命令/检查 | 真实结果 |
+| --- | --- |
+| `node --test scripts/deploy/local-run.test.mjs` | 8通过；先观察缺失模块/宿主检查的RED，再实现GREEN，覆盖迁移失败停止、保留卷、拒绝cloud与真实宿主可达性/SPA误路由 |
+| `uv run --frozen --directory backend pytest tests/deploy/test_smoke.py -q` | 3通过；真实临时HTTP服务验证健康、readiness失败及API不被SPA吞掉，先RED后GREEN |
+| `uv run --frozen --directory backend ruff check ../scripts/deploy/smoke.py tests/deploy` | 通过 |
+| `node scripts/dev.mjs check` | exit0；678 pytest、114 Vitest、18默认浏览器、4聊天/人工/反馈、1统计浏览器；既有依赖弃用与颜色提示保留，无云模型调用 |
+| `node scripts/deploy/local-run.mjs build` | 后端/前端镜像实际成功；首次npm下载ECONNRESET失败后保留缓存重试成功，不更改锁文件 |
+| resolved Compose静态核对 | 通过；脱敏核对loopback、api/db不发布端口、持久卷、只读模型、日志轮转，不打印配置密钥 |
+| `node scripts/deploy/local-run.mjs start` / `smoke` | 数据库迁移成功，API/web/db healthy、两个worker持续运行且RestartCount=0；内部与宿主健康/深链接/API404路由通过 |
+| `uv run --frozen --directory backend python ../scripts/deploy/smoke.py http://127.0.0.1:5246 --auth` | 真实注册、登录、身份恢复、HttpOnly/SameSite=Lax、非法CSRF403、正常退出及退出后401通过；仅创建一个标注的合成普通账号，不保存或输出密码 |
+| 本任务 `stop` → `start` 后持久核对 | 合成账号数量保持1、上传卷临时标记保持；核对后只移除本检查的标记，数据卷保留 |
+
+本机 Docker 首次创建 web 时曾发生 HostConfig 有 loopback绑定而 NetworkSettings.Ports 为空，Compose内部健康无法发现。只重启本任务web后映射恢复；已增加宿主验证并在使用说明记录排错，未重置Docker或停止其他任务服务。
+
+当前运行URL是 `http://127.0.0.1:5246`；没有公网HTTPS或生产验收结果。上述代码检查为本地证据，不表示云端CI已运行。管理员初始化交由用户隐藏密码输入；真实Ollama问答、root独立评审、PR、main合并及本地使用版本更新仍待最终记录。
