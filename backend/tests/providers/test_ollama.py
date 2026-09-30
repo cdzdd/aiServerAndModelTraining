@@ -131,6 +131,19 @@ async def test_http_failures_are_sanitized_no_retry(make_ollama, messages, statu
         ([frame(message={"tool_calls": [{"function": {}}]})], "PROVIDER_UNSUPPORTED_RESPONSE"),
         ([frame("文本", done=True, reason="unknown")], "PROVIDER_UNSUPPORTED_RESPONSE"),
         ([frame("部分"), b'{"error":"private-host.local secret body"}\n'], "PROVIDER_UNAVAILABLE"),
+        pytest.param(
+            [b'{"message":{"content":"\\ud800"},"done":true,"done_reason":"stop"}\n'],
+            "PROVIDER_PROTOCOL_ERROR",
+            id="unpaired-surrogate",
+        ),
+        pytest.param(
+            [
+                b'{"extra":' + b"[" * 10000 + b"0" + b"]" * 10000
+                + b',"message":{"content":"ok"},"done":true,"done_reason":"stop"}\n'
+            ],
+            "PROVIDER_PROTOCOL_ERROR",
+            id="deeply-nested-json",
+        ),
         ([b"x" * 65537], "PROVIDER_PROTOCOL_ERROR"),
         ([b'{"message":{"content":"\xff"},"done":false}\n'], "PROVIDER_PROTOCOL_ERROR"),
     ],

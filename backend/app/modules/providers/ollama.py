@@ -94,6 +94,7 @@ class OllamaProvider:
                         text = message.get("content", "")
                         if not isinstance(text, str):
                             raise ProviderError("PROVIDER_PROTOCOL_ERROR")
+                        text.encode("utf-8")
                         if done:
                             if reason is None:
                                 raise ProviderError("PROVIDER_PROTOCOL_ERROR")
@@ -121,7 +122,7 @@ class OllamaProvider:
         except httpx.TransportError:
             code = "PROVIDER_STREAM_INTERRUPTED" if has_text else "PROVIDER_UNAVAILABLE"
             raise ProviderError(code) from None
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError, RecursionError):
             raise ProviderError("PROVIDER_PROTOCOL_ERROR") from None
         # Match CloudProvider: release the socket before exposing the terminal delta.
         yield terminal
