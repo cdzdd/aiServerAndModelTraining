@@ -50,11 +50,16 @@ Ollama 使用 todo-014 目录中已下载的便携程序与模型缓存，没有
 $ollamaRoot = 'C:\Users\Administrator\.codex\worktrees\todo-014-ollama\aiSoftwareAttempt\.local'
 $env:OLLAMA_HOST = '127.0.0.1:11434'
 $env:OLLAMA_MODELS = Join-Path $ollamaRoot 'models\ollama'
-Start-Process -FilePath (Join-Path $ollamaRoot 'tools\ollama-v0.35.0\ollama.exe') -ArgumentList 'serve' -WindowStyle Hidden
+$env:OLLAMA_CONTEXT_LENGTH = '4096'
+$env:OLLAMA_NUM_PARALLEL = '1'
+$env:OLLAMA_MAX_LOADED_MODELS = '1'
+$env:OLLAMA_NO_CLOUD = 'true'
+$ollamaExe = Join-Path $ollamaRoot 'tools\ollama-v0.35.0\ollama.exe'
+Start-Process -FilePath $ollamaExe -ArgumentList 'serve' -WorkingDirectory (Split-Path $ollamaExe) -WindowStyle Hidden
 Invoke-RestMethod 'http://127.0.0.1:11434/api/version'
 ```
 
-请保留该 todo-014 目录的便携程序和模型缓存，不要在服务已运行时重复启动。模型生成使用本机 GPU，其他模型评测或训练时需串行安排。真实本地网页资料入库与问答验收结果见 [todo-016](../tasks/todo-016.md)；最终记录完成前，模型服务连通不代表整条业务链已验收。
+请保留该 todo-014 目录的便携程序和模型缓存，不要在服务已运行时重复启动，也无需重复下载权重。已有模型身份、许可、版本、digest及小样本专项结果见 [本机模型验收报告](../../experiments/inference/reports/qwen3-4b-2026-10-01.md)；专项结果不能代替当前网页运行版的最终验收。模型生成使用本机 GPU，其他模型评测或训练时需串行安排。真实本地网页资料入库与问答验收结果见 [todo-016](../tasks/todo-016.md)；最终记录完成前，模型服务连通不代表整条业务链已验收。
 
 ## 第一次使用
 
