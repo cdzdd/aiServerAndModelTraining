@@ -22,6 +22,7 @@ def frame(text="", *, done=False, reason=None, **fields):
 @pytest.fixture
 def make_ollama(make_provider):
     def make(url, **overrides):
+        overrides.setdefault("ollama_num_ctx", 4096)
         return make_provider(
             url.removesuffix("/v1"), model_provider="ollama", model_api_key="", **overrides
         )

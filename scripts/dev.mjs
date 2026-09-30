@@ -47,9 +47,9 @@ switch (process.argv[2]) {
   case 'check':
     if (!process.env.TEST_DATABASE_URL) throw new Error('Set a dedicated TEST_DATABASE_URL before running checks.')
     run('node', ['--test', 'scripts/deploy/local-run.test.mjs'])
-    run('uv', ['run', '--frozen', 'ruff', 'check', '.'], backend)
-    run('uv', ['run', '--frozen', 'ruff', 'check', '../scripts/deploy/smoke.py'], backend)
+    run('uv', ['run', '--frozen', 'ruff', 'check', '--config', 'pyproject.toml', '.', '../experiments/evaluation', '../scripts/deploy/smoke.py'], backend)
     run('uv', ['run', '--frozen', 'pytest', '-q'], backend)
+    run('uv', ['run', '--frozen', 'pytest', '-c', 'pyproject.toml', '../experiments/evaluation/tests', '-q'], backend)
     // A second upgrade must be a safe no-op on an already migrated database.
     run('uv', ['run', '--frozen', 'alembic', 'upgrade', 'head'], backend)
     run('uv', ['run', '--frozen', 'alembic', 'upgrade', 'head'], backend)

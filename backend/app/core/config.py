@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     retrieval_threshold: float = Field(
         default=0.65, ge=-1, le=1, validation_alias="RETRIEVAL_THRESHOLD"
     )
+    retrieval_mode: Literal["vector", "hybrid"] = Field(
+        default="vector", validation_alias="RETRIEVAL_MODE"
+    )
+    retrieval_rerank_enabled: bool = Field(
+        default=False, validation_alias="RETRIEVAL_RERANK_ENABLED"
+    )
+    reranker_model_path: str = Field(default="", validation_alias="RERANKER_MODEL_PATH")
+    rerank_timeout_seconds: float = Field(
+        default=2.0, gt=0, le=30, validation_alias="RERANK_TIMEOUT_SECONDS"
+    )
     ingestion_parse_timeout: int = Field(
         default=60, ge=1, le=300, validation_alias="INGESTION_PARSE_TIMEOUT"
     )
@@ -37,9 +47,7 @@ class Settings(BaseSettings):
     chat_requests_per_minute: int = Field(
         default=10, ge=1, validation_alias="CHAT_REQUESTS_PER_MINUTE"
     )
-    chat_requests_per_day: int = Field(
-        default=60, ge=1, validation_alias="CHAT_REQUESTS_PER_DAY"
-    )
+    chat_requests_per_day: int = Field(default=60, ge=1, validation_alias="CHAT_REQUESTS_PER_DAY")
     chat_global_concurrency: int = Field(
         default=2, ge=1, validation_alias="CHAT_GLOBAL_CONCURRENCY"
     )

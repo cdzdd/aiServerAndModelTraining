@@ -1,0 +1,4 @@
+mode: vector
+threshold: 0.65
+rerank: false
+rerank_timeout_seconds: 2.0

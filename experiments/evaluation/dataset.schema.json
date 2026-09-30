@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Original synthetic campus evaluation dataset",
+  "type": "object",
+  "required": ["version", "synthetic", "review_status", "sources", "cases"],
+  "properties": {
+    "version": {"type": "string"},
+    "synthetic": {"const": true},
+    "review_status": {"type": "string"},
+    "sources": {
+      "type": "array", "items": {
+        "type": "object", "required": ["id", "group", "split", "kb", "visibility", "title", "text", "provenance", "sha256"],
+        "properties": {
+          "id": {"type": "string"}, "group": {"type": "string"},
+          "split": {"enum": ["dev", "test"]}, "kb": {"type": "string"},
+          "visibility": {"enum": ["public", "restricted"]}, "title": {"type": "string"},
+          "text": {"type": "string"}, "provenance": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+        }
+      }
+    },
+    "cases": {
+      "type": "array", "minItems": 50, "items": {
+        "type": "object", "required": ["id", "split", "group", "question", "retrieval_query", "allowed_kbs", "reference_sources", "reference_answer", "answer_terms", "expected_refusal", "history", "tags"],
+        "properties": {
+          "id": {"type": "string"}, "split": {"enum": ["dev", "test"]}, "group": {"type": "string"},
+          "question": {"type": "string"}, "retrieval_query": {"type": "string"},
+          "allowed_kbs": {"type": "array", "items": {"type": "string"}},
+          "reference_sources": {"type": "array", "items": {"type": "string"}},
+          "reference_answer": {"type": "string"}, "answer_terms": {"type": "array", "items": {"type": "string"}},
+          "expected_refusal": {"type": "boolean"},
+          "history": {"type": "array", "items": {"type": "object", "required": ["role", "content"], "properties": {"role": {"enum": ["user", "assistant"]}, "content": {"type": "string"}}}},
+          "tags": {"type": "array", "items": {"enum": ["normal", "multi_turn", "no_answer", "permission", "malicious_document"]}},
+          "forbidden_answer_terms": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
