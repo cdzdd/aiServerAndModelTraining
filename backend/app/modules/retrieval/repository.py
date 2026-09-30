@@ -63,6 +63,7 @@ def search_candidates(
     *,
     top_k: int,
     threshold: float,
+    lexical_query: str | None = None,
 ) -> list[SearchHit]:
     candidates = active_candidates(actor, kb_ids)
     mismatched = or_(
@@ -82,9 +83,10 @@ def search_candidates(
             score >= threshold,
         )
         .order_by(distance, Chunk.id)
-        .limit(top_k)
     )
-    return [
+    if lexical_query is None:
+        ranked = ranked.limit(top_k)
+    result = [
         SearchHit(
             chunk_id=chunk.id,
             kb_id=chunk.kb_id,
@@ -101,11 +103,22 @@ def search_candidates(
         )
         for chunk, similarity in db.execute(ranked)
     ]
+    if lexical_query is not None:
+        from app.modules.retrieval.lexical import lexical_score
+
+        result = [
+            hit for hit in result if lexical_score(lexical_query, hit.title + "\n" + hit.text)
+        ]
+        result.sort(
+            key=lambda hit: (
+                -lexical_score(lexical_query, hit.title + "\n" + hit.text),
+                hit.chunk_id,
+            )
+        )
+    return result[:top_k]
 
 
-def validate_hits(
-    db: Session, actor: Actor, kb_ids: list[UUID], hits: list[SearchHit]
-) -> bool:
+def validate_hits(db: Session, actor: Actor, kb_ids: list[UUID], hits: list[SearchHit]) -> bool:
     """Recheck current authority and exact source snapshots without embedding work."""
     if not hits or not kb_ids:
         return False
@@ -123,8 +136,14 @@ def validate_hits(
     )
     current = {chunk.id: chunk for chunk in db.scalars(candidates)}
     fields = (
-        "kb_id", "text", "title", "revision_id", "faq_version",
-        "page_number", "paragraph_number", "line_number",
+        "kb_id",
+        "text",
+        "title",
+        "revision_id",
+        "faq_version",
+        "page_number",
+        "paragraph_number",
+        "line_number",
     )
     for hit in hits:
         chunk = current.get(hit.chunk_id)

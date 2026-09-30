@@ -1,0 +1,124 @@
+{
+  "version": "campus-synthetic-training-v1",
+  "synthetic": true,
+  "sources": [
+    {
+      "id": "train-parking",
+      "group": "train-parking",
+      "split": "train",
+      "title": "停车登记TC-41",
+      "text": "TC-41教学停车登记需要车牌号和学生编号，临时停车期限为两天。",
+      "provenance": "本项目原创虚构教学资料",
+      "sha256": "a988abb81502554bed6e93dc9d12c2abc21f4d11987ba28099efd030b1dacb3e"
+    },
+    {
+      "id": "train-print",
+      "group": "train-print",
+      "split": "train",
+      "title": "教学打印DY-36",
+      "text": "DY-36教学打印点位于东楼36室，支持A4黑白双面打印，需自备校园卡。",
+      "provenance": "本项目原创虚构教学资料",
+      "sha256": "17fb9dfba53704a3472c548a249a0a09c328970897742d0a8292bbe5e7cf5e36"
+    },
+    {
+      "id": "train-art",
+      "group": "train-art",
+      "split": "train",
+      "title": "艺术展览YS-77",
+      "text": "YS-77教学艺术展览位于文化楼77室，周六13:00至17:00开放，禁止闪光摄影。",
+      "provenance": "本项目原创虚构教学资料",
+      "sha256": "7adba21b2aa2d68f9ddf6ce83058b691019d9dd9fb611d85affc85d794aafe66"
+    },
+    {
+      "id": "train-package",
+      "group": "train-package",
+      "split": "train",
+      "title": "包裹领取BG-58",
+      "text": "BG-58教学包裹站位于东门58室，包裹保留五天，凭取件码领取。",
+      "provenance": "本项目原创虚构教学资料",
+      "sha256": "72a99aca4bb992609c1031e8bb05816e6525a8c8d4e4a7230dede4e945543376"
+    }
+  ],
+  "cases": [
+    {
+      "id": "train-parking-q1",
+      "split": "train",
+      "group": "train-parking",
+      "question": "停车登记需要什么？",
+      "reference_sources": [
+        "train-parking"
+      ],
+      "reference_answer": "车牌号和学生编号"
+    },
+    {
+      "id": "train-parking-q2",
+      "split": "train",
+      "group": "train-parking",
+      "question": "临时停车可以停多久？",
+      "reference_sources": [
+        "train-parking"
+      ],
+      "reference_answer": "两天"
+    },
+    {
+      "id": "train-print-q1",
+      "split": "train",
+      "group": "train-print",
+      "question": "教学打印点在哪里？",
+      "reference_sources": [
+        "train-print"
+      ],
+      "reference_answer": "东楼36室"
+    },
+    {
+      "id": "train-print-q2",
+      "split": "train",
+      "group": "train-print",
+      "question": "打印需要什么卡？",
+      "reference_sources": [
+        "train-print"
+      ],
+      "reference_answer": "校园卡"
+    },
+    {
+      "id": "train-art-q1",
+      "split": "train",
+      "group": "train-art",
+      "question": "艺术展览何时开放？",
+      "reference_sources": [
+        "train-art"
+      ],
+      "reference_answer": "周六13:00至17:00"
+    },
+    {
+      "id": "train-art-q2",
+      "split": "train",
+      "group": "train-art",
+      "question": "艺术展览可以用闪光灯吗？",
+      "reference_sources": [
+        "train-art"
+      ],
+      "reference_answer": "禁止闪光摄影"
+    },
+    {
+      "id": "train-package-q1",
+      "split": "train",
+      "group": "train-package",
+      "question": "教学包裹站在哪里？",
+      "reference_sources": [
+        "train-package"
+      ],
+      "reference_answer": "东门58室"
+    },
+    {
+      "id": "train-package-q2",
+      "split": "train",
+      "group": "train-package",
+      "question": "包裹保留几天？",
+      "reference_sources": [
+        "train-package"
+      ],
+      "reference_answer": "五天"
+    }
+  ]
+}

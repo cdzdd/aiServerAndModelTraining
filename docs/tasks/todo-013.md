@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-013 |
-| 状态 | pending |
+| 状态 | in_review |
 | depends_on | todo-008 |
 | 并行可行性 | 可与 009、014 并行；本任务独占检索算法改动，其他任务保持既有 search 接口 |
 | 负责目录 | `experiments/evaluation/`、`backend/app/modules/retrieval/` 的混合检索/重排、评测测试 |
@@ -61,3 +61,13 @@ uv run ruff check . ../experiments/evaluation
 - 未领取；负责人、worktree、分支、commit、PR 未产生。
 - 未采集数据、未运行评测、无质量提升声明。
 - 按 [WORKFLOW](../WORKFLOW.md) 交付版本化数据说明、逐条结果、对照结论与评审；分支 `in_review`，合入权威 main 且检查通过后统一 `done`。
+
+## 2026-10-01 本轮教学范围与实施记录
+
+- 用户明确授权先使用原创、明确虚构的校园教学资料和至少50个评测问题，由独立代理复核；真实业务资料收集、人工审核与生产质量验收仍留到正式发布前。此范围调整不把自动审核冒充人工验收。
+- 分支 `feat/todo-013-evaluation`，独立worktree `todo-013-evaluation`，基线 `0f5832279978983c959deff434990ca1b7ec7c9f`；API8143/Web5243/DB15473，独立qa_test随机schema，冻结uv/npm依赖。
+- 实施：60题固定教学评测（18开发/42最终测试），20来源带sha256；dev/test按来源组隔离，另4主题/8条训练格式样例供015独立扩展。禁止从最终评测规则改写训练样本。
+- 先观察手算指标、混合/权限、重排降级、运行器DB/引用/索引集成行为RED，再最小实现；已有真实PostgreSQL/pgvector检索套件101通过，评测测试7通过（包括上游错误不算正确拒答）。依赖第三方Starlette存在已记录DeprecationWarning。
+- 中文bigram/完整ASCII编号词法在SQL完整权限/有效版本/元数据/余弦阈值之后排序；RRF仅改顺序、SearchHit.score保留真实余弦。默认vector/重排关闭。CrossEncoder本地CPU开关、单worker超时/busy/不可用回退、重排前后复验；不自动下载模型。
+- 真实BGE开发基线/混合18题报告已跑：14可答题Recall@5/MRR=0.50，两模式无提升，各0泄露/错误；现有0.65阈值与RRF配置冻结，不用最终测试调参。纯检索的生成质量列为null。
+- 最终检索、真实Ollama生成、重排模型对照、完整统一检查与独立代码/逐题评审待记录。共享.env.example/CONTRACTS/dev检查入口由root串行整合，未直接修改。仍in_review，尚无PR/合并SHA，不宣称main完成。
