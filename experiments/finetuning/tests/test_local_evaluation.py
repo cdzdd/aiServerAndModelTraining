@@ -84,6 +84,7 @@ def test_runtime_manifest_does_not_mislabel_adapter_or_accept_invalid_hash(
     tmp_path, kind, adapters
 ):
     import json
+
     from experiments.evaluation.run_eval import load_runtime_manifest
 
     path = tmp_path / "runtime.json"
