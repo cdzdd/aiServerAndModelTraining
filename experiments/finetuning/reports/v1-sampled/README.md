@@ -1,0 +1,7 @@
+# 已纠正的随机采样运行记录
+
+这四份报告是源码27bb52ee7e7a4497e18dfd686fe26501dc90eec3上的真实本地运行，全部原始结果保留。配置/桥接请求意图do_sample=False，实际Transformers4.57.6以模型generation_config默认值覆盖为do_sample=True、temperature=0.7。原runtime-provenance的greedy说明因此失实，仅作为被纠正的历史记录，不用于最终确定性对照结论。
+
+独立审核通过真实GenerationMixin._prepare_generation_config的CPU复现定位此问题；实验桥会修正内存中的模型默认采样开关，验证实际GREEDY_SEARCH后重跑两组四份报告。训练数据、20步QLoRA及2→4恢复制品、检索、提示词和超参不改；这是实现纠错重测，不是用已见测试答案调参。最终测试已在此前运行中见过，不声称完全未见。
+
+旧采样test结果基座12/31、微调14/31，误拒答19/17；两者0权限泄露/上游错误。此结果不构成要求的greedy结论。comparison JSON从未损坏的UTF8原始报告重建，修复了Windows汇总默认编码问题；未修改四份原始报告。

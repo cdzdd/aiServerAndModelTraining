@@ -1,0 +1,34 @@
+{
+  "measurement_scope": "Whole-device snapshot with desktop/other processes included; not model-specific allocator peak",
+  "fine_api_health": {
+    "status": "ready",
+    "model": "qwen3-4b-qlora-demo"
+  },
+  "web_readiness": {
+    "status": "ready"
+  },
+  "running_services": "016 local web5246 + own Ollama11434 + own trained adapter experiment11435; idle memory fits current device",
+  "recorded_at": "2026-09-30T21:34:58.6259852Z",
+  "ollama_warm_verified": true,
+  "model_process": {
+    "pid": 3657,
+    "started_at_utc": "2026-10-01T05:28:06.256345+08:00",
+    "cwd": "/mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt",
+    "command": [
+      "experiments/finetuning/local_api.py",
+      "--config",
+      ".local/finetuning/configs/inference-finetuned.yaml",
+      "--key-file",
+      ".local/finetuning/api.key",
+      "--model-id",
+      "qwen3-4b-qlora-demo",
+      "--port",
+      "11435"
+    ],
+    "config_sha256": "7f710b2874cad5726b5e74ca49c35ac53642752d8f5db9391021beb626534ec4",
+    "source_commit": "49d3ded90f34969122a841258f7dedd4af0c6cbf"
+  },
+  "gpu_whole_device": "NVIDIA GeForce RTX 5070 Ti, 16303 MiB, 9661 MiB, 6335 MiB",
+  "ollama_model": "qwen3:4b-instruct-2507-q4_K_M",
+  "ollama_done_reason": "stop"
+}
