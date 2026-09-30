@@ -12,6 +12,8 @@ GitHub 仓库：[cdzdd/aiServerAndModelTraining](https://github.com/cdzdd/aiServ
 
 ## 本地运行
 
+本机容器运行版访问 **http://127.0.0.1:5246**，启动、管理员初始化和完整使用步骤见 [中文使用说明](docs/operations/local-run.md)。运行版只在本机开放，使用本地 Ollama 4B 模型；公网 HTTPS 部署仍待验收。以下命令用于开发环境。
+
 准备 Node.js 24、Python 3.12、uv 和 Docker，在独立 worktree 配置 `.env`，按 [开发与检查说明](scripts/README.md) 安装依赖并启动。常用入口：
 
 ```text

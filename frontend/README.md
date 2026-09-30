@@ -1,6 +1,6 @@
 # 前端页面与模块接入
 
-本地安装与统一验收见 [开发说明](../scripts/README.md)。应用入口为 `/`，根据服务端身份进入普通用户、客服或管理员首页。服务连接检查保留在 `/status`。
+本地安装与统一验收见 [开发说明](../scripts/README.md)。容器运行版的使用步骤见 [本地使用说明](../docs/operations/local-run.md)。应用入口为 `/`，根据服务端身份进入普通用户、客服或管理员首页。服务连接检查保留在 `/status`。
 
 ## 页面与权限
 
@@ -9,7 +9,10 @@
 - `/admin/users`：管理员分页查看账号、编辑显示名称/角色/启停。
 - `/forbidden`、`/session-error`：权限不足和可重试的身份恢复失败。
 - `/knowledge`、`/knowledge/:id`：可访问知识库、FAQ；管理员可创建/修改/停用知识库、分页选择成员、编辑/停用/恢复 FAQ。
-- 未完成的聊天、接单、反馈和统计能力仅以文字说明展示。
+- `/chat/:id?`：问答、历史、引用、停止生成、回答评价及申请转人工。
+- `/handoffs`、`/handoffs/:handoffId`：客服或管理员排队、接单、人工留言与关闭。
+- `/admin/feedback`、`/admin/feedback/:feedbackId`：管理员反馈处理。
+- `/admin/stats`、`/admin/audit-events`：管理员统计与审计查询。
 
 前端权限守卫只控制导航体验，所有 API 仍由后端鉴权。会话身份通过 `/auth/me` 恢复；会话 Cookie 由浏览器发送，CSRF token 仅存内存，不写入 localStorage/sessionStorage。写请求先获取 CSRF，登录后换用新 token；CSRF 失败仅在用户再次提交时重新获取，不自动重放写请求。
 

@@ -83,7 +83,7 @@ test('user cannot enter admin pages and agent has a separate home',async({page})
   state.user={...fixtureUser,role:'agent'}
   await page.goto('/agent')
   await expect(page.getByRole('heading',{name:'客服工作台'})).toBeVisible()
-  await expect(page.getByText('人工接单功能尚未开放。')).toBeVisible()
+  await expect(page.getByRole('link',{name:'查看待接单请求 →'})).toHaveAttribute('href','/handoffs')
 })
 test('administrator changes roles and activation then loses private admin access on self demotion',async({page})=>{
   const state=await mockAuth(page,'admin')
@@ -192,4 +192,3 @@ test('administrator can disable another user and sees the returned list state',a
   await expect(page.getByRole('status')).toContainText('用户已更新')
   await expect(page).toHaveURL(/\/admin\/users$/)
 })
-
