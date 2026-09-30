@@ -1,4 +1,4 @@
-# 模型 provider（todo-004）
+# 模型 provider（todo-004 / todo-014）
 
 本模块只供后端调用，不暴露 HTTP 模型代理端点。`create_provider()` 从本 worktree `.env` / 进程环境读取配置，默认返回不会联网的 `MockProvider`。真实云模型仅支持项目选定的 OpenAI-compatible Chat Completions 文本流公共子集。
 
@@ -39,12 +39,12 @@ async with aclosing(
 
 | 变量 | 规则 |
 | --- | --- |
-| MODEL_PROVIDER | `mock`（默认）或 `cloud` |
-| MODEL_BASE_URL | 含版本路径的 HTTPS 地址；会追加 `/chat/completions`。仅本机 loopback 允许 HTTP 假服务；禁止 URL 凭据、query、fragment |
-| MODEL_DISABLE_THINKING | 默认 false；true 时发送 `thinking: {type: "disabled"}`，仅用于支持该字段的服务（DeepSeek 已按官方协议适配） |
+| MODEL_PROVIDER | `mock`（默认）、`cloud` 或 `ollama` |
+| MODEL_BASE_URL | cloud含版本路径并追加`/chat/completions`；ollama为根地址并追加`/api/chat`。HTTPS；HTTP仅loopback，Ollama额外允许host.docker.internal。禁止URL凭据、query、fragment |
+| MODEL_DISABLE_THINKING | 默认 false；true时cloud发送`thinking: {type: "disabled"}`，Ollama发送`think:false`，仅用于支持该选项的模型 |
 | MODEL_ID | 服务端选择的模型，必须在 MODEL_ALLOWED_IDS 中 |
 | MODEL_ALLOWED_IDS | JSON 字符串数组，例如 `["example-model"]` |
-| MODEL_API_KEY | 后端 Bearer key；SecretStr 隐藏普通配置 repr |
+| MODEL_API_KEY | cloud必须的后端Bearer key；Ollama不要求且不发送该key；SecretStr隐藏配置repr |
 | MODEL_CONNECT_TIMEOUT_SECONDS | 默认 10，范围 (0, 120] 秒 |
 | MODEL_READ_TIMEOUT_SECONDS | 默认 30，范围 (0, 300] 秒 |
 | MODEL_MAX_OUTPUT_TOKENS | 默认 512，范围 1–32768；调用请求超出此上限时在联网前拒绝 |
@@ -81,3 +81,14 @@ uv run --directory backend --frozen python -m app.modules.providers.smoke --env-
 每次执行只发送一个固定短问题，最多 64 个输出 tokens，无重试；只打印模型、UTC 时间、耗时、字符数、结束原因及实际返回的 usage，不打印 key、endpoint 或完整回答。非 stop 结束返回非零退出码。省略 `--run` 不发送请求。配置文件中的 SMOKE_PROVIDER_NAME / SMOKE_MAX_CALLS / SMOKE_BUDGET 是人工审批记录，程序不自动解析价格或累计预算；后续操作者须核对累计调用次数和厂商账单，不得将输出 token 上限等同于金额上限。
 
 协议参考：[Chat Completions 官方结构](https://developers.openai.com/api/reference/resources/chat)。
+
+
+## Ollama 原生流（todo-014）
+
+显式`MODEL_PROVIDER=ollama`选择`OllamaProvider`，不会因本地故障选择云provider。MODEL_ID同样必须在服务端allowlist，Ollama无需MODEL_API_KEY。新增`OLLAMA_NUM_CTX`默认4096，范围512..131072，控制原生`options.num_ctx`；每次调用的max_tokens/temperature映射`options.num_predict`/`options.temperature`，业务调用签名保持一致。完整运行和真机专项见[本地推理验收](../../../../experiments/inference/README.md)。
+
+以上`[DONE]`/SSE生命周期说明专用于cloud。Ollama读取原生`application/x-ndjson`，按完整JSON行解码，允许中文UTF-8跨网络块，单行上限64KiB。`done:true`与有效`done_reason`共同确定完整流结束；终止片段仍在上游关闭后唯一发出。`stop`正常完成，`length`显式表示截断；缺少原因为协议错误，缺少done的EOF为断流。不把`thinking`文本展示为回答；工具/图像响应拒绝。RAG现有正常stop约束保持不变。
+
+`prompt_eval_count`映射prompt_tokens，`eval_count`映射completion_tokens；只有这些原生计数有值时才提供usage，各缺失字段保留null，total_tokens始终null，不相加估算。模型缺失404、上游5xx或流内error为PROVIDER_UNAVAILABLE；错误体、内部地址和完整异常不对外暴露。所有连接、取消、超时、无自动重试/重定向的保证与cloud相同。
+
+协议主源：[Chat](https://docs.ollama.com/api/chat)、[Streaming](https://docs.ollama.com/api/streaming)、[Errors](https://docs.ollama.com/api/errors)。本机真实TCP假服务测试已接入默认完整pytest，真实模型脚本需显式执行，不由普通测试调用GPU或云服务。
