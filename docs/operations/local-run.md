@@ -29,11 +29,40 @@ node scripts/deploy/local-run.mjs stop
 
 `EMBEDDING_MODEL_PATH` 指向已有 `BAAI/bge-small-zh-v1.5` 固定修订的宿主绝对目录；Windows 可以使用正斜杠。运行版只读挂载该目录，不会自动下载模型。tokenizer 在容器中使用模型目录的 tokenizer.json。BGE 和普通业务容器只使用 CPU，不启动训练。
 
-`MODEL_PROVIDER=mock` 可用于验证登录与操作界面，固定模型文字不代表可信知识答案。真实本地问答需 todo-014 接入并设置 `MODEL_PROVIDER=ollama`、`MODEL_ID` 与 `MODEL_ALLOWED_IDS` 为已安装的授权模型；容器使用 `LOCAL_MODEL_BASE_URL`（默认 `http://host.docker.internal:11434`）连接宿主 Ollama。宿主模型只监听回环时，Docker 容器可能无法直接访问，需由本机维护者确认 Docker 可达的受控入口；不要为排错将模型端口开放公网。修改模型配置后重新执行 `start` 使容器重建。本地脚本拒绝 cloud，避免意外付费调用。
+当前接入 **Ollama 0.35.0 + `qwen3:4b-instruct-2507-q4_K_M`**，无需付费云 API。私有 `.env` 已设置以下非秘密模型项；不要覆盖同一文件中的数据库密码、会话密钥或 BGE 路径：
+
+```dotenv
+MODEL_PROVIDER=ollama
+MODEL_BASE_URL=http://127.0.0.1:11434
+LOCAL_MODEL_BASE_URL=http://host.docker.internal:11434
+MODEL_ID=qwen3:4b-instruct-2507-q4_K_M
+MODEL_ALLOWED_IDS=["qwen3:4b-instruct-2507-q4_K_M"]
+OLLAMA_NUM_CTX=4096
+MODEL_READ_TIMEOUT_SECONDS=120
+MODEL_DISABLE_THINKING=false
+```
+
+`MODEL_BASE_URL` 用于宿主开发入口；容器使用 `LOCAL_MODEL_BASE_URL`，不带 `/v1` 或 `/api/chat` 后缀。本机已实际验证 Docker Desktop 容器能访问仅监听 `127.0.0.1:11434` 的 Ollama，不必把模型端口开放局域网或公网。这一可达性与本机 Docker Desktop 有关，换电脑后须重新验证。`MODEL_DISABLE_THINKING=false` 与当前非思考 Instruct 模型匹配。修改配置后重新执行 `start` 使容器重建；代码变化还需要先 `build`。本地脚本拒绝 cloud，避免意外付费调用。`mock` 仅用于验证操作界面，其固定文字不作为可信答案。
+
+Ollama 使用 todo-014 目录中已下载的便携程序与模型缓存，没有安装系统级 Ollama。当前进程已启动；电脑重启后，如 `http://127.0.0.1:11434/api/version` 不可达，可在 PowerShell 启动同一个本地模型服务：
+
+```powershell
+$ollamaRoot = 'C:\Users\Administrator\.codex\worktrees\todo-014-ollama\aiSoftwareAttempt\.local'
+$env:OLLAMA_HOST = '127.0.0.1:11434'
+$env:OLLAMA_MODELS = Join-Path $ollamaRoot 'models\ollama'
+Start-Process -FilePath (Join-Path $ollamaRoot 'tools\ollama-v0.35.0\ollama.exe') -ArgumentList 'serve' -WindowStyle Hidden
+Invoke-RestMethod 'http://127.0.0.1:11434/api/version'
+```
+
+请保留该 todo-014 目录的便携程序和模型缓存，不要在服务已运行时重复启动。模型生成使用本机 GPU，其他模型评测或训练时需串行安排。真实本地网页资料入库与问答验收结果见 [todo-016](../tasks/todo-016.md)；最终记录完成前，模型服务连通不代表整条业务链已验收。
 
 ## 第一次使用
 
-初始化首个管理员，在本机交互终端执行：
+当前这台电脑已初始化三类**虚构本地演示账号**（管理员、普通用户、客服），并保留标为虚构的教学资料。用户名和随机强密码仅保存在本任务忽略文件 `.local/runtime-accounts.json`，已限制为当前 Windows 用户可读；可在本机编辑器查看并用于试用，不要分享、截图或提交该文件。账号不会出现在指南或公开仓库中。此前的普通认证验收账号和现有数据也已保留。`admin` 命令在这套运行版会提示管理员已初始化。
+
+如需自己的账号，先在网页注册，再用演示管理员在用户管理分配所需角色。确认自己拥有可用管理员后，可自行停用不再需要的演示管理员；系统会保护最后一个启用管理员。演示账号不能沿用到未来公网环境。
+
+**新建独立环境**时，初始化首个管理员，在本机交互终端执行：
 
 ```powershell
 node scripts/deploy/local-run.mjs admin

@@ -88,3 +88,11 @@ npm run test:e2e -- e2e/preproduction.spec.ts
 本机 Docker 首次创建 web 时曾发生 HostConfig 有 loopback绑定而 NetworkSettings.Ports 为空，Compose内部健康无法发现。只重启本任务web后映射恢复；已增加宿主验证并在使用说明记录排错，未重置Docker或停止其他任务服务。
 
 当前运行URL是 `http://127.0.0.1:5246`；没有公网HTTPS或生产验收结果。上述代码检查为本地证据，不表示云端CI已运行。管理员初始化交由用户隐藏密码输入；真实Ollama问答、root独立评审、PR、main合并及本地使用版本更新仍待最终记录。
+
+## 2026-10-01 最终本地集成准备（进行中）
+
+- 已合入权威 `origin/main` 的 todo-014（`b6b5f9c`），按 shared-files 原子锁把 8 项 Node 部署测试和独立 smoke Ruff 纳入 `node scripts/dev.mjs check`；README 已链接中文运行指南，CI 使用该统一入口，无需新增空成功检查。
+- 本任务私有模型配置已设为 Ollama 0.35.0 / `qwen3:4b-instruct-2507-q4_K_M`，`OLLAMA_NUM_CTX=4096`、读超时120秒、disable_thinking=false。Docker宿主入口使用 `host.docker.internal:11434`，Ollama继续仅监听 `127.0.0.1:11434`；模型服务连通由根对话已实测，016网页真实回答仍待最终镜像验收，不冒用014独立模型证据。
+- 按用户授权在专属本地运行数据库通过现有 `bootstrap_admin --stdin-password` 受控标准输入创建演示管理员；普通/客服账号走真实注册与管理员角色修改。随机强密码仅保留ignored本机账号文件并限制当前Windows用户访问，未进入参数、日志或仓库。未绕过browser seed限制；已有普通验收账号与数据不删除。
+- 上传明确标为虚构的图书馆教学TXT，通过真实parse-worker、BGE CPU index-worker达到ready；最终知识回答、引用、持久历史、人工与反馈统计闭环等待013最新main集成及GPU协调。
+- 新鲜专项验证：8 Node测试、3真实HTTP smoke测试、Ruff、Node语法和`git diff --check`通过。尚未重跑最终完整check；旧678/114/18+4+1只证明5414009之前实现树，不能当作此次集成树通过。
