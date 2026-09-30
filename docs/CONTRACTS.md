@@ -113,13 +113,15 @@ Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temper
 
 首版CloudProvider固定实现 **OpenAI-compatible Chat Completions文字流协议**，不要求用户购买特定厂商服务。`MODEL_BASE_URL`包括版本路径（例如`https://example.invalid/v1`），后端POST到其`/chat/completions`，Bearer认证；请求字段为`model,messages,stream:true,max_tokens,temperature`。首个真实提供商须支持此公共子集；若选定模型只支持其他上限字段/协议，在004接入时明确适配并补契约测试，不猜测兼容。返回按SSE `data:`行解码JSON，读取`choices[0].delta.content`、`finish_reason`，以`data: [DONE]`识别完整流结束；空role片段不产生文本，存在usage的末尾空choices块也应能处理。usage未提供则记录null，不伪造计费用量。不发送工具调用/图像请求，不展示提供商的推理过程字段。为已选定的 DeepSeek 模型增加显式后端配置 `MODEL_DISABLE_THINKING=true`，仅启用时额外发送 `thinking: {type: "disabled"}`；默认 false 保持公共子集。协议参考[Chat Completions官方结构](https://developers.openai.com/api/reference/resources/chat)。
 
-004的假HTTP服务固定覆盖此协议：中文UTF-8跨网络块、SSE事件跨块、空delta、usage块、DONE、错误状态和未完整结束即断连。收到length/content_filter等终止原因时明确向调用方暴露，不能把截断/过滤内容当作正常完整答案。Ollama在014实现自身HTTP协议到同一内部类型的转换。
+004的假HTTP服务固定覆盖此协议：中文UTF-8跨网络块、SSE事件跨块、空delta、usage块、DONE、错误状态和未完整结束即断连。收到length/content_filter等终止原因时明确向调用方暴露，不能把截断/过滤内容当作正常完整答案。Ollama 在 014 使用原生 POST `/api/chat` 与 `application/x-ndjson`，MODEL_BASE_URL 为服务根地址。逐行 UTF-8 JSON 解码；`done:true` 必须含 `done_reason:stop|length`，不把缺失原因或提前 EOF 当成功。输入/输出计数分别映射 prompt/completion_tokens，total_tokens 保持 null；缺失数值不估算。Ollama 无需 key，不发送 Authorization；模型不存在的 404、流内 error 和资源失败使用既有脱敏错误。仅 Ollama 的 HTTP 配置额外允许 Docker Desktop 的 `host.docker.internal`；Cloud 的 HTTPS/loopback 规则保持不变。两者均无透明重试、重定向或云端回退。
+
+Ollama 本批次接口兼容基线为 **0.35.0**，请求固定发送顶层 `truncate:false`、`shift:false`，禁止静默裁剪输入及上下文滑动；超限沿用脱敏错误或非正常结束原因，不记作成功回答，不自动重试或删减 system/证据。RAG 的 12000 UTF-8 字节预算不保证适配 4096 token context。两个字段与传递路径已核对 [0.35.0 请求类型](https://github.com/ollama/ollama/blob/v0.35.0/api/types.go)、[消息裁剪](https://github.com/ollama/ollama/blob/v0.35.0/server/prompt.go)、[调度器](https://github.com/ollama/ollama/blob/v0.35.0/server/sched.go)及[底层处理](https://github.com/ollama/ollama/blob/v0.35.0/llm/llama_server.go)，请求契约由真实 TCP 假服务覆盖。旧版本兼容性未验证；真实模型的短输入成功和超长拒绝仍以 todo-014 真机证据为准。
 
 ### 004 已实现接入细则
 
 接口、配置与取消示例见 [providers/README](../backend/app/modules/providers/README.md)。`create_provider()` 默认选择 Mock；云模型 ID 必须在服务端 `MODEL_ALLOWED_IDS` 中，key 为后端 `MODEL_API_KEY`。`LLMDelta.usage` 为可空 `LLMUsage(prompt_tokens?, completion_tokens?, total_tokens?)`，只保留上游数值，不估算。
 
-文本片段只有 text；只在 `[DONE]` 后发出一个 text 为空、finish_reason 非空的终止片段，usage 附在该片段上。`stop` 表示完整，`length/content_filter` 需业务层明确处理；缺少 DONE、协议无效或空白 stop 抛出 `ProviderError`。错误 code 及含义见模块说明，不透传厂商错误体。上游资源在终止片段前关闭；消费方提前退出须使用 `contextlib.aclosing`，任务取消保留 CancelledError。连接/读取超时分别配置，无透明重试。
+文本片段只有 text；Cloud 只在 `[DONE]` 后发出一个 text 为空、finish_reason 非空的终止片段，usage 附在该片段上。`stop` 表示完整，`length/content_filter` 需业务层明确处理；Cloud 缺少 DONE、Ollama 缺少有效 done、协议无效或空白 stop 抛出 `ProviderError`。错误 code 及含义见模块说明，不透传厂商错误体。上游资源在终止片段前关闭；消费方提前退出须使用 `contextlib.aclosing`，任务取消保留 CancelledError。连接/读取超时分别配置，无透明重试。
 
 本任务无对外代理 API；真实云连接按用户明确授权执行受控 smoke，当前提供商与结果见 [todo-004](tasks/todo-004.md) 最新工作记录。单次成功不替代 017 发布前对实际部署配置的真实验收。
 Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: int = 5) -> list[SearchHit]`，异步调用。内部重新验证权限；空授权集合返回空候选，不能退化为全库。初期 score 是余弦相似度；混合检索后类型/含义变化必须更新评测与阈值，不能视为同一概率。

@@ -1,0 +1,325 @@
+{
+  "utc": "2026-09-30T19:48:07.056303+00:00",
+  "provider": "ollama",
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "num_ctx": 4096,
+  "prompt_version": "rag-extractive-v1",
+  "embedding_revision": "7999e1d3359715c523056ef9478215996d62a620",
+  "threshold": 0.65,
+  "synthetic_fixture_only": true,
+  "actual_model_calls": 5,
+  "calls": [
+    {
+      "max_tokens": 512,
+      "input_content_utf8_bytes": 1518,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 361,
+        "completion_tokens": 23,
+        "total_tokens": null
+      },
+      "output": "{\"status\":\"answered\",\"selections\":[{\"index\":1,\"quote\":\"晚上十一点闭馆。\"}]}",
+      "seconds": 0.2891734999138862
+    },
+    {
+      "max_tokens": 512,
+      "input_content_utf8_bytes": 1518,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 361,
+        "completion_tokens": 23,
+        "total_tokens": null
+      },
+      "output": "{\"status\":\"answered\",\"selections\":[{\"index\":1,\"quote\":\"晚上十一点闭馆。\"}]}",
+      "seconds": 0.12213769997470081
+    },
+    {
+      "max_tokens": 512,
+      "input_content_utf8_bytes": 1518,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 361,
+        "completion_tokens": 23,
+        "total_tokens": null
+      },
+      "output": "{\"status\":\"answered\",\"selections\":[{\"index\":1,\"quote\":\"晚上十一点闭馆。\"}]}",
+      "seconds": 0.1214538998901844
+    },
+    {
+      "max_tokens": 128,
+      "input_content_utf8_bytes": 836,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 200,
+        "completion_tokens": 20,
+        "total_tokens": null
+      },
+      "output": "{\"query\":\"普通教学周图书馆晚上几点关门？\",\"needs_clarification\":false}",
+      "seconds": 0.1489575000014156
+    },
+    {
+      "max_tokens": 384,
+      "input_content_utf8_bytes": 1494,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 358,
+        "completion_tokens": 26,
+        "total_tokens": null
+      },
+      "output": "{\"status\":\"answered\",\"selections\":[{\"index\":1,\"quote\":\"普通教学周晚上九点闭馆。\"}]}",
+      "seconds": 0.17293919995427132
+    }
+  ],
+  "cases": [
+    {
+      "name": "library_1",
+      "question": "期末考试周图书馆晚上几点关门？",
+      "elapsed_seconds": 0.32046770001761615,
+      "model_calls": 1,
+      "events": [
+        {
+          "type": "delta",
+          "payload": {
+            "text": "资料原文：晚上十一点闭馆。 [1]"
+          }
+        },
+        {
+          "type": "citations",
+          "payload": {
+            "items": [
+              {
+                "index": 1,
+                "chunk_id": "7208c06c-7f96-498b-bfa8-be5f079b1009",
+                "kb_id": "64df5f38-f66a-4c4a-a6e3-08d4f872911e",
+                "source_type": "document",
+                "source_id": "8ed6d001-7f82-4207-bbb9-832945aa1ce7",
+                "title": "library.txt",
+                "quote": "晚上十一点闭馆。",
+                "revision_id": "504dd3f5-5201-456c-97a9-7f1881efa105",
+                "faq_version": null,
+                "page_number": null,
+                "paragraph_number": null,
+                "line_number": 1
+              }
+            ]
+          }
+        },
+        {
+          "type": "done",
+          "payload": {
+            "answer_status": "answered",
+            "evidence_level": "sufficient",
+            "intent": "knowledge",
+            "usage": {
+              "prompt_tokens": 361,
+              "completion_tokens": 23,
+              "total_tokens": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "library_2",
+      "question": "期末考试周图书馆晚上几点关门？",
+      "elapsed_seconds": 0.14651089999824762,
+      "model_calls": 1,
+      "events": [
+        {
+          "type": "delta",
+          "payload": {
+            "text": "资料原文：晚上十一点闭馆。 [1]"
+          }
+        },
+        {
+          "type": "citations",
+          "payload": {
+            "items": [
+              {
+                "index": 1,
+                "chunk_id": "7208c06c-7f96-498b-bfa8-be5f079b1009",
+                "kb_id": "64df5f38-f66a-4c4a-a6e3-08d4f872911e",
+                "source_type": "document",
+                "source_id": "8ed6d001-7f82-4207-bbb9-832945aa1ce7",
+                "title": "library.txt",
+                "quote": "晚上十一点闭馆。",
+                "revision_id": "504dd3f5-5201-456c-97a9-7f1881efa105",
+                "faq_version": null,
+                "page_number": null,
+                "paragraph_number": null,
+                "line_number": 1
+              }
+            ]
+          }
+        },
+        {
+          "type": "done",
+          "payload": {
+            "answer_status": "answered",
+            "evidence_level": "sufficient",
+            "intent": "knowledge",
+            "usage": {
+              "prompt_tokens": 361,
+              "completion_tokens": 23,
+              "total_tokens": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "library_3",
+      "question": "期末考试周图书馆晚上几点关门？",
+      "elapsed_seconds": 0.14779119985178113,
+      "model_calls": 1,
+      "events": [
+        {
+          "type": "delta",
+          "payload": {
+            "text": "资料原文：晚上十一点闭馆。 [1]"
+          }
+        },
+        {
+          "type": "citations",
+          "payload": {
+            "items": [
+              {
+                "index": 1,
+                "chunk_id": "7208c06c-7f96-498b-bfa8-be5f079b1009",
+                "kb_id": "64df5f38-f66a-4c4a-a6e3-08d4f872911e",
+                "source_type": "document",
+                "source_id": "8ed6d001-7f82-4207-bbb9-832945aa1ce7",
+                "title": "library.txt",
+                "quote": "晚上十一点闭馆。",
+                "revision_id": "504dd3f5-5201-456c-97a9-7f1881efa105",
+                "faq_version": null,
+                "page_number": null,
+                "paragraph_number": null,
+                "line_number": 1
+              }
+            ]
+          }
+        },
+        {
+          "type": "done",
+          "payload": {
+            "answer_status": "answered",
+            "evidence_level": "sufficient",
+            "intent": "knowledge",
+            "usage": {
+              "prompt_tokens": 361,
+              "completion_tokens": 23,
+              "total_tokens": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "followup",
+      "question": "普通教学周呢？",
+      "elapsed_seconds": 0.3455495999660343,
+      "model_calls": 2,
+      "events": [
+        {
+          "type": "delta",
+          "payload": {
+            "text": "资料原文：普通教学周晚上九点闭馆。 [1]"
+          }
+        },
+        {
+          "type": "citations",
+          "payload": {
+            "items": [
+              {
+                "index": 1,
+                "chunk_id": "7208c06c-7f96-498b-bfa8-be5f079b1009",
+                "kb_id": "64df5f38-f66a-4c4a-a6e3-08d4f872911e",
+                "source_type": "document",
+                "source_id": "8ed6d001-7f82-4207-bbb9-832945aa1ce7",
+                "title": "library.txt",
+                "quote": "普通教学周晚上九点闭馆。",
+                "revision_id": "504dd3f5-5201-456c-97a9-7f1881efa105",
+                "faq_version": null,
+                "page_number": null,
+                "paragraph_number": null,
+                "line_number": 1
+              }
+            ]
+          }
+        },
+        {
+          "type": "done",
+          "payload": {
+            "answer_status": "answered",
+            "evidence_level": "sufficient",
+            "intent": "knowledge",
+            "usage": {
+              "prompt_tokens": 558,
+              "completion_tokens": 46,
+              "total_tokens": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "unrelated",
+      "question": "怎样维修家用燃气热水器？",
+      "elapsed_seconds": 0.01711570005863905,
+      "model_calls": 0,
+      "events": [
+        {
+          "type": "delta",
+          "payload": {
+            "text": "当前可访问资料中未找到足够依据，请补充具体问题或咨询人工客服。"
+          }
+        },
+        {
+          "type": "citations",
+          "payload": {
+            "items": []
+          }
+        },
+        {
+          "type": "done",
+          "payload": {
+            "answer_status": "no_answer",
+            "evidence_level": "none",
+            "intent": "knowledge",
+            "usage": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "revoked",
+      "question": "期末考试周图书馆晚上几点关门？",
+      "elapsed_seconds": 0.004755399888381362,
+      "model_calls": 0,
+      "events": [
+        {
+          "type": "delta",
+          "payload": {
+            "text": "当前可访问资料中未找到足够依据，请补充具体问题或咨询人工客服。"
+          }
+        },
+        {
+          "type": "citations",
+          "payload": {
+            "items": []
+          }
+        },
+        {
+          "type": "done",
+          "payload": {
+            "answer_status": "no_answer",
+            "evidence_level": "none",
+            "intent": "knowledge",
+            "usage": null
+          }
+        }
+      ]
+    }
+  ]
+}
