@@ -157,6 +157,12 @@ def create_app(chat_model, *, token, model_id):
     return app
 
 
+def enforce_greedy(chat_model):
+    # Transformers 4.57 treats explicit False as a global default and may replace it
+    # with the loaded model's True. Align that in-memory default before HF generate.
+    chat_model.engine.model.generation_config.do_sample = False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -175,6 +181,7 @@ def main():
 
     config = yaml.safe_load(args.config.read_text(encoding="utf-8-sig"))
     model = ChatModel(config)
+    enforce_greedy(model)
     uvicorn.run(
         create_app(model, token=token, model_id=args.model_id),
         host="127.0.0.1",
