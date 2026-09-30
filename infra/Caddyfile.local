@@ -1,0 +1,22 @@
+{
+	auto_https off
+	admin off
+}
+:8080 {
+	@backend path /api /api/* /health /health/*
+	handle @backend {
+		reverse_proxy api:8000 {
+			flush_interval -1
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy same-origin
+		-Server
+	}
+}
