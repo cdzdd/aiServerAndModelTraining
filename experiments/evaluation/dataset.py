@@ -11,7 +11,9 @@ def load_dataset(path):
         raise ValueError("this runner accepts only explicitly synthetic teaching data")
     sources = {source["id"]: source for source in value["sources"]}
     cases = value["cases"]
-    if len(sources) != len(value["sources"]) or len({case["id"] for case in cases}) != len(cases):
+    if len(sources) != len(value["sources"]) or len(
+        {case["id"] for case in cases}
+    ) != len(cases):
         raise ValueError("duplicate source or sample ID")
     groups = {}
     for source in sources.values():
@@ -27,10 +29,14 @@ def load_dataset(path):
             raise ValueError("reference/refusal mismatch")
         for reference in refs:
             source = sources[reference]
-            if source["split"] != case["split"] or source["kb"] not in case["allowed_kbs"]:
+            if (
+                source["split"] != case["split"]
+                or source["kb"] not in case["allowed_kbs"]
+            ):
                 raise ValueError("reference split or authorization mismatch")
         if any(
-            not any(term in sources[ref]["text"] for ref in refs) for term in case["answer_terms"]
+            not any(term in sources[ref]["text"] for ref in refs)
+            for term in case["answer_terms"]
         ):
             raise ValueError("reference answer is not supported by source")
     if any(len(splits) != 1 for splits in groups.values()):

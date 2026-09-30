@@ -54,3 +54,11 @@ def test_authority_is_checked_again_after_reranking(search_data):
         data.factory, FixedEmbedder(), mode="hybrid", reranker=RevokingReranker()
     )
     assert asyncio.run(service.search(data.actor, [kb], "借阅柜")) == []
+
+
+def test_local_cross_encoder_rejects_unverified_snapshot_before_loading(tmp_path):
+    from app.modules.retrieval.reranker import LocalCrossEncoder
+
+    (tmp_path / "config.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="RERANK_INTEGRITY"):
+        LocalCrossEncoder(str(tmp_path)).rank("借阅柜", [])

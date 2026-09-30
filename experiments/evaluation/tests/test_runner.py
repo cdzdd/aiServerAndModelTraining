@@ -94,7 +94,9 @@ def test_runner_records_real_rag_citation_event_and_term_coverage(search_data):
     assert row["answer_term_coverage"] == 1.0
 
 
-def test_build_index_uses_existing_index_handler_and_stable_source_ids(search_data, tmp_path):
+def test_build_index_uses_existing_index_handler_and_stable_source_ids(
+    search_data, tmp_path
+):
     from types import SimpleNamespace
 
     from experiments.evaluation.run_eval import build_index, stable_id
@@ -128,3 +130,61 @@ def test_build_index_uses_existing_index_handler_and_stable_source_ids(search_da
         assert len(chunk.embedding) == 512
     assert actor.role == "user"
     assert kbs == {"dev-public": stable_id("dev-public")}
+
+
+def test_all_actual_generation_candidates_are_audited_even_when_not_cited(search_data):
+    from app.modules.retrieval.schemas import SearchHit
+    from app.modules.retrieval.service import SearchOutcome
+    from tests.rag.service_helpers import ScriptedProvider, answer, complete
+
+    data = search_data
+    visible, hidden = data.kb(), data.kb(member=False)
+    source, _, _ = data.document(visible, text="GH-204借阅柜位于东馆")
+    secret, revision, chunk = data.document(hidden, text="内部未授权口令")
+
+    class UnsafeCandidateService(RetrievalService):
+        async def search_detailed(self, actor, scope, query, top_k=5):
+            result = await super().search_detailed(actor, scope, query, top_k)
+            if query == "GH-204借阅柜在哪？":
+                return SearchOutcome(
+                    result.hits
+                    + [
+                        SearchHit(
+                            chunk_id=chunk,
+                            kb_id=hidden,
+                            text="内部未授权口令",
+                            source_type="document",
+                            source_id=secret,
+                            title="服务",
+                            score=1.0,
+                            revision_id=revision,
+                            line_number=7,
+                        )
+                    ]
+                )
+            return result
+
+    case = {
+        "id": "rag-audit-q1",
+        "reference_sources": ["visible-source"],
+        "expected_refusal": False,
+        "question": "GH-204借阅柜在哪？",
+        "retrieval_query": "GH-204柜位置",
+        "history": [],
+        "answer_terms": ["东馆"],
+    }
+    provider = ScriptedProvider(complete(answer(quote="GH-204借阅柜位于东馆")))
+    service = UnsafeCandidateService(data.factory, FixedEmbedder())
+    row = asyncio.run(
+        evaluate_case(
+            case,
+            data.actor,
+            [visible, hidden],
+            service,
+            {source: "visible-source", secret: "secret-source"},
+            provider=provider,
+        )
+    )
+    assert row["error"] is None
+    assert row["citation_sources"] == ["visible-source"]
+    assert row["unauthorized_sources"] == ["secret-source"]

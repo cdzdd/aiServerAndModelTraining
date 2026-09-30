@@ -45,7 +45,18 @@ from app.modules.retrieval.embedding import (
     BGEEmbedder,
 )
 from app.modules.retrieval.indexing import process_job
-from app.modules.retrieval.reranker import LocalCrossEncoder
+from app.modules.retrieval.reranker import (
+    MODEL_FILES as RERANK_FILES,
+)
+from app.modules.retrieval.reranker import (
+    MODEL_ID as RERANK_MODEL_ID,
+)
+from app.modules.retrieval.reranker import (
+    MODEL_REVISION as RERANK_MODEL_REVISION,
+)
+from app.modules.retrieval.reranker import (
+    LocalCrossEncoder,
+)
 from app.modules.retrieval.service import RetrievalService
 
 
@@ -98,7 +109,9 @@ def build_index(factory, dataset, settings, embedder):
                 KnowledgeBase(
                     id=kb_id,
                     name=name,
-                    visibility="restricted" if name.endswith("restricted") else "public",
+                    visibility="restricted"
+                    if name.endswith("restricted")
+                    else "public",
                 )
             )
         db.flush()
@@ -164,7 +177,9 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
         "error": None,
     }
     try:
-        outcome = await retriever.search_detailed(actor, kb_ids, case["retrieval_query"], top_k=5)
+        outcome = await retriever.search_detailed(
+            actor, kb_ids, case["retrieval_query"], top_k=5
+        )
         hits = outcome.hits
         row["hits"] = [hit.model_dump(mode="json") for hit in hits]
         row["retrieved_sources"] = [
@@ -183,13 +198,20 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
             async def traced_search(actor, scope, query, top_k=5):
                 result = await retriever.search_detailed(actor, scope, query, top_k)
                 generation_hits[:] = result.hits
+                for hit in result.hits:
+                    if not await retriever.validate_hits(actor, scope, [hit]):
+                        source_label = source_map.get(hit.source_id, str(hit.source_id))
+                        if source_label not in row["unauthorized_sources"]:
+                            row["unauthorized_sources"].append(source_label)
                 row["generation_query"] = query
                 row["generation_rerank_status"] = result.rerank_status
                 return result.hits
 
             rag = RAGService(traced_search, retriever.validate_hits, provider)
             history = [LLMMessage(**message) for message in case["history"]]
-            async for event in rag.stream_answer(actor, kb_ids, case["question"], history):
+            async for event in rag.stream_answer(
+                actor, kb_ids, case["question"], history
+            ):
                 if event.type == "delta":
                     row["answer_text"] += event.payload["text"]
                 elif event.type == "citations":
@@ -200,11 +222,15 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
                 elif event.type == "error":
                     row["error"] = event.payload["code"]
                     row["answer_status"] = "error"
-            row["generation_hits"] = [hit.model_dump(mode="json") for hit in generation_hits]
+            row["generation_hits"] = [
+                hit.model_dump(mode="json") for hit in generation_hits
+            ]
             hit_map = {str(hit.chunk_id): hit for hit in generation_hits}
             for citation in row["citations"]:
                 source_id = citation["source_id"]
-                row["citation_sources"].append(source_map.get(stable_uuid(source_id), source_id))
+                row["citation_sources"].append(
+                    source_map.get(stable_uuid(source_id), source_id)
+                )
                 hit = hit_map.get(citation["chunk_id"])
                 mapped = bool(
                     hit
@@ -241,7 +267,9 @@ def stable_uuid(value):
 
 
 async def run_cases(dataset, split, factory, actor, kbs, retriever, provider):
-    source_map = {stable_id(source["id"]): source["id"] for source in dataset["sources"]}
+    source_map = {
+        stable_id(source["id"]): source["id"] for source in dataset["sources"]
+    }
     rows = []
     for case in dataset["cases"]:
         if case["split"] == split:
@@ -283,7 +311,11 @@ def peak_memory():
         kernel = ctypes.windll.kernel32
         kernel.GetCurrentProcess.restype = wintypes.HANDLE
         memory_info = ctypes.windll.psapi.GetProcessMemoryInfo
-        memory_info.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
+        memory_info.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(Counters),
+            wintypes.DWORD,
+        ]
         if memory_info(kernel.GetCurrentProcess(), ctypes.byref(counters), counters.cb):
             return counters.PeakWorkingSetSize
         return None
@@ -317,7 +349,9 @@ def main():
             "generation requires explicitly configured local Ollama; Mock/cloud disallowed"
         )
     provider = create_provider(model_settings) if args.generate else None
-    reranker = LocalCrossEncoder(settings.reranker_model_path) if config["rerank"] else None
+    reranker = (
+        LocalCrossEncoder(settings.reranker_model_path) if config["rerank"] else None
+    )
     with evaluation_database() as factory:
         index_started = time.perf_counter()
         actor, kbs = build_index(factory, dataset, settings, embedder)
@@ -332,7 +366,9 @@ def main():
         )
         reranker_warmup_ms = None
         if reranker:
-            warmup_case = next(case for case in dataset["cases"] if case["split"] == "dev")
+            warmup_case = next(
+                case for case in dataset["cases"] if case["split"] == "dev"
+            )
             warmup_hits = asyncio.run(
                 RetrievalService(factory, embedder, config["threshold"]).search(
                     actor,
@@ -346,9 +382,15 @@ def main():
                 # is separately covered by fallback tests. No final-test labels are consulted.
                 reranker.rank(warmup_case["retrieval_query"], warmup_hits)
             reranker_warmup_ms = (time.perf_counter() - warmup_started) * 1000
-        rows = asyncio.run(run_cases(dataset, args.split, factory, actor, kbs, retriever, provider))
-    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True))
+        rows = asyncio.run(
+            run_cases(dataset, args.split, factory, actor, kbs, retriever, provider)
+        )
+    commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    dirty = bool(
+        subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True)
+    )
     report = {
         "metadata": {
             "created_at": datetime.now(UTC).isoformat(),
@@ -365,8 +407,9 @@ def main():
             "embedding_load_ms": embedding_load_ms,
             "indexing_ms": indexing_ms,
             "reranker_warmup_ms": reranker_warmup_ms,
-            "reranker_model": config.get("reranker_model") if reranker else None,
-            "reranker_revision": config.get("reranker_revision") if reranker else None,
+            "reranker_model": RERANK_MODEL_ID if reranker else None,
+            "reranker_revision": RERANK_MODEL_REVISION if reranker else None,
+            "reranker_files_sha256": RERANK_FILES if reranker else None,
             "peak_process_working_set_bytes": peak_memory(),
             "prompt_version": PROMPT_VERSION,
             "provider": model_settings.model_provider if args.generate else None,
@@ -397,7 +440,9 @@ def main():
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     print(json.dumps(report["summary"], ensure_ascii=False))
-    return int(bool(report["summary"]["error_count"] or report["summary"]["permission_leaks"]))
+    return int(
+        bool(report["summary"]["error_count"] or report["summary"]["permission_leaks"])
+    )
 
 
 if __name__ == "__main__":

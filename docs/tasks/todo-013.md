@@ -71,3 +71,5 @@ uv run ruff check . ../experiments/evaluation
 - 中文bigram/完整ASCII编号词法在SQL完整权限/有效版本/元数据/余弦阈值之后排序；RRF仅改顺序、SearchHit.score保留真实余弦。默认vector/重排关闭。CrossEncoder本地CPU开关、单worker超时/busy/不可用回退、重排前后复验；不自动下载模型。
 - 真实BGE开发基线/混合18题报告已跑：14可答题Recall@5/MRR=0.50，两模式无提升，各0泄露/错误；现有0.65阈值与RRF配置冻结，不用最终测试调参。纯检索的生成质量列为null。
 - 最终检索、真实Ollama生成、重排模型对照、完整统一检查与独立代码/逐题评审待记录。共享.env.example/CONTRACTS/dev检查入口由root串行整合，未直接修改。仍in_review，尚无PR/合并SHA，不宣称main完成。
+
+独立评审纠错：v2资料和standalone query修订详见evaluation README；保留reports/v1，明确v1最终测试已见、v2为纠错重测且不调参数。三项评测/完整模型元信息P2及RAG排序问题已逐项RED→GREEN；评测9、重排4、RAG128专项通过。首次完整check在da0573e通过（backend680/frontend114/E2E18+4+1），评审修订后还要重跑完整check。RAG prompts.py及对应预算测试为root明确扩展的最小授权范围。

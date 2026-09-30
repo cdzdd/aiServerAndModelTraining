@@ -91,3 +91,24 @@ def test_generation_error_is_never_a_correct_refusal():
     )
     assert result["refusal_accuracy"] == 0.0
     assert result["error_count"] == 1
+
+
+def test_answerable_generation_error_is_separate_from_false_refusal():
+    result = summarize(
+        [
+            {
+                "reference_sources": ["a"],
+                "retrieved_sources": ["a"],
+                "expected_refusal": False,
+                "answer_status": "error",
+                "citation_sources": [],
+                "citation_mapped": [],
+                "unauthorized_sources": [],
+                "latency_ms": 1,
+                "error": "RAG_TIMEOUT",
+            }
+        ]
+    )
+    assert result["false_refusal_count"] == 0
+    assert result["error_count"] == 1
+    assert result["refusal_accuracy"] == 0.0

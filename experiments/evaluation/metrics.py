@@ -14,7 +14,9 @@ def _percentile(values, percentile):
     index = (len(values) - 1) * percentile
     lower = int(index)
     fraction = index - lower
-    return values[lower] + fraction * (values[min(lower + 1, len(values) - 1)] - values[lower])
+    return values[lower] + fraction * (
+        values[min(lower + 1, len(values) - 1)] - values[lower]
+    )
 
 
 def summarize(rows, k=5):
@@ -28,7 +30,11 @@ def summarize(rows, k=5):
         recalls.append(len(references.intersection(ranked)) / len(references))
         reciprocals.append(
             next(
-                (1 / rank for rank, source in enumerate(ranked, 1) if source in references),
+                (
+                    1 / rank
+                    for rank, source in enumerate(ranked, 1)
+                    if source in references
+                ),
                 0,
             )
         )
@@ -36,13 +42,17 @@ def summarize(rows, k=5):
     citations = [
         (source in row["reference_sources"], mapped)
         for row in generated
-        for source, mapped in zip(row["citation_sources"], row["citation_mapped"], strict=True)
+        for source, mapped in zip(
+            row["citation_sources"], row["citation_mapped"], strict=True
+        )
     ]
     false_answers = sum(
-        row["expected_refusal"] and row["answer_status"] == "answered" for row in generated
+        row["expected_refusal"] and row["answer_status"] == "answered"
+        for row in generated
     )
     false_refusals = sum(
-        not row["expected_refusal"] and row["answer_status"] != "answered" for row in generated
+        not row["expected_refusal"] and row["answer_status"] in {"no_answer", "clarify"}
+        for row in generated
     )
     return {
         "samples": len(rows),
@@ -50,12 +60,19 @@ def summarize(rows, k=5):
         "recall_at_k": mean(recalls) if recalls else None,
         "mrr": mean(reciprocals) if reciprocals else None,
         "citation_denominator": len(citations),
-        "citation_correctness": _ratio(sum(correct for correct, _ in citations), len(citations)),
-        "citation_mapping": _ratio(sum(mapped for _, mapped in citations), len(citations)),
+        "citation_correctness": _ratio(
+            sum(correct for correct, _ in citations), len(citations)
+        ),
+        "citation_mapping": _ratio(
+            sum(mapped for _, mapped in citations), len(citations)
+        ),
         "refusal_denominator": len(generated),
         "refusal_accuracy": _ratio(
             sum(
-                (row["expected_refusal"] and row["answer_status"] in {"no_answer", "clarify"})
+                (
+                    row["expected_refusal"]
+                    and row["answer_status"] in {"no_answer", "clarify"}
+                )
                 or (not row["expected_refusal"] and row["answer_status"] == "answered")
                 for row in generated
             ),
