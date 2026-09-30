@@ -102,3 +102,28 @@ def test_runtime_manifest_does_not_mislabel_adapter_or_accept_invalid_hash(
     )
     with pytest.raises(ValueError, match="adapter"):
         load_runtime_manifest(path)
+
+
+@pytest.mark.parametrize(
+    "adapters", [{"adapter_config.json": "a" * 64}, {"adapter_model.safetensors": "a" * 64}]
+)
+def test_finetuned_identity_requires_both_config_and_actual_weight_hash(tmp_path, adapters):
+    import json
+
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    path = tmp_path / "runtime.json"
+    path.write_text(
+        json.dumps(
+            {
+                "kind": "finetuned",
+                "base_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+                "inference_config_sha256": "a" * 64,
+                "training_manifest_sha256": "b" * 64,
+                "adapter_files_sha256": adapters,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="adapter"):
+        load_runtime_manifest(path)

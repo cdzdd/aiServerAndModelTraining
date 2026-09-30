@@ -357,7 +357,7 @@ def load_runtime_manifest(path):
     if value["kind"] == "finetuned":
         if (
             not isinstance(adapters, dict)
-            or not adapters
+            or set(adapters) != {"adapter_model.safetensors", "adapter_config.json"}
             or any(
                 name not in {"adapter_model.safetensors", "adapter_config.json"}
                 or not isinstance(digest, str)
