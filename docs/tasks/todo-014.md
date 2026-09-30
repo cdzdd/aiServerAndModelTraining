@@ -20,14 +20,14 @@
 
 ## 分步执行
 
-- [ ] 核对依赖合入，确定 Ollama 可用版本、模型名称/精确标签及许可；先记录环境探测结果，不把“能下载”当“能运行”。
+- [x] 核对依赖合入，确定 Ollama 可用版本、模型名称/精确标签及许可；先记录环境探测结果，不把“能下载”当“能运行”。
 - [x] 先写 NDJSON 分片、结束统计、错误、取消和 provider 配置选择测试，运行确认目标实现失败。
 - [x] 实现 Ollama 请求/响应到统一 provider 类型转换，保证中文分片、停止原因与 usage 按契约表达，缺失字段不伪造。
 - [x] 实现超时、连接失败、模型未加载/不存在与取消；保持统一错误，不暴露 Ollama 内部地址/完整异常给普通用户。
 - [x] 加入显式 provider 配置切换，确认无意外云端回退；使用相同 RAG 输入比较云端与本地事件协议。
-- [ ] 在本机运行固定短问题和知识问答 smoke，记录模型版本、量化、上下文、首 token/总耗时、显存峰值与冷/热启动区别。
-- [ ] 调整到本机可稳定承载的最小参数，记录上下文过长/资源不足的可理解失败；不以一次成功掩盖持续请求失败。
-- [ ] 执行适配测试、RAG 回归和独立评审；交付运行说明与真实报告，提交 `in_review`，按 WORKFLOW 合并收尾。
+- [x] 在本机运行固定短问题和知识问答 smoke，记录模型版本、量化、上下文、首 token/总耗时、显存峰值与冷/热启动区别。
+- [x] 调整到本机可稳定承载的最小参数，记录上下文过长/资源不足的可理解失败；不以一次成功掩盖持续请求失败。
+- [x] 执行适配测试、RAG 回归和独立评审；交付运行说明与真实报告，提交 `in_review`，按 WORKFLOW 合并收尾。
 
 ## 验收与测试场景
 
@@ -84,3 +84,10 @@ smoke 入口在本任务创建，读取环境配置；不得把模型密钥或�
 - 首轮 `node scripts/dev.mjs check` 退出 1：后端 **732 passed**、前端单测 **114 passed**、默认浏览器 **18 passed**，聊天套件 3通过、`chat.spec.ts:87` 等待“已取消”失败。trace 显示第三次慢速流在约49ms后被浏览器取消（status=-1），刷新历史仅有前两轮，没有慢速请求消息；测试只等待本地停止按钮，没有等待服务端受理。该套件用 BrowserRAG，不调用本次修改的 Ollama provider。未改生产聊天逻辑、用例或超时；原样专项复跑 **1 passed**，再跑完整统一检查。
 - 第二轮 `node scripts/dev.mjs check` **退出0**：Ruff、pytest **732 passed / 1 warning**、两次 Alembic、前端 lint/typecheck、Vitest **114 passed / 19 files**、build、Playwright **18 + 4 + 1 passed**。专项 `uv run --directory backend --frozen ruff check . ../experiments/inference`、`git diff --check` 通过。首次失败日志 `.local/check-context-guard-014.txt`、trace `.local/context-guard-first-chat-failure.zip` 及对应 `.md` 保留；原样专项复跑 `.local/context-guard-chat-rerun.txt`、完整成功复跑 `.local/check-context-guard-014-rerun.txt` 分开保存。现有 Starlette/前端大 chunk/NO_COLOR/Node shell 弃用提示仍保留，不伪报无warning；上述取消时序窗口作为既有测试不稳定项交接主代理。
 - provider/inference README 与 CONTRACTS 写明 0.35.0 源码依据、两个开关、旧版本兼容性未验证及真实超长验收待完成。CONTRACTS 在 common coordination 的 shared-files 原子锁下编辑。本次评审者已转为修复执行者，主代理再独立复核差异；GPU、模型下载和真实长短输入专项均未由本执行者运行。未推送、创建 PR 或合并，任务保持 `in_review`。
+
+### 2026-10-01 主代理真实验收与合并准备
+
+- 精确标签、固定许可/大小/SHA256 已核对；真机 6 次短问均成功，冷首次总 33.4788 秒、热三问总 0.0177–0.0262 秒。实际 4096 context/单并行/单驻留，GPU 整卡采样峰值 5356MiB（含显示/其他程序，不是模型独占）。
+- 真实 BGE/RAG 专项 1 passed / 1 既有 warning：三次引用、追问、无依据、撤权共 6 场景，5 次模型调用；无依据/撤权不调用模型。真实超长拒绝与缺模型错误均无成功终态，不制造真实 OOM。详见[真实报告](../../experiments/inference/reports/qwen3-4b-2026-10-01.md)。
+- 独立代码评审与两轮修复复核已通过；主代理独立核对 context guard 最小代码/请求断言和官方源码，再以真实超长请求确认。统一验收对应代码 d751f4625455607d0780083cca0a3ce72d87ee77，732 后端/114 前端/18+4+1 浏览器；后续仅脱敏报告/文档，无新代码。首次既有取消时序失败与原样成功重验事实保留。
+- PR [#27](https://github.com/cdzdd/aiServerAndModelTraining/pull/27) 已附当前 Codex 任务；状态暂 in_review，实际合并与独立收尾后才 done。云端 CI 未运行。
