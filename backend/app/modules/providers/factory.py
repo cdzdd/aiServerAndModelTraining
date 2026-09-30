@@ -6,6 +6,7 @@ from .cloud import CloudProvider
 from .config import ModelSettings
 from .errors import ProviderError
 from .mock import MockProvider
+from .ollama import OllamaProvider
 
 
 def create_provider(settings: ModelSettings | None = None) -> Provider:
@@ -15,4 +16,6 @@ def create_provider(settings: ModelSettings | None = None) -> Provider:
         raise ProviderError("PROVIDER_CONFIG_ERROR") from None
     if settings.model_provider == "mock":
         return MockProvider(max_output_tokens=settings.model_max_output_tokens)
+    if settings.model_provider == "ollama":
+        return OllamaProvider(settings)
     return CloudProvider(settings)
