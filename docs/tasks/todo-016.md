@@ -96,3 +96,14 @@ npm run test:e2e -- e2e/preproduction.spec.ts
 - 按用户授权在专属本地运行数据库通过现有 `bootstrap_admin --stdin-password` 受控标准输入创建演示管理员；普通/客服账号走真实注册与管理员角色修改。随机强密码仅保留ignored本机账号文件并限制当前Windows用户访问，未进入参数、日志或仓库。未绕过browser seed限制；已有普通验收账号与数据不删除。
 - 上传明确标为虚构的图书馆教学TXT，通过真实parse-worker、BGE CPU index-worker达到ready；最终知识回答、引用、持久历史、人工与反馈统计闭环等待013最新main集成及GPU协调。
 - 新鲜专项验证：8 Node测试、3真实HTTP smoke测试、Ruff、Node语法和`git diff --check`通过。尚未重跑最终完整check；旧678/114/18+4+1只证明5414009之前实现树，不能当作此次集成树通过。
+## 2026-10-01 最终本地阶段验收
+
+本地代码已集成权威main `0a4d32f7fd888cf56380750472e58b0fe3a2db62`（013/014均已收尾）。最终完整检查对应干净代码提交 `65cb850b3e9c395030e624dfe69c3543480ad10d`，实际 `node scripts/dev.mjs check` exit0：8 Node部署安全、741 pytest、9评测、114 Vitest、18+4+1 Playwright全部通过，Ruff/前端lint/typecheck/build/两次迁移均通过。保留既有依赖弃用及颜色警告，不宣称无警告；没有云端CI或付费云API调用。日志在ignored `.local/check-final.log`。
+
+从该干净提交构建的backend/web镜像实际成功。启动内部全部健康，但Docker Desktop第二次出现HostConfig有loopback发布、NetworkSettings端口映射为空、宿主无监听；真实host smoke按预期拒绝成功。仅Restart该web未恢复，单独Stop→Start该web后真实映射恢复为127.0.0.1:5246，宿主健康/深链接/API路由再次通过。失败、诊断和恢复保留本地日志，未重置Docker、未动其他任务服务或删卷。
+
+真实本地角色闭环通过（仅原创虚构教学资料）：受控管理员初始化、普通/客服真实注册与授权；上传TXT→parse-worker→固定真实BGE CPU索引ready；通过网页同源API使用Ollama精确4B模型生成一次complete/answered回答，具有当前文档引用，历史与受控原文件下载通过；评价→管理员resolved→用户可读处理结果；申请人工→客服队列/接单→双向留言→关闭，管理员统计与审计可读。首次临时验收脚本误期望转人工200，而新建实际返回201；仅修正ignored验收脚本并从已成功生成的会话继续，未改产品代码、未重复模型调用。全部原始资料和账号明确标为虚构且保留本机；随机凭据只在ACL受限ignored文件中，不进入参数/日志/Git。
+
+中文说明已记录当前URL、便携Ollama缓存与重启限制、演示账号使用、新环境管理员引导、模型与权限边界、资料/问答/人工/反馈/统计及实际排错。沿用013的vector默认、重排关闭；教学评测19/31误拒答仍是事实，不因本次单样本成功抹去。
+
+整体仍为 `in_review`：本地阶段功能验收已通过，最终文档提交后的镜像版本、stop/start数据持久性和最终服务身份由本地实施报告及根对话集成记录补充；PR、main功能集成与阶段收尾由根对话执行。本地阶段合入不代表原公网HTTPS、DNS、生产发布或正式备份恢复完成。

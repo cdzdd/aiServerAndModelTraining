@@ -59,7 +59,7 @@ Start-Process -FilePath $ollamaExe -ArgumentList 'serve' -WorkingDirectory (Spli
 Invoke-RestMethod 'http://127.0.0.1:11434/api/version'
 ```
 
-请保留该 todo-014 目录的便携程序和模型缓存，不要在服务已运行时重复启动，也无需重复下载权重。已有模型身份、许可、版本、digest及小样本专项结果见 [本机模型验收报告](../../experiments/inference/reports/qwen3-4b-2026-10-01.md)；专项结果不能代替当前网页运行版的最终验收。模型生成使用本机 GPU，其他模型评测或训练时需串行安排。真实本地网页资料入库与问答验收结果见 [todo-016](../tasks/todo-016.md)；最终记录完成前，模型服务连通不代表整条业务链已验收。
+请保留该 todo-014 目录的便携程序和模型缓存，不要在服务已运行时重复启动，也无需重复下载权重。已有模型身份、许可、版本、digest及小样本专项结果见 [本机模型验收报告](../../experiments/inference/reports/qwen3-4b-2026-10-01.md)；专项结果不能代替当前网页运行版的最终验收。模型生成使用本机 GPU，其他模型评测或训练时需串行安排。真实本地网页资料入库与问答验收结果见 [todo-016](../tasks/todo-016.md)；当前已实际验收一次网页同源 API 的完整链路：真实注册/登录、虚构文档上传与解析、BGE索引、Ollama回答与文档引用、历史和下载、反馈处理、客服接单/双向留言/关闭，以及管理员统计与审计。它是本机合成资料的小样本功能验收，不能代表真实业务质量。
 
 ## 第一次使用
 
@@ -106,7 +106,7 @@ node scripts/deploy/local-run.mjs logs
 | --- | --- |
 | Docker 连接失败 | 打开 Docker Desktop，确认 Linux 引擎就绪，再重试；不要删数据库卷 |
 | 端口被占用 | 核对分配的 WEB_PORT，停止本任务冲突的网页进程；不要停止其他任务服务 |
-| 容器 healthy 但网页打不开、host smoke 失败 | 检查 status 的 web 是否有 127.0.0.1:5246 映射；本机曾出现 Docker 首次创建后未实际发布端口，配置确认正确时在 Docker Desktop 只重启本任务 web 容器，再运行 smoke；不要重置 Docker 或删卷 |
+| 容器 healthy 但网页打不开、host smoke 失败 | 检查 status 的 web 是否有 127.0.0.1:5246 映射；本机曾出现 Docker 首次创建后未实际发布端口，配置确认正确时在 Docker Desktop 只停止再启动本任务 web 容器，再运行 smoke；本机第二次遇到时单独 Restart 无效，Stop → Start 恢复映射。不要重置 Docker 或删卷 |
 | 镜像或依赖下载失败 | 检查网络与已配置代理；配置中不要写个人代理凭据 |
 | model 目录不存在或 index-worker 重启 | 核对 EMBEDDING_MODEL_PATH 是真实固定修订 BGE 目录，Docker Desktop 可访问；不以空目录代替模型 |
 | 文档长期待索引 | 查看 parse-worker/index-worker 是否在运行和页面最近任务错误；修复模型/文件问题后使用页面重试 |
@@ -117,4 +117,4 @@ node scripts/deploy/local-run.mjs logs
 
 维护者可显式运行认证专项：`uv run --frozen --directory backend python ../scripts/deploy/smoke.py http://127.0.0.1:5246 --auth`。它在当前运行数据库创建一个标注为“本地验收账号”的随机普通用户，验证真实注册、登录、会话、非法 CSRF 与退出；不保存或输出凭据。只读 smoke 不创建账号。
 
-当前可用范围是已合入的账号/知识库/上传解析索引/问答历史/人工客服/反馈/统计与审计。本机真实 Ollama 问答的最终验证结果由任务交付记录注明；容器构建通过或 Mock 操作通过不能替代真实模型验收。公网 HTTPS、生产发布与正式备份恢复留待后续授权阶段。
+当前可用范围是已合入的账号/知识库/上传解析索引/问答历史/人工客服/反馈/统计与审计。本机真实 Ollama 链路已按任务记录验证；当前沿用纯向量检索、重排关闭。独立教学评测仍有19/31可答题误拒答，详见 [检索评测决定](../../experiments/evaluation/reports/decision.md)，使用时请核对资料与引用。公网 HTTPS、生产发布与正式备份恢复留待后续授权阶段。
