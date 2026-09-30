@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-014 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-004、todo-008 |
 | 并行可行性 | 可与 009、013 并行；只扩展 provider 与配置，不复制 RAG 流程或修改检索算法 |
 | 负责目录 | `backend/app/modules/providers/ollama.py`、provider 选择配置、`experiments/inference/` |
@@ -91,3 +91,9 @@ smoke 入口在本任务创建，读取环境配置；不得把模型密钥或�
 - 真实 BGE/RAG 专项 1 passed / 1 既有 warning：三次引用、追问、无依据、撤权共 6 场景，5 次模型调用；无依据/撤权不调用模型。真实超长拒绝与缺模型错误均无成功终态，不制造真实 OOM。详见[真实报告](../../experiments/inference/reports/qwen3-4b-2026-10-01.md)。
 - 独立代码评审与两轮修复复核已通过；主代理独立核对 context guard 最小代码/请求断言和官方源码，再以真实超长请求确认。统一验收对应代码 d751f4625455607d0780083cca0a3ce72d87ee77，732 后端/114 前端/18+4+1 浏览器；后续仅脱敏报告/文档，无新代码。首次既有取消时序失败与原样成功重验事实保留。
 - PR [#27](https://github.com/cdzdd/aiServerAndModelTraining/pull/27) 已附当前 Codex 任务；状态暂 in_review，实际合并与独立收尾后才 done。云端 CI 未运行。
+
+### 2026-10-01 状态收尾
+
+- 功能 PR [#27](https://github.com/cdzdd/aiServerAndModelTraining/pull/27) 已实际 MERGED，功能合并 SHA `48e846f156526136fa790c3006ccc0cc95cfa199`。
+- 全部本轮适配、真实 GPU/BGE/RAG、超长/缺模型、独立评审与本地验收已完成；本收尾仅更新本任务状态，依据 WORKFLOW 10.1 采用普通纯文档 PR。云端 CI 未运行。
+- 基于实际合入的 origin/main 创建本收尾分支；权威 main 只有本收尾 PR 也合入后才显示 done。保留独立 worktree、模型缓存与本地 Ollama，不删除用户数据。
