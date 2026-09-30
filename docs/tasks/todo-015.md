@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-015 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-013、todo-014 |
 | 并行可行性 | 可与 010–012/017 的应用工作并行；独占本机训练 GPU 时协调 014 推理，禁止抢占同一资源导致错误性能结论 |
 | 负责目录 | `experiments/finetuning/`；不更改生产默认 provider，不把训练依赖加入业务运行环境 |
@@ -58,6 +58,6 @@ python ../evaluation/run_eval.py --config configs/eval-finetuned.yaml
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未创建训练数据、未安装训练环境、未训练、未产出模型或质量结论。
+- 2026-10-01 已按 WORKFLOW 由本轮批次原子领取；独立 worktree `todo-015-qlora`，分支 `feat/todo-015-qlora`，API/Web/DB 端口 8145/5245/15475；本地模型实验端口 11435。013/014 已合入权威 main 并收尾。
+- 数据准备及校验已实现，行为测试 20 项通过；消费 013 已审核的 8 条原创虚构训练样本，新增独立校报主题 2 条验证样本。训练尚未开始，须先完成独立数据/配置复核和 tokenizer 预检。
 - 按 [WORKFLOW](../WORKFLOW.md) 保存真实实验与对照证据；分支 `in_review`，合入权威 main 且检查通过后统一 `done`。基础发布可先完成，全部增强目标仍需要本任务。
