@@ -107,3 +107,11 @@ npm run test:e2e -- e2e/preproduction.spec.ts
 中文说明已记录当前URL、便携Ollama缓存与重启限制、演示账号使用、新环境管理员引导、模型与权限边界、资料/问答/人工/反馈/统计及实际排错。沿用013的vector默认、重排关闭；教学评测19/31误拒答仍是事实，不因本次单样本成功抹去。
 
 整体仍为 `in_review`：本地阶段功能验收已通过，最终文档提交后的镜像版本、stop/start数据持久性和最终服务身份由本地实施报告及根对话集成记录补充；PR、main功能集成与阶段收尾由根对话执行。本地阶段合入不代表原公网HTTPS、DNS、生产发布或正式备份恢复完成。
+## 本地阶段合并与交接
+
+- 功能 [PR31](https://github.com/cdzdd/aiServerAndModelTraining/pull/31) 已于2026-10-01实际MERGED，功能合并SHA `6477428717c7bb320c621c445396b9c4abbc9f30`，功能分支 `feat/todo-016-local-runtime`。PR头 `8a4beea9476c2b2f1e467e791e9108ec785d3074` 仅文档晚于已完整验收的代码 `65cb850b3e9c395030e624dfe69c3543480ad10d`。
+- 最终clean HEAD 8a4beea已实际全缓存build/start，再经本任务wrapper stop/start验证账号总数、ready文档、真实回答内容/文档引用/历史、resolved反馈、closed人工会话精确保留；宿主就绪200、深链接与API404通过。5个服务持续运行、RestartCount=0，只有web绑定127.0.0.1:5246。独立代理 fresh review通过，无新增P0/P1/P2。
+- 本地backend imageID `sha256:742293ec4c122d9bc6c79e4cca74fcbd6a5b8ff8b31bd7c4dc63e0607dfebe65`，web imageID `sha256:bd99997133a8a503b73688eb6e798dc0c96d63cccf5d5c2555a0aa6eb82b237f`，tag8a4beea9476c；这些是本地镜像身份，不是远端发布digest。最终工作区HEAD变化须按使用说明重新build后start，不伪称旧tag对应新SHA。
+- 可用入口 `http://127.0.0.1:5246`；[中文使用说明](../operations/local-run.md)与ignored ACL受限`.local/runtime-accounts.json`供本机试用。代码、任务资料和使用说明已保存；数据库/上传卷、模型缓存及worktree保留。
+- 用户明确要求止于本地版：**本地阶段已验收并交接，整体状态保持in_review**；公网服务器、DNS、HTTPS/Secure Cookie、生产发布、正式备份恢复尚未执行，不能标整体done。本阶段纯文档交接PR合入后释放本轮claim，后续公网阶段需另行明确接手。
+- 验收模式仍为本地验收 + GitHub PR，云端CI未运行；普通squash合并，未绕过服务端规则。训练015占用GPU期间模型推理串行协调，最终用户交接前恢复本机Ollama可用。
