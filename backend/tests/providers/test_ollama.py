@@ -54,6 +54,8 @@ async def test_fragmented_ndjson_utf8_usage_and_request(make_ollama, messages):
         "model": "fake-model",
         "messages": [{"role": "user", "content": "你好"}],
         "stream": True,
+        "truncate": False,
+        "shift": False,
         "options": {"num_predict": 32, "temperature": 0.3, "num_ctx": 4096},
     }
     assert len(requests) == 1

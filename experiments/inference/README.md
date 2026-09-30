@@ -24,6 +24,12 @@ MODEL_DISABLE_THINKING=false
 
 Ollama不要求或发送MODEL_API_KEY。MODEL_BASE_URL是服务根地址，不带`/api`；适配器追加`/api/chat`。不设置MODEL_DISABLE_THINKING时使用模型默认值；true时发送Ollama原生`think:false`，仅适用于支持该选项的模型。本次非思考指令模型不需要该选项。
 
+## 上下文完整性与版本边界
+
+本批次以 **Ollama 0.35.0** 为接口兼容基线，适配器固定发送顶层 `truncate:false`、`shift:false`，要求输入过长时拒绝而不静默删除上下文，并禁止生成期间的上下文滑动。超限可能通过 HTTP 错误、流内 error 或非正常结束原因返回，沿用现有脱敏错误和 RAG 失败处理，不自动重试或改用云端。12000 UTF-8 字节的 RAG 预算不是模型 token 上限；不能据此宣称输入一定适配 4096 context。
+
+依据已核对的 [0.35.0 请求字段](https://github.com/ollama/ollama/blob/v0.35.0/api/types.go)、[消息裁剪](https://github.com/ollama/ollama/blob/v0.35.0/server/prompt.go)、[shift 调度](https://github.com/ollama/ollama/blob/v0.35.0/server/sched.go)和[底层裁剪处理](https://github.com/ollama/ollama/blob/v0.35.0/llm/llama_server.go)，两个开关必须同时关闭。请求契约由真实 TCP 假服务核验；旧版本兼容性未验证，不能假定服务会识别开关。真机验收须记录实际版本、模型和 context，先确认短输入正常完成，再确认明显超过上下文的输入被拒绝且没有成功终态。此项真实超长检查由主代理完成，当前文档不声称已通过。
+
 ## 固定短问与连续请求
 
 从worktree根目录执行。省略`--run`仅说明，不发出模型请求；显式运行固定三个独立问题，无自动重试。每个问题至多64输出token、temperature=0。

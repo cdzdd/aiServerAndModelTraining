@@ -44,6 +44,8 @@ class OllamaProvider:
             "model": settings.model_id,
             "messages": [message.model_dump() for message in messages],
             "stream": True,
+            "truncate": False,
+            "shift": False,
             "options": {
                 "num_predict": max_tokens,
                 "temperature": temperature,

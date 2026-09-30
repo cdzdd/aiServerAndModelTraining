@@ -87,6 +87,8 @@ uv run --directory backend --frozen python -m app.modules.providers.smoke --env-
 
 显式`MODEL_PROVIDER=ollama`选择`OllamaProvider`，不会因本地故障选择云provider。MODEL_ID同样必须在服务端allowlist，Ollama无需MODEL_API_KEY。新增`OLLAMA_NUM_CTX`默认4096，范围512..131072，控制原生`options.num_ctx`；每次调用的max_tokens/temperature映射`options.num_predict`/`options.temperature`，业务调用签名保持一致。完整运行和真机专项见[本地推理验收](../../../../experiments/inference/README.md)。
 
+本批次以 **Ollama 0.35.0** 为兼容基线：请求固定发送顶层 `truncate:false` 和 `shift:false`，禁止静默裁剪输入及生成期间的上下文滑动，超出可用上下文时应拒绝或以非正常终态结束；业务 RAG 不将其当作完整回答。RAG 的 12000 UTF-8 字节预算不是 token 估计，不能保证适配 `OLLAMA_NUM_CTX=4096`，也不以减掉 system 或证据来重试。开关已通过请求契约测试并核对 [0.35.0 ChatRequest](https://github.com/ollama/ollama/blob/v0.35.0/api/types.go)、[消息裁剪](https://github.com/ollama/ollama/blob/v0.35.0/server/prompt.go)、[调度器](https://github.com/ollama/ollama/blob/v0.35.0/server/sched.go)和[底层上下文处理](https://github.com/ollama/ollama/blob/v0.35.0/llm/llama_server.go)。旧版本兼容性未验证；实际模型的短问成功和超长输入拒绝仍须在真机专项中记录，不能以假 HTTP 测试代替。
+
 以上`[DONE]`/SSE生命周期说明专用于cloud。Ollama读取原生`application/x-ndjson`，按完整JSON行解码，允许中文UTF-8跨网络块，单行上限64KiB。`done:true`与有效`done_reason`共同确定完整流结束；终止片段仍在上游关闭后唯一发出。`stop`正常完成，`length`显式表示截断；缺少原因为协议错误，缺少done的EOF为断流。不把`thinking`文本展示为回答；工具/图像响应拒绝。RAG现有正常stop约束保持不变。
 
 `prompt_eval_count`映射prompt_tokens，`eval_count`映射completion_tokens；只有这些原生计数有值时才提供usage，各缺失字段保留null，total_tokens始终null，不相加估算。模型缺失404、上游5xx或流内error为PROVIDER_UNAVAILABLE；错误体、内部地址和完整异常不对外暴露。所有连接、取消、超时、无自动重试/重定向的保证与cloud相同。
