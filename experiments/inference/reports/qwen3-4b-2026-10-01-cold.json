@@ -1,0 +1,76 @@
+{
+  "utc": "2026-09-30T19:47:51.126727+00:00",
+  "provider": "ollama",
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "num_ctx": 4096,
+  "max_output_tokens": 64,
+  "first_request_state": "cold",
+  "planned_requests": 3,
+  "successes": 3,
+  "cases": [
+    {
+      "name": "short_first",
+      "question": "请只用一个数字回答：1加1等于几？",
+      "text": "2",
+      "first_text_seconds": 32.64796179998666,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 21,
+        "completion_tokens": 2,
+        "total_tokens": null
+      },
+      "error_code": null,
+      "elapsed_seconds": 33.47881529992446
+    },
+    {
+      "name": "short_second",
+      "question": "请只用一个数字回答：3加4等于几？",
+      "text": "7",
+      "first_text_seconds": 0.023981499951332808,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 21,
+        "completion_tokens": 2,
+        "total_tokens": null
+      },
+      "error_code": null,
+      "elapsed_seconds": 0.03195259999483824
+    },
+    {
+      "name": "short_third",
+      "question": "请只用一个数字回答：1加1等于几？",
+      "text": "2",
+      "first_text_seconds": 0.025470599997788668,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 21,
+        "completion_tokens": 2,
+        "total_tokens": null
+      },
+      "error_code": null,
+      "elapsed_seconds": 0.030089000007137656
+    }
+  ],
+  "vram_peak_mib": 5356.0,
+  "ollama_version": "0.35.0",
+  "model_digest": "0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0",
+  "model_details": {
+    "parent_model": "",
+    "format": "gguf",
+    "family": "qwen3",
+    "families": [
+      "qwen3"
+    ],
+    "parameter_size": "4.0B",
+    "quantization_level": "Q4_K_M",
+    "context_length": 262144,
+    "embedding_length": 2560
+  },
+  "vram_measurement": {
+    "scope": "whole GPU including display and other applications",
+    "interval_ms": 250,
+    "samples": 195,
+    "first_sample_mib": 2081.0,
+    "source": "nvidia-smi"
+  }
+}

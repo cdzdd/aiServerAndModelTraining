@@ -1,0 +1,31 @@
+{
+  "ollama_version": "0.35.0",
+  "model": "qwen3:4b-instruct-2507-q4_K_M",
+  "cases": [
+    {
+      "case": "oversized_input",
+      "input_characters": 35000,
+      "input_utf8_bytes": 105000,
+      "num_ctx": 4096,
+      "max_tokens": 16,
+      "truncate": false,
+      "shift": false,
+      "error": "PROVIDER_BAD_REQUEST",
+      "successful_terminal": false,
+      "elapsed_seconds": 0.10991659993305802
+    },
+    {
+      "case": "missing_model",
+      "input_characters": 2,
+      "input_utf8_bytes": 6,
+      "num_ctx": 4096,
+      "max_tokens": 16,
+      "truncate": false,
+      "shift": false,
+      "error": "PROVIDER_UNAVAILABLE",
+      "successful_terminal": false,
+      "elapsed_seconds": 0.002591300057247281
+    }
+  ],
+  "synthetic_only": true
+}

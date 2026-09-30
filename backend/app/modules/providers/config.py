@@ -16,7 +16,7 @@ class ModelSettings(BaseSettings):
         hide_input_in_errors=True,
         populate_by_name=True,
     )
-    model_provider: Literal["mock", "cloud"] = "mock"
+    model_provider: Literal["mock", "cloud", "ollama"] = "mock"
     model_disable_thinking: bool = False
     model_base_url: str = ""
     model_id: str = ""
@@ -26,8 +26,10 @@ class ModelSettings(BaseSettings):
     model_read_timeout_seconds: float = Field(default=30, gt=0, le=300)
     model_max_output_tokens: int = Field(default=512, ge=1, le=32768)
 
+    ollama_num_ctx: int = Field(default=4096, ge=512, le=131072)
+
     @model_validator(mode="after")
-    def validate_cloud(self):
+    def validate_model(self):
         if self.model_provider == "mock":
             return self
         try:
@@ -36,6 +38,9 @@ class ModelSettings(BaseSettings):
             _ = parsed.port
         except (ValueError, InvalidURL):
             raise ValueError("MODEL_BASE_URL is invalid") from None
+        http_hosts = {"127.0.0.1", "localhost", "::1"}
+        if self.model_provider == "ollama":
+            http_hosts.add("host.docker.internal")
         if (
             not parsed.host
             or parsed.username
@@ -43,10 +48,10 @@ class ModelSettings(BaseSettings):
             or parsed.query
             or parsed.fragment
             or parsed.scheme not in ("https", "http")
-            or (parsed.scheme == "http" and parsed.host not in ("127.0.0.1", "localhost", "::1"))
+            or (parsed.scheme == "http" and parsed.host not in http_hosts)
         ):
             raise ValueError(
-                "MODEL_BASE_URL must be HTTPS (HTTP only for loopback), without secrets"
+                "MODEL_BASE_URL must be HTTPS or an allowed local HTTP host, without secrets"
             )
         if (
             not self.model_id.strip()
@@ -54,6 +59,8 @@ class ModelSettings(BaseSettings):
             or any(ord(char) < 32 for char in self.model_id)
         ):
             raise ValueError("MODEL_ID must be in MODEL_ALLOWED_IDS")
+        if self.model_provider == "ollama":
+            return self
         key = self.model_api_key.get_secret_value()
         if not key.strip() or any(ord(char) < 32 or ord(char) > 126 for char in key):
             raise ValueError("MODEL_API_KEY must contain a nonempty ASCII credential")
