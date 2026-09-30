@@ -30,6 +30,7 @@ def make_provider(provider_api):
     def make(url, **overrides):
         values = dict(
             model_provider="cloud",
+            model_disable_thinking=False,
             model_base_url=url,
             model_id="fake-model",
             model_api_key="fake-secret-never-log",

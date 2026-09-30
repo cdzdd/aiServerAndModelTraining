@@ -7,7 +7,7 @@ from app.modules.retrieval.schemas import SearchHit
 
 from .schemas import RAGError
 
-PROMPT_VERSION = "rag-extractive-v1"
+PROMPT_VERSION = "rag-extractive-v2"
 INPUT_BYTE_LIMIT = 12000
 
 REWRITE_SYSTEM = """你只负责把当前问题中的指代补全为独立检索问题，不回答问题。
@@ -93,7 +93,7 @@ def build_answer_prompt(
     query = question if retrieval_query is None else retrieval_query
     if not _valid_text(query):
         raise RAGError("QUESTION_INVALID")
-    retained = sorted(hits, key=lambda hit: hit.score, reverse=True)[:5]
+    retained = list(hits[:5])
     while True:
         messages = _messages(
             ANSWER_SYSTEM,

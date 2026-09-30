@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-013 |
-| 状态 | pending |
+| 状态 | in_review |
 | depends_on | todo-008 |
 | 并行可行性 | 可与 009、014 并行；本任务独占检索算法改动，其他任务保持既有 search 接口 |
 | 负责目录 | `experiments/evaluation/`、`backend/app/modules/retrieval/` 的混合检索/重排、评测测试 |
@@ -50,7 +50,7 @@ uv run python ../experiments/evaluation/run_eval.py --config ../experiments/eval
 uv run ruff check . ../experiments/evaluation
 ```
 
-以上配置和入口均在本任务实现，当前没有报告。真实模型评测需预算许可；报告必须区分固定检索测试与真实生成质量。
+以上配置和入口均已在本任务实现；用户授权的本地真实模型检索与生成报告见experiments/evaluation/reports。报告区分固定检索与完整RAG质量，未调用付费云模型。
 
 ## 已知问题与外部阻塞
 
@@ -58,6 +58,36 @@ uv run ruff check . ../experiments/evaluation
 
 ## 工作记录与完成标准
 
-- 未领取；负责人、worktree、分支、commit、PR 未产生。
-- 未采集数据、未运行评测、无质量提升声明。
+- 负责人implement_013（root协调）；worktree与分支见下方实施记录，当前in_review；PR与合并由root接续。
+- 本轮已交付用户授权的60题虚构教学数据、真实检索与完整RAG逐题报告；没有质量提升或人工业务验收声明。
 - 按 [WORKFLOW](../WORKFLOW.md) 交付版本化数据说明、逐条结果、对照结论与评审；分支 `in_review`，合入权威 main 且检查通过后统一 `done`。
+
+## 2026-10-01 本轮教学范围与实施记录
+
+- 用户明确授权先使用原创、明确虚构的校园教学资料和至少50个评测问题，由独立代理复核；真实业务资料收集、人工审核与生产质量验收仍留到正式发布前。此范围调整不把自动审核冒充人工验收。
+- 分支 `feat/todo-013-evaluation`，独立worktree `todo-013-evaluation`，基线 `0f5832279978983c959deff434990ca1b7ec7c9f`；API8143/Web5243/DB15473，独立qa_test随机schema，冻结uv/npm依赖。
+- 实施：60题固定教学评测（18开发/42最终测试），20来源带sha256；dev/test按来源组隔离，另4主题/8条训练格式样例供015独立扩展。禁止从最终评测规则改写训练样本。
+- 先观察手算指标、混合/权限、重排降级、运行器DB/引用/索引集成行为RED，再最小实现；已有真实PostgreSQL/pgvector检索套件101通过，评测测试7通过（包括上游错误不算正确拒答）。依赖第三方Starlette存在已记录DeprecationWarning。
+- 中文bigram/完整ASCII编号词法在SQL完整权限/有效版本/元数据/余弦阈值之后排序；RRF仅改顺序、SearchHit.score保留真实余弦。默认vector/重排关闭。CrossEncoder本地CPU开关、单worker超时/busy/不可用回退、重排前后复验；不自动下载模型。
+- 真实BGE开发基线/混合18题报告已跑：14可答题Recall@5/MRR=0.50，两模式无提升，各0泄露/错误；现有0.65阈值与RRF配置冻结，不用最终测试调参。纯检索的生成质量列为null。
+- 最终检索、真实Ollama生成、重排模型对照、完整统一检查与独立代码/逐题评审待记录。共享.env.example/CONTRACTS/dev检查入口由root串行整合，未直接修改。仍in_review，尚无PR/合并SHA，不宣称main完成。
+
+独立评审纠错：v2资料和standalone query修订详见evaluation README；保留reports/v1，明确v1最终测试已见、v2为纠错重测且不调参数。三项评测/完整模型元信息P2及RAG排序问题已逐项RED→GREEN；评测9、重排4、RAG128专项通过。首次完整check在da0573e通过（backend680/frontend114/E2E18+4+1），评审修订后还要重跑完整check。RAG prompts.py及对应预算测试为root明确扩展的最小授权范围。
+
+- v2独立代理复审通过，初审6项问题关闭。20评测来源和4训练来源hash/划分核对无数字替换近重复跨split；仍非人工业务验收。review_status在报告前冻结；接下来重跑v2全部模式。
+
+- v2真实CPU检索6份均已运行：dev14参考题Recall@5/MRR=10/14；test31参考题=21/31，vector/hybrid/CrossEncoder三模式一致，各0泄露/0错误。真重排dev10/test21题applied，无降级；test p95分别26.12/38.70/82.29ms，进程峰值约522/532/1139MiB。默认保持vector、重排关闭，不能宣称质量提升或生产SLA。
+- 真实生成仍待014先走PR合入main后同步provider；本worktree生成配置模板在忽略目录，不含密钥，需root填写真实已验证tag再运行。纯检索报告的引用/拒答质量为null。
+- root授权串行整合共享.env.example/CONTRACTS/scriptsdev到本分支，提交8d23104；统一check现包含评测9项与外目录Ruff，当前完整重跑中。
+
+- 最终统一验收 `node scripts/dev.mjs check` 已实际exit0（8d23104对应实现）：backend681、评测9、frontend114、E2E18+4+1；Ruff/ESLint/typecheck/build、两次Alembic upgrade完成。完整输出保留该worktree忽略目录的unified-check-final.log。检查后仅报告/文档追加，真实生成仍待014，状态保持in_review，不宣称已合并或生成质量已过。
+
+
+## 2026-10-01 014集成后的完整RAG验收
+
+- 014功能PR27与状态PR28已合入origin/main b6b5f9c2dd18536f77cacf6d70961586e6205d16；root同步本分支至c0d19f0cc9baaaae79abc8cacbf115c313839e1e。此为013六份真实生成报告的执行源码提交，不是013已合入main。
+- 在本worktree真实Ollama qwen3:4b-instruct-2507-q4_K_M（8192上下文、512输出、不发送think、temperature=0）串行运行dev/test × baseline/hybrid/rerank --generate，六份均exit0；BGE与真实CrossEncoder仍CPU。报告与事后运行身份旁证已版本化，资料和参数未改。
+- 三模式均dev回答6/14、误拒答8；test回答12/31、误拒答19。各0权限泄露/0上游错误/0应拒答误答/0恶意短语匹配；dev6/test12个实际引用来源精确率及原文映射1.0，不代表全部问题正确或无幻觉。纯检索test缺10/31参考题；完整RAG实际搜索16/31无候选，另1clarify、2生成/引用校验拒答。完整结果见evaluation/reports/decision.md，默认vector与关闭重排保留。
+- 首次合入014后统一check因provider测试fixture继承外部8192上下文失败：737通过/1失败，原日志保留.local/unified-check-after-014.log。4096进程覆盖下完整check exit0仅用于诊断，不作为解决方案。随后目标测试在8192环境复现RED；root授权仅fixture默认ollama_num_ctx=4096及model_disable_thinking=false两行，生产provider/真实报告不改。外部8192/thinking=true下providers105通过，backend目录Ruff通过；修复提交0a341005c1bd9019004d88326bdddd0936304d7d。
+- 修复后在0a341005c1bd9019004d88326bdddd0936304d7d对应实现使用实际.env8192、仅该check进程MODEL_PROVIDER=mock重跑完整node scripts/dev.mjs check，实际exit0：backend738、评测9、frontend114、E2E18+4+1；Ruff/ESLint/typecheck/build与重复迁移检查完成。完整原始输出保留.local/unified-check-after-014-fixture-fixed.log。六份真实生成在独立进程使用ollama，未用mock冒充效果。
+- 独立代理已复算12份v2报告360行/54引用无不一致，最终文案、数值和两行fixture定点复核均已通过。正式发布前真实业务资料与人工审核仍未完成；本轮教学交付依用户范围调整接受代理复核，不声称替代人工验收。013仍in_review，由root继续普通PR/合并/状态收尾。

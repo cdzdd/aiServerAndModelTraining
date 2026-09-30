@@ -69,11 +69,11 @@ def test_unusable_history_requires_clarification_instead_of_partial_referent():
         build_rewrite_prompt("它支持退款吗", pair("产品 A" * 5000))
 
 
-def test_answer_drops_entire_lowest_score_hit_and_keeps_source_map():
-    high = hit("可信原文", 0.99)
-    low = hit("低" * 3900, 0.65)
+def test_answer_drops_entire_lowest_ranked_hit_and_keeps_source_map():
+    high = hit("可信原文", 0.65)
+    low = hit("低" * 3900, 0.99)
     middle = hit("另一条原文", 0.8)
-    messages, actual_hits = build_answer_prompt("退款规则是什么？", [high, low, middle])
+    messages, actual_hits = build_answer_prompt("退款规则是什么？", [high, middle, low])
     data = json.loads(messages[1].content)
     assert actual_hits == [high, middle]
     assert data["question"] == "退款规则是什么？"
@@ -100,7 +100,7 @@ def test_document_instructions_stay_json_data_and_cannot_create_roles():
 
 
 def test_at_most_five_highest_ranked_chunks_reach_model():
-    hits = [hit(str(i), 1 - i / 10) for i in range(8)]
+    hits = [hit(str(i), 0.1 + i / 10) for i in range(8)]
     _, actual = build_answer_prompt("问题", hits)
     assert actual == hits[:5]
 
