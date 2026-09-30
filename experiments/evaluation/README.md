@@ -58,3 +58,5 @@ uv run --frozen ruff check --config pyproject.toml . ../experiments/evaluation
 2026-10-01代理逐题复核修订说明：v1的dev/test权限与攻击资料曾仅换编号跨split，另有自习室题目缺主语、部分独立检索表述缺实体。v2把dev权限资料改为财务核对/档案保管，把dev攻击资料改为饮水设施/花圃浇水及不同攻击payload；同一family统一group，test自习室补明确主体，q4独立query补来源实体。旧负结果完整保留于reports/v1。由于v1最终测试已运行，v2报告属于评审纠错后的重测，不声称完全未见测试；检索参数未改变。真实跨业务泛化仍需另外独立数据。
 
 重排运行前校验六个固定快照文件SHA256（含1,112,206,140-byte safetensors）；报告模型ID/修订来自通过校验的已知快照常量，不接受配置文字冒充实际加载版本。RAG提示版本rag-extractive-v2保留retriever排序并从末尾丢弃超预算证据，避免按cosine重排撤销实验排名。
+
+v2独立代理定点复审已通过，6项初审问题关闭；共20评测来源与另4训练来源逐条核对。review_status在报告前最后冻结，文字状态不代表人工审核。所有参数保留v1的0.65/Top5/20候选/RRF60，v1已见最终数据的限制继续保留。

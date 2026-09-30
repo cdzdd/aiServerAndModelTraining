@@ -1,7 +1,7 @@
 {
   "version": "campus-synthetic-v2",
   "synthetic": true,
-  "review_status": "独立代理逐题复核后修订；待v2复核，未进行人工业务验收",
+  "review_status": "独立代理逐题复核通过（v2定点复审关闭6项问题）；仍未进行人工业务验收",
   "sources": [
     {
       "id": "dev-library",

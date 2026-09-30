@@ -73,3 +73,5 @@ uv run ruff check . ../experiments/evaluation
 - 最终检索、真实Ollama生成、重排模型对照、完整统一检查与独立代码/逐题评审待记录。共享.env.example/CONTRACTS/dev检查入口由root串行整合，未直接修改。仍in_review，尚无PR/合并SHA，不宣称main完成。
 
 独立评审纠错：v2资料和standalone query修订详见evaluation README；保留reports/v1，明确v1最终测试已见、v2为纠错重测且不调参数。三项评测/完整模型元信息P2及RAG排序问题已逐项RED→GREEN；评测9、重排4、RAG128专项通过。首次完整check在da0573e通过（backend680/frontend114/E2E18+4+1），评审修订后还要重跑完整check。RAG prompts.py及对应预算测试为root明确扩展的最小授权范围。
+
+- v2独立代理复审通过，初审6项问题关闭。20评测来源和4训练来源hash/划分核对无数字替换近重复跨split；仍非人工业务验收。review_status在报告前冻结；接下来重跑v2全部模式。
