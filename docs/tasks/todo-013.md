@@ -75,3 +75,9 @@ uv run ruff check . ../experiments/evaluation
 独立评审纠错：v2资料和standalone query修订详见evaluation README；保留reports/v1，明确v1最终测试已见、v2为纠错重测且不调参数。三项评测/完整模型元信息P2及RAG排序问题已逐项RED→GREEN；评测9、重排4、RAG128专项通过。首次完整check在da0573e通过（backend680/frontend114/E2E18+4+1），评审修订后还要重跑完整check。RAG prompts.py及对应预算测试为root明确扩展的最小授权范围。
 
 - v2独立代理复审通过，初审6项问题关闭。20评测来源和4训练来源hash/划分核对无数字替换近重复跨split；仍非人工业务验收。review_status在报告前冻结；接下来重跑v2全部模式。
+
+- v2真实CPU检索6份均已运行：dev14参考题Recall@5/MRR=10/14；test31参考题=21/31，vector/hybrid/CrossEncoder三模式一致，各0泄露/0错误。真重排dev10/test21题applied，无降级；test p95分别26.12/38.70/82.29ms，进程峰值约522/532/1139MiB。默认保持vector、重排关闭，不能宣称质量提升或生产SLA。
+- 真实生成仍待014先走PR合入main后同步provider；本worktree生成配置模板在忽略目录，不含密钥，需root填写真实已验证tag再运行。纯检索报告的引用/拒答质量为null。
+- root授权串行整合共享.env.example/CONTRACTS/scriptsdev到本分支，提交8d23104；统一check现包含评测9项与外目录Ruff，当前完整重跑中。
+
+- 最终统一验收 `node scripts/dev.mjs check` 已实际exit0（8d23104对应实现）：backend681、评测9、frontend114、E2E18+4+1；Ruff/ESLint/typecheck/build、两次Alembic upgrade完成。完整输出保留该worktree忽略目录的unified-check-final.log。检查后仅报告/文档追加，真实生成仍待014，状态保持in_review，不宣称已合并或生成质量已过。

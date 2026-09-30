@@ -48,7 +48,7 @@ RRF合并向量和词法各前20候选；完全同分优先词法参与候选，
 
 ```powershell
 uv run --frozen pytest tests/retrieval/test_hybrid_search.py tests/retrieval/test_rerank_access.py -q
-uv run --frozen pytest ../experiments/evaluation/tests -q
+uv run --frozen pytest -c pyproject.toml ../experiments/evaluation/tests -q
 uv run --frozen ruff check --config pyproject.toml . ../experiments/evaluation
 ```
 
@@ -60,3 +60,4 @@ uv run --frozen ruff check --config pyproject.toml . ../experiments/evaluation
 重排运行前校验六个固定快照文件SHA256（含1,112,206,140-byte safetensors）；报告模型ID/修订来自通过校验的已知快照常量，不接受配置文字冒充实际加载版本。RAG提示版本rag-extractive-v2保留retriever排序并从末尾丢弃超预算证据，避免按cosine重排撤销实验排名。
 
 v2独立代理定点复审已通过，6项初审问题关闭；共20评测来源与另4训练来源逐条核对。review_status在报告前最后冻结，文字状态不代表人工审核。所有参数保留v1的0.65/Top5/20候选/RRF60，v1已见最终数据的限制继续保留。
+
