@@ -132,6 +132,8 @@ Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: 
 
 `node scripts/dev.mjs index-worker` 单独处理持久 index 任务；原 `worker` 仅处理 parse。索引批次在事务外编码并续租，最终重新检查租约令牌、知识库/来源状态及捕获版本，完整写入向量后才在同一事务激活文档或设置 FAQ indexed_version。文档重建保留已有 chunk ID，失败不破坏旧 active；FAQ 编辑使旧版本立即失效，并排入新版本索引。迁移为已有启用 FAQ 创建初始任务。首次加载和运行说明见 [scripts/README](../scripts/README.md)。
 
+013 增加显式 `RETRIEVAL_MODE=vector|hybrid` 与独立 `RETRIEVAL_RERANK_ENABLED`，默认 vector、重排关闭、余弦阈值 0.65。hybrid 各取最多 20 个向量/词法候选，以等权 RRF（k=60）排序；词法使用中文字符 bigram 与完整 ASCII 编号，先经过同一 SQL 权限/来源/模型元数据/余弦阈值过滤，不救回低阈值候选。`SearchHit.score` 始终是真实余弦，排序结果由列表顺序表达；RAG 保持此顺序，预算不足时丢弃末尾完整候选，不再次按 score 排序。可选重排仅加载固定身份且逐文件 SHA256 验证的离线 CPU CrossEncoder；默认 2 秒、单 worker、busy/超时失败回退且无排队，线程超时后可能继续计算。重排前后重新检查当前权限与版本。`search_detailed` 仅供实验记录降级，现有 search 接口形状不变。教学集评测和审核属于教学代理验收，真实业务资料与人工审核仍是上线前条件。
+
 RAG 接口：`stream_answer(actor: Actor, kb_ids: list[UUID], question: str, history: list[LLMMessage]) -> AsyncIterator[AnswerEvent]`。不依赖 Conversation ORM；由 chat 提供已过滤的历史，由 retrieval 验证知识范围。todo-008 可以在 todo-009 尚未开发时独立测试。
 
 `done` payload：`{answer_status: "answered|clarify|no_answer", evidence_level: "sufficient|limited|none", intent: "knowledge|complaint|handoff|other"}`。明确转人工意图交由 chat/handoff 执行状态变更，RAG 不自行写会话状态。done 可附带 `usage: {prompt_tokens?,completion_tokens?,total_tokens?}|null`；仅使用真实上游 usage，多阶段某字段缺失则该合计保持 null，不按字数估算，不把缺失当零。
@@ -142,7 +144,7 @@ RAG 接口：`stream_answer(actor: Actor, kb_ids: list[UUID], question: str, his
 
 引用元数据由当前 SearchHit 提供，包含 kb_id、文档 revision_id 或 FAQ faq_version 与定位。发送任何证据前，通过 retrieval.validate_hits 复用当前 SQL 权限/有效版本谓词再次核验；同一 SQL 同时要求用户仍有效且当前角色未变；撤权、用户停用/改角色、来源停用、删除或版本改变返回安全 SOURCE_CHANGED 错误，不输出旧原文。该接口为新短会话只读查询，不跨模型调用持数据库锁。
 
-提示词版本 `rag-extractive-v1`，问题 1–2000 字符；历史只接收调用方已授权的完整 user/assistant 轮次，最近最多 3 轮。system 历史不受信任。回答提示词同时保留原问题与改写后的独立查询；后者仅恢复指代，不作为事实证据，两者都计入体积预算。问题不截断；证据超出输入预算时丢弃最低排名的完整片段并同步来源映射。输入按序列化消息内容的 UTF-8 字节限制为 12000，属于保守体积上限而非 DeepSeek 精确 token 计数。当前 DeepSeek 配置容量依据见 [官方模型文档](https://api-docs.deepseek.com/quick_start/pricing/)；BGE 自身仍用真实 tokenizer 检查 512 上限，超过时请求用户缩短问题。
+提示词版本 `rag-extractive-v2`，问题 1–2000 字符；历史只接收调用方已授权的完整 user/assistant 轮次，最近最多 3 轮。system 历史不受信任。回答提示词同时保留原问题与改写后的独立查询；后者仅恢复指代，不作为事实证据，两者都计入体积预算。问题不截断；证据超出输入预算时丢弃最低排名的完整片段并同步来源映射。输入按序列化消息内容的 UTF-8 字节限制为 12000，属于保守体积上限而非 DeepSeek 精确 token 计数。当前 DeepSeek 配置容量依据见 [官方模型文档](https://api-docs.deepseek.com/quick_start/pricing/)；BGE 自身仍用真实 tokenizer 检查 512 上限，超过时请求用户缩短问题。
 
 改写、检索、答复及发送前核验共用 60 秒期限；无历史时答复最多 512 输出 tokens，有改写时最多 128+384。所有模型流有明确关闭/取消，失败无透明重试；不完整、截断、过滤或超时不能以成功 done 结束。文档/历史仅作为不可信数据，不进入 system 权限或工具调用；本模块不写会话或人工接管状态。
 
