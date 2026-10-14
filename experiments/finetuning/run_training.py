@@ -17,6 +17,10 @@ from pathlib import Path
 BUDGET_SECONDS = 86400
 
 
+class BudgetDeadlineExceeded(ValueError):
+    pass
+
+
 def remaining_seconds(
     used_seconds: float, elapsed_seconds: float, budget_seconds: int = BUDGET_SECONDS
 ) -> float:
@@ -244,6 +248,23 @@ class BudgetLedger:
                 require(attempt["identity"]["task_id"] == self.task_id)
                 require(isinstance(attempt["parent"], dict))
                 require(attempt["reason"] is not None or index == len(record["attempts"]) - 1)
+                require(
+                    math.isclose(
+                        attempt["allowance_seconds"],
+                        remaining_seconds(total, 0),
+                        rel_tol=0,
+                        abs_tol=1e-6,
+                    )
+                )
+                for clock_name in ("utc", "monotonic"):
+                    require(
+                        math.isclose(
+                            attempt[f"deadline_{clock_name}"],
+                            attempt[f"started_{clock_name}"] + attempt["allowance_seconds"],
+                            rel_tol=0,
+                            abs_tol=1e-6,
+                        )
+                    )
                 total += attempt["occupied_seconds"]
             require(math.isclose(total, record["occupied_seconds"], abs_tol=1e-6))
         except (KeyError, TypeError, OSError) as error:
@@ -291,6 +312,7 @@ class BudgetLedger:
         if self.record["attempts"] and now < self.record["attempts"][-1]["last_utc"]:
             raise ValueError("UTC clock moved backwards")
         self.last_mono = self.clock.monotonic()
+        allowance = self.remaining
         self.record["attempts"].append(
             {
                 "identity": identity,
@@ -301,13 +323,16 @@ class BudgetLedger:
                 "last_utc": now,
                 "started_monotonic": self.last_mono,
                 "last_monotonic": self.last_mono,
+                "allowance_seconds": allowance,
+                "deadline_monotonic": self.last_mono + allowance,
+                "deadline_utc": now + allowance,
                 "occupied_seconds": 0.0,
                 "reason": None,
             }
         )
         self.save()
 
-    def heartbeat(self):
+    def heartbeat(self, *, on_exhausted=None):
         attempt = self.active
         if attempt is None or self.last_mono is None:
             raise ValueError("No active owned attempt")
@@ -320,6 +345,8 @@ class BudgetLedger:
         self.record["occupied_seconds"] += delta
         attempt.update(last_utc=now, last_monotonic=mono)
         self.last_mono = mono
+        if self.remaining <= 0 and on_exhausted is not None:
+            on_exhausted()  # Terminate before any possibly blocking ledger persistence.
         self.save()
 
     def finish(self, reason):
@@ -334,37 +361,34 @@ class BudgetLedger:
 class OwnedWorker:
     """Retains the actual Popen handle. Arbitrary PIDs can never be terminated here."""
 
-    def __init__(self, command, *, deadline=None, **kwargs):
-        if deadline is not None and deadline <= time.monotonic():
-            raise ValueError("Worker deadline has already expired")
-        self.timer = None
+    def __init__(self, command, *, deadline, utc_deadline, **kwargs):
+        if deadline <= time.monotonic() or utc_deadline <= time.time():
+            raise BudgetDeadlineExceeded("Worker deadline has already expired")
+        self.deadline, self.utc_deadline = deadline, utc_deadline
         self.expired = threading.Event()
         self.cancel_deadline = threading.Event()
         self.process = subprocess.Popen(command, **kwargs)
-        if deadline is not None:
-            self._arm(deadline)
+        self._arm()
 
-    def _arm(self, deadline):
-        if self.timer is not None:
-            return
-
-        utc_deadline = time.time() + max(0, deadline - time.monotonic())
-
+    def _arm(self):
         def kill_at_deadline():
             while not self.cancel_deadline.is_set():
-                remaining = min(deadline - time.monotonic(), utc_deadline - time.time())
+                remaining = min(self.deadline - time.monotonic(), self.utc_deadline - time.time())
                 if remaining <= 0:
-                    if self.process.poll() is None:
-                        self.expired.set()
-                        try:
-                            self.process.kill()
-                        except ProcessLookupError:
-                            pass  # It exited between poll and kill.
+                    self.expire()
                     return
                 self.cancel_deadline.wait(min(0.1, remaining))
 
         self.timer = threading.Thread(target=kill_at_deadline, daemon=True)
         self.timer.start()
+
+    def expire(self):
+        if self.process.poll() is None:
+            self.expired.set()
+            try:
+                self.process.kill()
+            except ProcessLookupError:
+                pass  # It exited between poll and kill.
 
     def stop(self, process):
         if process is not self.process:
@@ -372,11 +396,9 @@ class OwnedWorker:
         if process.poll() is None:
             process.kill()
         process.wait(timeout=5)
-        if self.timer is not None:
-            self.cancel_deadline.set()
+        self.cancel_deadline.set()
 
-    def wait_until(self, deadline, heartbeat=None):
-        self._arm(deadline)
+    def wait_until(self, heartbeat=None):
         next_heartbeat = time.monotonic()
         try:
             while self.process.poll() is None:
@@ -384,7 +406,7 @@ class OwnedWorker:
                 if heartbeat and now >= next_heartbeat:
                     heartbeat()
                     next_heartbeat = now + 10
-                time.sleep(min(0.05, max(0.001, deadline - now)))
+                time.sleep(min(0.05, max(0.001, self.deadline - now)))
             return (
                 "deadline"
                 if self.expired.is_set()
@@ -553,11 +575,13 @@ class TrainingCallback:
         *,
         deadline,
         max_steps,
+        utc_deadline=None,
         stop_after_step=None,
         slowest_save_seconds=0,
     ):
         self.identity, self.status_file = identity, Path(status_file)
         self.deadline, self.max_steps = deadline, max_steps
+        self.utc_deadline = utc_deadline
         self.stop_after_step = stop_after_step
         self.slowest_save_seconds = slowest_save_seconds
         self.save_started = None
@@ -574,7 +598,7 @@ class TrainingCallback:
         self.hook = None
 
     def on_train_begin(self, args, state, control, model=None, **kwargs):
-        if time.monotonic() >= self.deadline - self.reserve_seconds:
+        if self.remaining <= self.reserve_seconds:
             self.status["reason"] = "budget_reserve_before_training"
             self.publish()
             raise ValueError("Insufficient budget after model loading to start training")
@@ -618,6 +642,13 @@ class TrainingCallback:
     def reserve_seconds(self):
         return max(600, 2 * self.slowest_save_seconds)
 
+    @property
+    def remaining(self):
+        remaining = self.deadline - time.monotonic()
+        if self.utc_deadline is not None:
+            remaining = min(remaining, self.utc_deadline - time.time())
+        return remaining
+
     def publish(self):
         self.status["training_elapsed_seconds"] = time.monotonic() - self.started
         self.status["input_tokens_per_second"] = self.status["input_tokens"] / max(
@@ -629,7 +660,7 @@ class TrainingCallback:
         self.status["steps"] = state.global_step
         if self.stop_after_step is not None and state.global_step >= self.stop_after_step:
             self.status["reason"] = "planned_pause"
-        elif time.monotonic() >= self.deadline - self.reserve_seconds:
+        elif self.remaining <= self.reserve_seconds:
             self.status["reason"] = "budget_reserve"
         if self.status["reason"] in {"planned_pause", "budget_reserve"}:
             control.should_training_stop = control.should_save = True
@@ -641,7 +672,7 @@ class TrainingCallback:
         return control
 
     def on_evaluate(self, args, state, control, **kwargs):
-        if time.monotonic() >= self.deadline - self.reserve_seconds:
+        if self.remaining <= self.reserve_seconds:
             self.status["reason"] = "budget_reserve"
             control.should_training_stop = control.should_save = True
         return control
@@ -661,7 +692,7 @@ class TrainingCallback:
             last_valid_checkpoint=record, slowest_save_seconds=self.slowest_save_seconds
         )
         self.publish()
-        if time.monotonic() >= self.deadline - self.reserve_seconds:
+        if self.remaining <= self.reserve_seconds:
             control.should_training_stop = True
             self.status["reason"] = "budget_reserve"
             self.publish()
@@ -669,6 +700,8 @@ class TrainingCallback:
 
 
 def validate_recipe(recipe):
+    if "tokenized_path" in recipe:
+        raise ValueError("tokenized_path is unsupported; load the hashed raw train/dev files")
     if not isinstance(recipe.get("max_steps"), int) or recipe["max_steps"] <= 0:
         raise ValueError("Recipe requires positive fixed max_steps")
     retained = 3 if recipe.get("load_best_model_at_end") else 2
@@ -769,6 +802,7 @@ def worker_main(spec_path):
         spec["identity"],
         spec["status_file"],
         deadline=spec["deadline"],
+        utc_deadline=spec["utc_deadline"],
         max_steps=spec["recipe"]["max_steps"],
         stop_after_step=spec["stop_after_step"],
         slowest_save_seconds=spec["slowest_save_seconds"],
@@ -880,7 +914,8 @@ def main(argv=None, *, repo=None):
         recipe["resume_from_checkpoint"] = str(options.resume.resolve())
     with BudgetLedger(path, options.task_id) as ledger:
         ledger.start(identity, options.phase)
-        deadline = ledger.active["started_monotonic"] + ledger.remaining
+        deadline = ledger.active["deadline_monotonic"]
+        utc_deadline = ledger.active["deadline_utc"]
         attempt_id = len(ledger.record["attempts"])
         prefix = path.parent / f"{options.task_id}-attempt-{attempt_id}"
         status_file = prefix.with_suffix(".status.json")
@@ -891,6 +926,7 @@ def main(argv=None, *, repo=None):
             "parent": ledger.active["parent"],
             "budget_file": str(path),
             "deadline": deadline,
+            "utc_deadline": utc_deadline,
             "status_file": str(status_file),
             "resources_file": str(prefix.with_suffix(".resources.jsonl")),
             "stop_after_step": options.stop_after_step,
@@ -906,7 +942,7 @@ def main(argv=None, *, repo=None):
                 ledger.record["slowest_save_seconds"] = max(
                     ledger.record["slowest_save_seconds"], status.get("slowest_save_seconds", 0)
                 )
-            ledger.heartbeat()
+            ledger.heartbeat(on_exhausted=worker.expire)
 
         try:
             atomic_json(spec_path, spec)
@@ -916,10 +952,11 @@ def main(argv=None, *, repo=None):
                     stdout=log,
                     stderr=log,
                     deadline=deadline,
+                    utc_deadline=utc_deadline,
                 )
                 ledger.active["worker"] = process_identity(worker.process.pid)
                 ledger.save()
-                reason = worker.wait_until(deadline, heartbeat)
+                reason = worker.wait_until(heartbeat)
             heartbeat()
             if reason == "completed":
                 status = read_json(status_file)
@@ -940,11 +977,13 @@ def main(argv=None, *, repo=None):
                 )
             )
             return 0 if reason in {"completed", "planned_pause", "budget_reserve"} else 1
-        except BaseException:
+        except BaseException as error:
             if worker and worker.process.poll() is None:
                 worker.stop(worker.process)
             # If clock/storage fails, leave the attempt open for conservative crash recovery.
-            ledger.finish("interrupted_or_failed")
+            ledger.finish(
+                "deadline" if isinstance(error, BudgetDeadlineExceeded) else "interrupted_or_failed"
+            )
             raise
 
 

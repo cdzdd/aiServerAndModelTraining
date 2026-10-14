@@ -252,8 +252,12 @@ def test_live_or_unknown_owner_blocks_recovery(budget):
 
 def test_save_hang_hits_deadline():
     started = time.monotonic()
-    worker = training.OwnedWorker([sys.executable, "-c", "import time; time.sleep(30)"])
-    result = worker.wait_until(time.monotonic() + 0.25)
+    worker = training.OwnedWorker(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        deadline=time.monotonic() + 0.25,
+        utc_deadline=time.time() + 0.25,
+    )
+    result = worker.wait_until()
     assert result == "deadline"
     assert worker.process.poll() is not None
     assert time.monotonic() - started < 3
@@ -263,11 +267,12 @@ def test_deadline_is_armed_before_parent_bookkeeping():
     worker = training.OwnedWorker(
         [sys.executable, "-c", "import time; time.sleep(30)"],
         deadline=time.monotonic() + 0.15,
+        utc_deadline=time.time() + 0.15,
     )
     time.sleep(0.4)  # Simulates a slow ledger flush before the parent enters its monitor loop.
     try:
         assert worker.process.poll() is not None
-        assert worker.wait_until(time.monotonic() + 30) == "deadline"
+        assert worker.wait_until() == "deadline"
     finally:
         if worker.process.poll() is None:
             worker.stop(worker.process)
@@ -279,6 +284,7 @@ def test_expired_deadline_does_not_spawn_worker(tmp_path):
         training.OwnedWorker(
             [sys.executable, "-c", f"from pathlib import Path; Path({str(touched)!r}).touch()"],
             deadline=time.monotonic() - 1,
+            utc_deadline=time.time() + 20,
         )
     assert not touched.exists()
 
@@ -297,15 +303,111 @@ def test_forward_wall_clock_jump_also_enforces_external_deadline(monkeypatch):
     worker = training.OwnedWorker(
         [sys.executable, "-c", "import time; time.sleep(30)"],
         deadline=time.monotonic() + 20,
+        utc_deadline=time.time() + 20,
     )
     try:
         offset[0] = 30
         time.sleep(0.3)
         assert worker.process.poll() is not None
-        assert worker.wait_until(time.monotonic() + 20) == "deadline"
+        assert worker.wait_until() == "deadline"
     finally:
         if worker.process.poll() is None:
             worker.stop(worker.process)
+
+
+def test_pre_spawn_wall_jump_exhaustion_refuses_worker(budget, monkeypatch, tmp_path):
+    offset = [0]
+    clock = SimpleNamespace(
+        monotonic=time.monotonic,
+        sleep=time.sleep,
+        time=lambda: time.time() + offset[0],
+    )
+    monkeypatch.setattr(training, "time", clock)
+    touched = tmp_path / "should-not-launch"
+    with training.BudgetLedger(budget, "todo-019", clock=clock) as ledger:
+        ledger.start(IDENTITY, "preflight")
+        deadline = ledger.active["deadline_monotonic"]
+        utc_deadline = ledger.active["deadline_utc"]
+        offset[0] = 90000
+        with pytest.raises(ValueError, match="deadline"):
+            training.OwnedWorker(
+                [sys.executable, "-c", f"from pathlib import Path; Path({str(touched)!r}).touch()"],
+                deadline=deadline,
+                utc_deadline=utc_deadline,
+            )
+        ledger.finish("deadline")
+    assert not touched.exists()
+
+
+def test_pre_spawn_suspend_keeps_only_original_remaining_allowance(budget, monkeypatch):
+    offset = [0]
+    clock = SimpleNamespace(
+        monotonic=time.monotonic,
+        sleep=time.sleep,
+        time=lambda: time.time() + offset[0],
+    )
+    monkeypatch.setattr(training, "time", clock)
+    with training.BudgetLedger(budget, "todo-019", clock=clock) as ledger:
+        ledger.start(IDENTITY, "preflight")
+        deadline = ledger.active["deadline_monotonic"]
+        utc_deadline = ledger.active["deadline_utc"]
+        # Linux suspend advances UTC without advancing CLOCK_MONOTONIC. Only 0.3 s remains.
+        offset[0] = 86399.7
+        worker = training.OwnedWorker(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            deadline=deadline,
+            utc_deadline=utc_deadline,
+        )
+        try:
+            ledger.heartbeat()
+            time.sleep(0.6)
+            assert worker.process.poll() is not None
+            assert worker.wait_until() == "deadline"
+        finally:
+            worker.stop(worker.process)
+            ledger.finish("deadline")
+
+
+def test_attempt_deadlines_use_pre_attempt_remaining_allowance(budget):
+    clock = Clock()
+    with training.BudgetLedger(budget, "todo-019", clock=clock) as ledger:
+        ledger.start(IDENTITY, "preflight")
+        clock.advance(3600)
+        ledger.finish("paused")
+        clock.advance(5000)  # Closed pause is excluded from the new 82800-second allowance.
+        ledger.start(IDENTITY, "formal")
+        assert ledger.active["allowance_seconds"] == 82800
+        assert ledger.active["deadline_monotonic"] == 91400
+        assert ledger.active["deadline_utc"] == 92400
+        ledger.finish("paused")
+
+
+def test_accounting_exhaustion_kills_worker_before_persisting(budget, monkeypatch):
+    clock = Clock()
+    with training.BudgetLedger(budget, "todo-019", clock=clock) as ledger:
+        ledger.start(IDENTITY, "preflight")
+        # Accounting is also a fail-closed path, independently of the wall-clock watchdog.
+        worker = training.OwnedWorker(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            deadline=time.monotonic() + 20,
+            utc_deadline=time.time() + 20,
+        )
+        save = ledger.save
+        try:
+
+            def check_before_save():
+                assert worker.expired.is_set()
+                save()
+
+            monkeypatch.setattr(ledger, "save", check_before_save)
+            clock.advance(86400)
+            ledger.heartbeat(on_exhausted=worker.expire)
+            assert worker.wait_until() == "deadline"
+            assert ledger.remaining == 0
+        finally:
+            monkeypatch.setattr(ledger, "save", save)
+            worker.stop(worker.process)
+            ledger.finish("deadline")
 
 
 @pytest.mark.skipif(os.name != "posix", reason="PDEATHSIG is a Linux/WSL safeguard")
@@ -350,7 +452,11 @@ sys.exit(1)
 
 def test_only_owned_worker_can_be_stopped():
     other = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
-    worker = training.OwnedWorker([sys.executable, "-c", "import time; time.sleep(30)"])
+    worker = training.OwnedWorker(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        deadline=time.monotonic() + 20,
+        utc_deadline=time.time() + 20,
+    )
     try:
         with pytest.raises(ValueError, match="owned"):
             worker.stop(other)
@@ -465,6 +571,20 @@ def test_save_reserve_uses_slowest_complete_save(tmp_path):
     assert callback.status["reason"] == "budget_reserve"
 
 
+def test_save_reserve_uses_original_utc_deadline_after_startup(tmp_path):
+    callback = training.TrainingCallback(
+        IDENTITY,
+        tmp_path / "status.json",
+        deadline=time.monotonic() + 2000,
+        utc_deadline=time.time() + 599,
+        max_steps=200,
+    )
+    control = SimpleNamespace(should_save=False, should_training_stop=False)
+    callback.on_step_end(None, SimpleNamespace(global_step=10), control)
+    assert control.should_save and control.should_training_stop
+    assert callback.status["reason"] == "budget_reserve"
+
+
 def test_final_step_forces_complete_save_between_regular_intervals(tmp_path):
     callback = training.TrainingCallback(
         IDENTITY,
@@ -522,8 +642,12 @@ def test_save_hang_retains_previous_complete_marker(tmp_path):
         "from pathlib import Path; import time; "
         f"Path({str(partial / 'optimizer.pt')!r}).write_bytes(b'partial'); time.sleep(30)"
     )
-    worker = training.OwnedWorker([sys.executable, "-c", script])
-    assert worker.wait_until(time.monotonic() + 0.3) == "deadline"
+    worker = training.OwnedWorker(
+        [sys.executable, "-c", script],
+        deadline=time.monotonic() + 0.3,
+        utc_deadline=time.time() + 0.3,
+    )
+    assert worker.wait_until() == "deadline"
     assert training.read_checkpoint(old, IDENTITY)["global_step"] == 50
     assert not (partial / "complete.json").exists()
 
@@ -587,6 +711,15 @@ def test_recipe_rejects_nonresumable_or_unowned_training(changes):
         **changes,
     }
     with pytest.raises(ValueError):
+        training.validate_recipe(recipe)
+
+
+def test_pretokenized_cache_cannot_replace_hashed_raw_data(tmp_path):
+    cache = tmp_path / "cached"
+    cache.mkdir()
+    (cache / "dataset.arrow").write_bytes(b"unrelated pretokenized input and labels")
+    recipe = {"max_steps": 200, "tokenized_path": str(cache)}
+    with pytest.raises(ValueError, match="tokenized_path"):
         training.validate_recipe(recipe)
 
 
