@@ -817,7 +817,15 @@ def main():
         "summary": summarize(rows, k=5),
         "rows": rows,
     }
-    if runtime_manifest and runtime_manifest.get("schema_version") == 2:
+    runtime_v2 = (
+        runtime_manifest
+        if runtime_manifest and runtime_manifest.get("schema_version") == 2
+        else None
+    )
+    if dataset.get("schema_version") == 2 or runtime_v2 is not None:
+        report["metadata"]["generation_model"] = (
+            runtime_v2["base_repository"] if args.generate and runtime_v2 else None
+        )
         report["metadata"]["config"] = {
             key: config[key]
             for key in ("mode", "threshold", "rerank", "rerank_timeout_seconds")
@@ -829,7 +837,7 @@ def main():
                 "evaluation_path": "real_rag",
                 "evaluation_code_sha256": evaluation_code_hashes(),
                 "prompt_sha256": prompt_hashes(),
-                "effective_greedy": runtime_manifest["generation_evidence"],
+                "effective_greedy": runtime_v2["generation_evidence"] if runtime_v2 else None,
                 "input_byte_limit": INPUT_BYTE_LIMIT,
                 "output_token_limit": 512,
             }

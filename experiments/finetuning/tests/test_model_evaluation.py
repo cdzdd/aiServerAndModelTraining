@@ -324,3 +324,124 @@ def test_general_loader_rejects_empty_or_duplicate_schema(tmp_path, bad):
     path.write_text(bad, encoding="utf-8")
     with pytest.raises(ValueError):
         module.load_cases(path, "general")
+
+
+def run_rag_cli_fixture(
+    monkeypatch, tmp_path, *, runtime_schema=None, generate=False, legacy=False
+):
+    """Run real argument parsing, dataset loading, case evaluation and report writing on CPU."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    from experiments.evaluation import run_eval
+    from test_local_evaluation import runtime_v2, write_runtime
+
+    from app.modules.providers.config import ModelSettings
+
+    dataset = grounded_dataset()
+    if legacy:
+        del dataset["schema_version"]
+    dataset_path = tmp_path / "original-dataset.json"
+    dataset_path.write_text(json.dumps(dataset), encoding="utf-8")
+    config_path = tmp_path / "original-config.yaml"
+    config_path.write_text(
+        "mode: vector\nthreshold: 0.65\nrerank: false\nrerank_timeout_seconds: 2\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "public-report.json"
+    arguments = [
+        "run_eval.py",
+        "--config",
+        str(config_path),
+        "--dataset",
+        str(dataset_path),
+        "--split",
+        "test",
+        "--output",
+        str(output),
+    ]
+    if generate:
+        arguments.append("--generate")
+    if runtime_schema is not None:
+        value = (
+            runtime_v2()
+            if runtime_schema == 2
+            else {
+                "kind": "base",
+                "base_revision": "cdbee75f17c01a7cc42f958dc650907174af0554",
+                "inference_config_sha256": "a" * 64,
+                "training_manifest_sha256": "b" * 64,
+                "adapter_files_sha256": None,
+                "runtime_versions": {"torch": "2.9.1"},
+            }
+        )
+        arguments.extend(["--runtime-manifest", str(write_runtime(tmp_path, value))])
+    model_settings = ModelSettings(
+        _env_file=None,
+        model_provider="ollama",
+        model_base_url="http://127.0.0.1:11434",
+        model_id="C:/private/model/location",
+        model_allowed_ids=["C:/private/model/location"],
+    )
+
+    @contextmanager
+    def isolated_database():
+        yield object()
+
+    class EmptyRetriever:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def search_detailed(self, *args, **kwargs):
+            return SimpleNamespace(hits=[], rerank_status="disabled")
+
+        async def validate_hits(self, *args):
+            return True
+
+    # Stub the external CPU model/database boundaries only. Never call GPU/network inference.
+    monkeypatch.setattr(run_eval.sys, "argv", arguments)
+    monkeypatch.setattr(run_eval, "ModelSettings", lambda: model_settings)
+    monkeypatch.setattr(
+        run_eval, "Settings", lambda: SimpleNamespace(embedding_model_path="unused")
+    )
+    monkeypatch.setattr(run_eval, "BGEEmbedder", lambda path: SimpleNamespace(load=lambda: None))
+    monkeypatch.setattr(run_eval, "evaluation_database", isolated_database)
+    monkeypatch.setattr(
+        run_eval, "build_index", lambda *args: (None, {"test-public": "fixture-kb"})
+    )
+    monkeypatch.setattr(run_eval, "RetrievalService", EmptyRetriever)
+    assert run_eval.main() == 0
+    return json.loads(output.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("runtime_schema", [None, 1])
+def test_cli_new_dataset_retrieval_only_filters_labels_without_v2_runtime(
+    monkeypatch, tmp_path, runtime_schema
+):
+    report = run_rag_cli_fixture(monkeypatch, tmp_path, runtime_schema=runtime_schema)
+    serialized = json.dumps(report, ensure_ascii=False)
+    assert "question" not in report["rows"][0]
+    assert "answer" not in report["rows"][0]
+    assert "reference_answer" not in serialized and "rewrite" not in report["rows"][0]
+    assert "虚构星桥社的登记窗口在三层。" not in serialized
+    assert len(report["metadata"]["evaluation_dataset_sha256"]) == 64
+
+
+@pytest.mark.parametrize(
+    "runtime_schema,legacy", [(None, False), (1, False), (2, False), (2, True)]
+)
+def test_cli_new_public_report_omits_raw_model_alias(monkeypatch, tmp_path, runtime_schema, legacy):
+    report = run_rag_cli_fixture(
+        monkeypatch, tmp_path, runtime_schema=runtime_schema, generate=True, legacy=legacy
+    )
+    assert "C:/private/model/location" not in json.dumps(report)
+    assert report["metadata"].get("generation_model") in {None, "Qwen/Qwen3-8B"}
+
+
+def test_cli_actual_legacy_dataset_v1_keeps_existing_report_behavior(monkeypatch, tmp_path):
+    report = run_rag_cli_fixture(
+        monkeypatch, tmp_path, runtime_schema=1, generate=True, legacy=True
+    )
+    assert report["rows"][0]["question"] == "星桥社的登记窗口在哪？"
+    assert report["metadata"]["generation_model"] == "C:/private/model/location"
+    assert "evaluation_dataset_sha256" not in report["metadata"]
