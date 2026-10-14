@@ -21,6 +21,12 @@ uv run --frozen --directory backend python ../experiments/evaluation/run_eval.py
 
 真实生成另需014已集成、worktree明确配置 `MODEL_PROVIDER=ollama` 及本机模型；同一命令添加 `--generate`。运行器拒绝Mock/云provider生成质量报告。RAG发出temperature=0请求，但本地推理服务仍可能有数值差异，重复生成应单独保存，不能把单次结果视为确定事实。缺失usage保留null，不估算tokens。
 
+019 新语料必须显式传 `--dataset PATH`；省略仍读取本目录旧 `dataset.json`，不自动选择最新文件。例如在现有独立实验 API 与临时进程环境已配置后，使用 `--dataset ../.local/corpus-019/projection-preview-v2-r2/evaluation-v2.json --generate --local-openai --runtime-manifest ../.local/finetuning-019/runtime-base.json`。正式运行必须替换为操作者实际冻结的路径及清单，不能将 preview 名称当成已经冻结。`--local-openai` 仍只接受字面量 HTTP `127.0.0.1` / `::1`，不接受远程、DNS 名称或 Mock。
+
+v2 运行身份与给定证据/普通指令入口见 [微调评估说明](../finetuning/README.md#019版本化身份与独立评估)。真实 RAG 与给定金标准证据的生成分开报告；真实 RAG 的 `generation_diagnosis` 区分 `no_candidates`、模型 answered/no_answer/clarify、`invalid_json`、`invalid_citation` 和上游/RAG错误。逐阶段记录实际 `finish_reason`、`usage`、输入字节和输出上限；客户端 temperature=0 不是有效贪心的证明。
+
+数据集 `schema_version=2` 或 runtime 清单为 v2 时，报告都应用新数据的隐私规则，包括检索模式、未提供清单或仅提供 v1 清单的情况。报告保留实际 `evaluation_dataset_sha256`（兼容别名 `dataset_sha256`）、当前代码文件 SHA、提交/dirty 状态、推理/训练/模型/提示词身份。训练清单与 train.json 的 SHA 位于 runtime 清单，不能冒充本次评估数据 SHA。公开逐题结果过滤问题、参考答案、原文和模型输出，`generation_model` 只使用经 v2 清单校验的仓库名，缺少该身份时为 null，不发布原始服务端别名或本机路径；输出位于本仓库忽略的 `.local/` 时另写 `.private.json` 安全复核副本，包含实际请求/响应。实际旧数据集配合缺省/v1 清单的报告格式和 4B 身份入口继续兼容。评分仍只有既定来源/原文映射和字面覆盖含义，不自动升级为完整语义质量结论。
+
 重排配置为 `configs/rerank.yaml`：固定 `BAAI/bge-reranker-base` revision `2cfc18c9415c912f9d8155881c133215df768a70`，本地CrossEncoder、CPU、512-token上限；模型路径由 `.env` 的 `RERANKER_MODEL_PATH` 指定。真实重排权重由用户已授权的root准备。本地目录只读加载，不从请求下载或执行远程代码。评测先使用开发问题预热并单独记录预热耗时；报告逐题延时不包含模型加载/索引。内存列是整个进程峰值工作集，不能当成模型独占显存。
 
 服务重排默认每次最多2秒、单个后台worker；不可用、超时或已有工作未完成时回退到授权候选，诊断分别为unavailable/timeout/busy。线程中的计算不能硬取消，超时后继续到结束；不无限排队，后续调用回退。耗时和降级使方案不适合时保持关闭。

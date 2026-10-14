@@ -1,0 +1,52 @@
+# Preflight recipe: stop at 100, then resume to 200 without changing the schedule.
+# Freeze local model/data/output paths in the ignored operational recipe.
+# Formal max_steps and save/eval intervals are frozen after measured preflight.
+model_revision: b968826d9c46dd6066d109eabc6255188de91218
+trust_remote_code: false
+stage: sft
+do_train: true
+finetuning_type: lora
+lora_rank: 16
+lora_alpha: 32
+lora_target: all
+lora_dropout: 0
+quantization_method: bnb
+quantization_bit: 4
+quantization_type: nf4
+double_quantization: true
+bf16: true
+flash_attn: sdpa
+gradient_checkpointing: true
+disable_gradient_checkpointing: false
+template: qwen3_nothink
+dataset: teaching_train
+eval_dataset: teaching_validation
+cutoff_len: 2048
+packing: false
+train_on_prompt: false
+preprocessing_num_workers: 1
+dataloader_num_workers: 0
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 0.00005
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+optim: adamw_torch
+logging_steps: 1
+save_strategy: steps
+save_steps: 100
+eval_strategy: steps
+eval_steps: 100
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
+save_total_limit: 3
+save_only_model: false
+save_safetensors: true
+restore_callback_states_from_checkpoint: true
+# run_training must enforce the approved 0.001 minimum improvement threshold.
+early_stopping_steps: 3
+report_to: none
+seed: 42
+max_steps: 200

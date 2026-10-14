@@ -6,11 +6,13 @@ import asyncio
 import hashlib
 import importlib.metadata
 import json
+import math
 import platform
+import re
 import subprocess
 import sys
 import time
-from contextlib import contextmanager
+from contextlib import aclosing, contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -36,9 +38,17 @@ from app.modules.auth.schemas import Actor
 from app.modules.ingestion.models import Chunk, IngestionJob
 from app.modules.knowledge.models import FAQ, KnowledgeBase
 from app.modules.providers.config import ModelSettings
+from app.modules.providers.errors import ProviderError
 from app.modules.providers.factory import create_provider
 from app.modules.providers.schemas import LLMMessage
-from app.modules.rag.prompts import PROMPT_VERSION
+from app.modules.rag.citations import validate_selection
+from app.modules.rag.prompts import (
+    ANSWER_SYSTEM,
+    INPUT_BYTE_LIMIT,
+    PROMPT_VERSION,
+    REWRITE_SYSTEM,
+)
+from app.modules.rag.schemas import RAGError
 from app.modules.rag.service import RAGService
 from app.modules.retrieval.embedding import (
     MODEL_ID,
@@ -63,6 +73,130 @@ from app.modules.retrieval.service import RetrievalService
 
 def stable_id(label):
     return uuid5(NAMESPACE_URL, "campus-synthetic-v1/" + label)
+
+
+GENERAL_SYSTEM = "按用户要求完成任务，严格遵守要求的输出格式。"
+
+
+def strict_json(raw):
+    def object_hook(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON field")
+            result[key] = value
+        return result
+
+    def reject_constant(value):
+        raise ValueError("nonfinite JSON number")
+
+    def finite_float(value):
+        result = float(value)
+        if not math.isfinite(result):
+            raise ValueError("nonfinite JSON number")
+        return result
+
+    return json.loads(
+        raw, object_pairs_hook=object_hook, parse_constant=reject_constant, parse_float=finite_float
+    )
+
+
+def prompt_hashes():
+    return {
+        name: hashlib.sha256(text.encode("utf-8")).hexdigest()
+        for name, text in {
+            "answer": ANSWER_SYSTEM,
+            "rewrite": REWRITE_SYSTEM,
+            "general": GENERAL_SYSTEM,
+        }.items()
+    }
+
+
+def evaluation_code_hashes():
+    return {
+        filename: hashlib.sha256((ROOT / directory / filename).read_bytes()).hexdigest()
+        for directory, filename in (
+            ("experiments/evaluation", "run_eval.py"),
+            ("experiments/finetuning", "evaluate_model.py"),
+        )
+    }
+
+
+def safe_error(exc):
+    # Only known exception types provide public codes; arbitrary exception messages never do.
+    if isinstance(exc, (ProviderError, RAGError)) and re.fullmatch(r"[A-Z_]{1,64}", exc.code):
+        return exc.code
+    return "EVALUATION_PROVIDER_ERROR"
+
+
+class TracedProvider:
+    """Observe actual provider events; raw text stays in memory/private .local sidecars."""
+
+    def __init__(self, provider):
+        self.provider = provider
+        self.records = []
+
+    async def stream(self, messages, *, max_tokens, temperature):
+        started = time.perf_counter()
+        record = {
+            "stage": "answer"
+            if messages[0].content == ANSWER_SYSTEM
+            else "rewrite"
+            if messages[0].content == REWRITE_SYSTEM
+            else "general",
+            "input_bytes": sum(len(m.content.encode("utf-8")) for m in messages),
+            "max_output_tokens": max_tokens,
+            "request_temperature": temperature,
+            "finish_reason": None,
+            "usage": None,
+            "error": None,
+            "text": "",
+            "messages": [m.model_dump() for m in messages],
+        }
+        self.records.append(record)
+        try:
+            if record["input_bytes"] > INPUT_BYTE_LIMIT:
+                raise RAGError("INPUT_BYTE_LIMIT")
+            if not 1 <= max_tokens <= 512 or temperature != 0:
+                raise RAGError("GENERATION_CONFIG_INVALID")
+            async with aclosing(
+                self.provider.stream(messages, max_tokens=max_tokens, temperature=temperature)
+            ) as stream:
+                async for delta in stream:
+                    record["text"] += delta.text
+                    if len(record["text"]) > 8192:
+                        raise RAGError("RAG_INVALID_OUTPUT")
+                    if delta.finish_reason is not None:
+                        record["finish_reason"] = delta.finish_reason
+                    if delta.usage is not None:
+                        record["usage"] = delta.usage.model_dump()
+                    yield delta
+        except Exception as exc:  # noqa: BLE001 - safe code only, never exception text
+            record["error"] = safe_error(exc)
+            raise
+        finally:
+            record["latency_ms"] = (time.perf_counter() - started) * 1000
+
+
+def public_stage(record):
+    return {key: value for key, value in record.items() if key not in {"text", "messages"}}
+
+
+def answer_diagnosis(raw, hits):
+    try:
+        strict_json(raw)
+    except (ValueError, TypeError, RecursionError):
+        return "invalid_json"
+    try:
+        status, _, _ = validate_selection(raw, hits)
+        return "model_" + status
+    except RAGError:
+        return "invalid_citation"
+
+
+def load_evaluation_dataset(path=None):
+    path = Path(path) if path is not None else ROOT / "experiments/evaluation/dataset.json"
+    return path, load_dataset(path)
 
 
 @contextmanager
@@ -157,8 +291,12 @@ def build_index(factory, dataset, settings, embedder):
     return Actor(user_id=user_id, role="user"), kbs
 
 
-async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=None):
+async def evaluate_case(
+    case, actor, kb_ids, retriever, source_map, provider=None, *, private_records=None
+):
     started = time.perf_counter()
+    trace = TracedProvider(provider) if provider is not None else None
+    generation_hits = []
     row = {
         **case,
         "retrieved_sources": [],
@@ -190,7 +328,6 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
                 )
         row["retrieval_latency_ms"] = (time.perf_counter() - started) * 1000
         if provider is not None:
-            generation_hits = []
 
             async def traced_search(actor, scope, query, top_k=5):
                 result = await retriever.search_detailed(actor, scope, query, top_k)
@@ -204,7 +341,7 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
                 row["generation_rerank_status"] = result.rerank_status
                 return result.hits
 
-            rag = RAGService(traced_search, retriever.validate_hits, provider)
+            rag = RAGService(traced_search, retriever.validate_hits, trace)
             history = [LLMMessage(**message) for message in case["history"]]
             async for event in rag.stream_answer(actor, kb_ids, case["question"], history):
                 if event.type == "delta":
@@ -247,8 +384,50 @@ async def evaluate_case(case, actor, kb_ids, retriever, source_map, provider=Non
         row["error"] = getattr(exc, "code", type(exc).__name__)
         if provider is not None:
             row["answer_status"] = "error"
+    if trace is not None:
+        row["generation_stages"] = [public_stage(record) for record in trace.records]
+        answer_records = [record for record in trace.records if record["stage"] == "answer"]
+        if row["error"]:
+            row["generation_diagnosis"] = "provider_or_rag_error"
+        elif row["generation_query"] is not None and not generation_hits:
+            row["generation_diagnosis"] = "no_candidates"
+        elif answer_records:
+            answer_record = answer_records[-1]
+            evidence_count = len(strict_json(answer_record["messages"][1]["content"])["evidence"])
+            row["generation_diagnosis"] = answer_diagnosis(
+                answer_record["text"], generation_hits[:evidence_count]
+            )
+        else:
+            row["generation_diagnosis"] = "pre_generation_" + str(row["answer_status"])
+        if private_records is not None:
+            private_records.append({"id": case["id"], "stages": trace.records})
     row["latency_ms"] = (time.perf_counter() - started) * 1000
     return row
+
+
+def public_rag_row(row):
+    fields = {
+        "id",
+        "split",
+        "retrieved_sources",
+        "generation_diagnosis",
+        "generation_stages",
+        "answer_status",
+        "citation_sources",
+        "citation_mapped",
+        "usage",
+        "unauthorized_sources",
+        "rerank_status",
+        "generation_rerank_status",
+        "error",
+        "retrieval_latency_ms",
+        "latency_ms",
+        "answer_term_coverage",
+    }
+    result = {key: value for key, value in row.items() if key in fields}
+    if result.get("error") is not None and not re.fullmatch(r"[A-Z_]{1,64}", str(result["error"])):
+        result["error"] = "EVALUATION_PIPELINE_ERROR"
+    return result
 
 
 def stable_uuid(value):
@@ -257,7 +436,9 @@ def stable_uuid(value):
     return UUID(value)
 
 
-async def run_cases(dataset, split, factory, actor, kbs, retriever, provider):
+async def run_cases(
+    dataset, split, factory, actor, kbs, retriever, provider, *, private_records=None
+):
     source_map = {stable_id(source["id"]): source["id"] for source in dataset["sources"]}
     rows = []
     for case in dataset["cases"]:
@@ -269,6 +450,7 @@ async def run_cases(dataset, split, factory, actor, kbs, retriever, provider):
                 retriever,
                 source_map,
                 provider,
+                private_records=private_records,
             )
             rows.append(row)
             print(f"{case['id']}: {row['error'] or 'recorded'}", flush=True)
@@ -339,6 +521,10 @@ def select_generation_provider(settings, *, generate, local_openai=False):
 def load_runtime_manifest(path):
     raw = Path(path).read_bytes()
     value = json.loads(raw)
+    if value.get("schema_version") == 2 and type(value["schema_version"]) is int:
+        return _runtime_v2(strict_json(raw), raw)
+    if value.get("schema_version", 1) != 1:
+        raise ValueError("unsupported runtime manifest schema_version")
     if value.get("base_revision") != "cdbee75f17c01a7cc42f958dc650907174af0554":
         raise ValueError("runtime manifest requires the fixed Qwen base revision")
     if value.get("kind") not in {"base", "finetuned"}:
@@ -394,6 +580,119 @@ def load_runtime_manifest(path):
     }
 
 
+def _digest(value):
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _model_files(files):
+    required = {"config.json", "tokenizer.json", "tokenizer_config.json"}
+    allowed = required | {
+        "generation_config.json",
+        "tokenizer.model",
+        "special_tokens_map.json",
+        "added_tokens.json",
+        "vocab.json",
+        "merges.txt",
+        "model.safetensors",
+        "model.safetensors.index.json",
+    }
+    if not isinstance(files, dict) or not required <= files.keys():
+        raise ValueError("runtime requires actual model files")
+    shards = {}
+    totals = set()
+    for name, digest in files.items():
+        if not isinstance(name, str) or not _digest(digest):
+            raise ValueError("runtime model files require bare names and SHA256")
+        shard = re.fullmatch(r"model-(\d{5})-of-(\d{5})\.safetensors", name)
+        if shard:
+            index, total = map(int, shard.groups())
+            shards[index] = name
+            totals.add(total)
+        elif name not in allowed:
+            raise ValueError("runtime model files require known bare filenames")
+    if "model.safetensors" in files:
+        if shards or "model.safetensors.index.json" in files:
+            raise ValueError("runtime model files mix sharded and unsharded weights")
+    elif (
+        len(totals) != 1
+        or "model.safetensors.index.json" not in files
+        or set(shards) != set(range(1, next(iter(totals), 0) + 1))
+    ):
+        raise ValueError("runtime model files require complete weights and shard index")
+    return dict(files)
+
+
+def _runtime_v2(value, raw):
+    if value.get("base_repository") not in {"Qwen/Qwen3-8B", "Qwen/Qwen3-0.6B"}:
+        raise ValueError("runtime v2 requires an approved base_repository")
+    if not isinstance(value.get("base_revision"), str) or not re.fullmatch(
+        r"[0-9a-f]{40}", value["base_revision"]
+    ):
+        raise ValueError("runtime v2 requires an immutable base_revision")
+    if value.get("kind") not in {"base", "lora", "full"}:
+        raise ValueError("runtime v2 kind must be base, lora or full")
+    for field in ("inference_config_sha256", "training_manifest_sha256", "training_data_sha256"):
+        if not _digest(value.get(field)):
+            raise ValueError("runtime v2 requires valid inference/training identity hashes")
+    if value.get("prompt_sha256") != prompt_hashes():
+        raise ValueError("runtime v2 prompt hashes differ from frozen production/general prompts")
+    files = _model_files(value.get("files_sha256"))
+    adapters = value.get("adapter_files_sha256")
+    if value["kind"] == "lora":
+        if (
+            not isinstance(adapters, dict)
+            or set(adapters) != {"adapter_config.json", "adapter_model.safetensors"}
+            or not all(_digest(digest) for digest in adapters.values())
+        ):
+            raise ValueError("lora runtime requires actual adapter config/weight hashes")
+    elif adapters is not None:
+        raise ValueError("base/full runtime cannot include adapter hashes")
+    versions = value.get("runtime_versions")
+    if not isinstance(versions, dict):
+        raise ValueError("runtime_versions must be a package/version mapping")
+    versions = {
+        name: version
+        for name, version in versions.items()
+        if name
+        in {"torch", "transformers", "llamafactory", "bitsandbytes", "peft", "accelerate", "cuda"}
+        and isinstance(version, str)
+        and re.fullmatch(r"[0-9A-Za-z.+_-]{1,80}", version)
+    }
+    if not versions:
+        raise ValueError("runtime v2 requires actual runtime_versions")
+    evidence = value.get("generation_evidence")
+    if evidence is not None:
+        if (
+            not isinstance(evidence, dict)
+            or evidence.get("mode") != "GREEDY_SEARCH"
+            or evidence.get("do_sample") is not False
+            or not _digest(evidence.get("evidence_sha256"))
+        ):
+            raise ValueError("runtime greedy evidence requires actual mode and evidence hash")
+        evidence = {key: evidence[key] for key in ("mode", "do_sample", "evidence_sha256")}
+    return {
+        **{
+            key: value[key]
+            for key in (
+                "schema_version",
+                "base_repository",
+                "base_revision",
+                "kind",
+                "inference_config_sha256",
+                "training_manifest_sha256",
+                "training_data_sha256",
+                "prompt_sha256",
+            )
+        },
+        "files_sha256": files,
+        "adapter_files_sha256": adapters,
+        "runtime_versions": versions,
+        "generation_evidence": evidence,
+        "manifest_sha256": hashlib.sha256(raw).hexdigest(),
+        "identity_assurance": "caller-verified artifacts; not server authentication",
+    }
+
+
 def main():
     import yaml
 
@@ -407,12 +706,12 @@ def main():
         help="Opt in to the private experiment bridge on literal HTTP loopback",
     )
     parser.add_argument("--runtime-manifest", type=Path)
+    parser.add_argument("--dataset", type=Path, help="Explicit frozen evaluation dataset")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     config_bytes = args.config.read_bytes()
     config = yaml.safe_load(config_bytes)
-    dataset_path = ROOT / "experiments/evaluation/dataset.json"
-    dataset = load_dataset(dataset_path)
+    dataset_path, dataset = load_evaluation_dataset(args.dataset)
     model_settings = ModelSettings()
     provider = select_generation_provider(
         model_settings, generate=args.generate, local_openai=args.local_openai
@@ -423,6 +722,7 @@ def main():
         load_runtime_manifest(args.runtime_manifest) if args.runtime_manifest else None
     )
     settings = Settings()
+    private_records = []
     embedder = BGEEmbedder(settings.embedding_model_path)
     load_started = time.perf_counter()
     embedder.load()
@@ -456,7 +756,18 @@ def main():
                 # is separately covered by fallback tests. No final-test labels are consulted.
                 reranker.rank(warmup_case["retrieval_query"], warmup_hits)
             reranker_warmup_ms = (time.perf_counter() - warmup_started) * 1000
-        rows = asyncio.run(run_cases(dataset, args.split, factory, actor, kbs, retriever, provider))
+        rows = asyncio.run(
+            run_cases(
+                dataset,
+                args.split,
+                factory,
+                actor,
+                kbs,
+                retriever,
+                provider,
+                private_records=private_records,
+            )
+        )
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     dirty = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True))
     report = {
@@ -506,6 +817,47 @@ def main():
         "summary": summarize(rows, k=5),
         "rows": rows,
     }
+    runtime_v2 = (
+        runtime_manifest
+        if runtime_manifest and runtime_manifest.get("schema_version") == 2
+        else None
+    )
+    if dataset.get("schema_version") == 2 or runtime_v2 is not None:
+        report["metadata"]["generation_model"] = (
+            runtime_v2["base_repository"] if args.generate and runtime_v2 else None
+        )
+        report["metadata"]["config"] = {
+            key: config[key]
+            for key in ("mode", "threshold", "rerank", "rerank_timeout_seconds")
+            if key in config
+        }
+        report["metadata"].update(
+            {
+                "evaluation_dataset_sha256": hashlib.sha256(dataset_path.read_bytes()).hexdigest(),
+                "evaluation_path": "real_rag",
+                "evaluation_code_sha256": evaluation_code_hashes(),
+                "prompt_sha256": prompt_hashes(),
+                "effective_greedy": runtime_v2["generation_evidence"] if runtime_v2 else None,
+                "input_byte_limit": INPUT_BYTE_LIMIT,
+                "output_token_limit": 512,
+            }
+        )
+        report["summary"]["generation_diagnosis_counts"] = {
+            diagnosis: sum(row.get("generation_diagnosis") == diagnosis for row in rows)
+            for diagnosis in sorted(
+                {row["generation_diagnosis"] for row in rows if "generation_diagnosis" in row}
+            )
+        }
+        report["rows"] = [public_rag_row(row) for row in rows]
+        if args.output.resolve().is_relative_to((ROOT / ".local").resolve()):
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.with_suffix(".private.json").write_text(
+                json.dumps(
+                    {"rows": rows, "generation": private_records}, ensure_ascii=False, indent=2
+                )
+                + "\n",
+                encoding="utf-8",
+            )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
