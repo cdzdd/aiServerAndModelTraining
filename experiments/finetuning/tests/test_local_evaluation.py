@@ -127,3 +127,117 @@ def test_finetuned_identity_requires_both_config_and_actual_weight_hash(tmp_path
     )
     with pytest.raises(ValueError, match="adapter"):
         load_runtime_manifest(path)
+
+
+def runtime_v2(kind="base"):
+    import hashlib
+
+    from app.modules.rag.prompts import ANSWER_SYSTEM, REWRITE_SYSTEM
+
+    return {
+        "schema_version": 2,
+        "base_repository": "Qwen/Qwen3-8B",
+        "base_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "kind": kind,
+        "inference_config_sha256": "a" * 64,
+        "training_manifest_sha256": "b" * 64,
+        "training_data_sha256": "c" * 64,
+        "prompt_sha256": {
+            "answer": hashlib.sha256(ANSWER_SYSTEM.encode()).hexdigest(),
+            "rewrite": hashlib.sha256(REWRITE_SYSTEM.encode()).hexdigest(),
+            "general": "6ec8888abc33d084792f4a86c655ed0f51ca39dc8c78086348d401e1a444c6fe",
+        },
+        "files_sha256": dict.fromkeys(
+            ["config.json", "tokenizer.json", "tokenizer_config.json", "model.safetensors"],
+            "d" * 64,
+        ),
+        "adapter_files_sha256": None,
+        "runtime_versions": {"torch": "2.9.1+cu128"},
+        "generation_evidence": None,
+    }
+
+
+def write_runtime(tmp_path, value):
+    import json
+
+    path = tmp_path / "runtime.json"
+    path.write_text(json.dumps(value), encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("kind", ["base", "lora", "full"])
+def test_v2_requires_real_artifact_kind(tmp_path, kind):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2(kind)
+    if kind == "lora":
+        value["adapter_files_sha256"] = dict.fromkeys(
+            ["adapter_config.json", "adapter_model.safetensors"], "e" * 64
+        )
+    value["private_key"] = "do-not-publish"
+    value["model_path"] = "C:/private/model"
+    value["runtime_versions"]["private_path"] = "C:/private/model"
+    result = load_runtime_manifest(write_runtime(tmp_path, value))
+    assert result["kind"] == kind
+    assert result["training_data_sha256"] == "c" * 64
+    assert "private_key" not in result and "model_path" not in result
+    assert "private_path" not in result["runtime_versions"]
+
+
+@pytest.mark.parametrize(
+    "field,bad",
+    [
+        ("base_repository", "Qwen/Qwen3-4B"),
+        ("base_revision", "latest"),
+        ("training_data_sha256", None),
+        ("files_sha256", {"adapter_model.safetensors": "d" * 64}),
+        ("files_sha256", {"C:/model/config.json": "d" * 64}),
+        ("generation_evidence", {"mode": "GREEDY_SEARCH", "do_sample": False}),
+    ],
+)
+def test_v2_rejects_incomplete_or_unfixed_identity(tmp_path, field, bad):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2("full")
+    value[field] = bad
+    with pytest.raises(ValueError):
+        load_runtime_manifest(write_runtime(tmp_path, value))
+
+
+def test_v2_full_cannot_be_adapter_and_shards_must_be_complete(tmp_path):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2("full")
+    value["adapter_files_sha256"] = {"adapter_config.json": "a" * 64}
+    with pytest.raises(ValueError, match="adapter"):
+        load_runtime_manifest(write_runtime(tmp_path, value))
+    value["adapter_files_sha256"] = None
+    del value["files_sha256"]["model.safetensors"]
+    value["files_sha256"].update(
+        {
+            "model-00001-of-00002.safetensors": "a" * 64,
+            "model.safetensors.index.json": "a" * 64,
+        }
+    )
+    with pytest.raises(ValueError, match="files"):
+        load_runtime_manifest(write_runtime(tmp_path, value))
+    value["files_sha256"]["model-00002-of-00002.safetensors"] = "a" * 64
+    assert load_runtime_manifest(write_runtime(tmp_path, value))["kind"] == "full"
+
+
+def test_new_dataset_is_explicit_and_default_stays_legacy(tmp_path):
+    import json
+
+    from experiments.evaluation import run_eval
+
+    loader = getattr(run_eval, "load_evaluation_dataset", None)
+    assert callable(loader), "explicit evaluation dataset selection is missing"
+    path = tmp_path / "original.json"
+    path.write_text(
+        json.dumps({"synthetic": True, "version": "fixture", "sources": [], "cases": []}),
+        encoding="utf-8",
+    )
+    actual_path, dataset = loader(path)
+    assert actual_path == path and dataset["version"] == "fixture"
+    _, legacy = loader()
+    assert len(legacy["cases"]) == 60

@@ -152,3 +152,35 @@ for kind in ['base', 'finetuned']:
     (root/f'runtime-{kind}.json').write_text(json.dumps(record, indent=2)+'\n', encoding='utf-8')
 PY
 ```
+
+## 019版本化身份与独立评估
+
+019/020 使用显式 `schema_version=2` runtime JSON，旧 015 的缺省/v1 4B 清单保持原有格式。v2 清单必需记录：
+
+- `base_repository`：仅 `Qwen/Qwen3-8B` / `Qwen/Qwen3-0.6B`；`base_revision` 为原始基座的固定40位小写修订；`kind=base|lora|full`。
+- `files_sha256`：实际加载文件的裸文件名/SHA256映射，必含 config.json、tokenizer.json、tokenizer_config.json，以及 model.safetensors；分片权重改为完整 model-NNNNN-of-NNNNN.safetensors 集合及 model.safetensors.index.json，不能混用。base/lora记录实际基座文件；full记录实际完整微调制品。
+- `adapter_files_sha256`：base/full 为 null；lora 必须恰好包含实际 adapter_config.json 与 adapter_model.safetensors 的两个哈希，不能用 adapter 冒充完整模型。
+- `inference_config_sha256`、`training_manifest_sha256`、`training_data_sha256`：分别对实际推理 YAML、准备 manifest-v2.json、训练 train.json 的原始字节计算 SHA256。评估器自己计算本次评估文件的 `evaluation_dataset_sha256`，与训练身份分开。
+- `prompt_sha256={answer,rewrite,general}`：分别为生产 ANSWER_SYSTEM、REWRITE_SYSTEM 和固定普通指令 system 的 UTF-8 字节哈希，不加换行。general 固定为“按用户要求完成任务，严格遵守要求的输出格式。”，SHA 为 `6ec8888abc33d084792f4a86c655ed0f51ca39dc8c78086348d401e1a444c6fe`；入口拒绝不同提示词哈希。
+- `runtime_versions`：实际 torch/transformers/llamafactory/bitsandbytes/peft/accelerate/cuda 版本。未知字段、路径与密钥不会进入公开 runtime 元信息。
+- `generation_evidence`：未核验实际模式时为 null；核验后为 `{ "mode": "GREEDY_SEARCH", "do_sample": false, "evidence_sha256": "实际有效模式核验记录的64位SHA256" }`。必须先核验实际加载模型的有效模式；仅设置请求 temperature=0 不能填成已核验。清单是调用者制品旁证，HTTP 服务没有自动认证这些哈希。
+
+在已有私有 loopback API 和上述临时 ModelSettings 环境下，Windows worktree 根目录可执行：
+
+```powershell
+uv run --frozen --directory backend python ../experiments/finetuning/evaluate_model.py --mode grounded --dataset ../.local/finetuning-019/evaluation-v2.json --split dev --runtime-manifest ../.local/finetuning-019/runtime-base.json --output ../.local/finetuning-019/grounded-dev-base.json
+uv run --frozen --directory backend python ../experiments/finetuning/evaluate_model.py --mode general --dataset ../.local/finetuning-019/general-regression.json --split test --runtime-manifest ../.local/finetuning-019/runtime-base.json --output ../.local/finetuning-019/general-test-base.json
+```
+
+路径必须对应本轮实际冻结文件；例子不是训练/最终测试已执行的证据。grounded 分开调用生产给定证据回答与历史指代改写提示词，参考答案只用于评分。回答只含当前问题、独立查询和给定资料，历史助手答案不会进入证据；没有历史时改写不适用，不加入模型改写分母。真实检索/权限/RAG评估另走 `experiments/evaluation/run_eval.py --dataset PATH`，不能把给定证据的结果当成真实 RAG。
+
+general 使用 `schema_version=1, mode=general` 的冻结普通任务集，正式回归100题；输入只含固定普通 system 和该题 user_prompt，不发送 expected。算术仅按去首尾空白后的规范整数精确匹配，17.0、+17、解释文字都不计正确；指令按原样精确格式匹配；JSON拒绝重复字段、NaN/Infinity、Markdown包装，并对预定字段做类型严格的递归子集匹配，布尔值不等于整数，2.0不等于2。受控格式/算术评分不代表全部泛化或语义质量。
+
+两模式回答上限512 tokens，改写128，输入最多12,000个 UTF-8 内容字节；基座与微调组复用同一推理栈、模板、提示词、输出上限和实际核验的贪心模式。报告记录真实 finish_reason、usage、失败与各自评分分母；length/缺失终止/无效JSON等保留为失败，不改写成成功。无引用时 citation_mapping 为 null。公开输出只含评分与脱敏元信息，实际请求和模型输出仅在输出位于本仓库忽略 `.local/` 下时写入邻接 `.private.json`；保留在本机，不提交私钥、原始参考答案或模型输出。
+
+CPU行为验证不加载模型、不下载、不运行最终基准：
+
+```powershell
+uv run --frozen --directory backend pytest -c pyproject.toml ../experiments/finetuning/tests/test_local_evaluation.py ../experiments/finetuning/tests/test_model_evaluation.py ../experiments/evaluation/tests -q
+uv run --frozen --directory backend ruff check --config pyproject.toml ../experiments/evaluation/run_eval.py ../experiments/finetuning/evaluate_model.py ../experiments/finetuning/tests/test_local_evaluation.py ../experiments/finetuning/tests/test_model_evaluation.py
+```
