@@ -3,9 +3,9 @@ import hashlib
 import json
 
 import pytest
-from app.modules.rag.prompts import ANSWER_SYSTEM, PROMPT_VERSION
-
 from experiments.finetuning.validate_data import validate_manifest
+
+from app.modules.rag.prompts import ANSWER_SYSTEM, PROMPT_VERSION
 
 
 def fixture():

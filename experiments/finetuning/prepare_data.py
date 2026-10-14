@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "backend"))
 
-from app.modules.rag.prompts import ANSWER_SYSTEM, PROMPT_VERSION, REWRITE_SYSTEM
-
 from experiments.finetuning.validate_data import validate_corpus, validate_manifest
+
+from app.modules.rag.prompts import ANSWER_SYSTEM, PROMPT_VERSION, REWRITE_SYSTEM
 
 VALIDATION_TEXT = (
     "XB-65教学校报只接受校园活动报道，投稿须包含标题与作者署名，"
