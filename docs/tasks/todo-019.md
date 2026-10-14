@@ -46,7 +46,7 @@
 - [x] 在代码9a1e1d3运行统一检查并通过分项独立代码评审；两项 Windows 跳过行为在 WSL 补验。
 - [x] 独立从基座完成一轮有界正式训练，保存完整恢复 checkpoint 与分别标识的最佳/末轮 adapter。
 - [x] 完成同模型基座对照、遗忘回归、资源/预算/失败报告与本地使用教程，保留真实负结果与范围限制。
-- [ ] 完成最终运行/交付独立评审、功能 PR 与状态收尾 PR；实际合入权威 main 后才 done。
+- [x] 完成最终运行/交付独立评审、功能 PR 与状态收尾；本勾选和 done 状态在本状态 PR 实际合入权威 main 时生效。
 
 验收允许负结果与提前停止，但必须有真实参数更新、完整可恢复制品、有限 loss/张量、可加载模型及两条评测路径。若没有这些证据，不能仅以“运行了 24 小时”验收。
 
@@ -54,7 +54,7 @@
 
 详细步骤、文件、接口和验证命令见 [todo-019-plan](todo-019-plan.md)。实施前核实 RTX 5070 Ti / WSL2 / 现有 CUDA 12.8 环境仍可用及存储容量；不把 015 的短序列显存或耗时外推为 8B 保证。不默认购买资源、调用付费模型、切换网页 provider、删除旧训练制品、发布公网或启用 018。
 
-官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。以上保留原验收设计；本轮真实准备、预跑与已完成的正式训练见下方。功能尚未合入权威 main。
+官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。以上保留原验收设计；本轮真实训练、对照、评审与功能合入证据见下方。功能已通过PR36合入权威main；状态收尾按本PR实际合入生效。
 
 ## 2026-10-14 实施记录
 
