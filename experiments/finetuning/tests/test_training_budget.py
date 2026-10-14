@@ -152,7 +152,12 @@ def test_optimized_python_cannot_disable_ledger_validation(budget):
         "from experiments.finetuning.run_training import BudgetLedger\n"
         f"with BudgetLedger({str(budget)!r}, 'todo-019'): pass\n"
     )
-    result = subprocess.run([sys.executable, "-O", "-c", script], capture_output=True, text=True)
+    result = subprocess.run(
+        [sys.executable, "-O", "-c", script],
+        cwd=Path(__file__).resolve().parents[3],
+        capture_output=True,
+        text=True,
+    )
     assert result.returncode != 0
     assert "ledger" in result.stderr
 
@@ -680,7 +685,14 @@ def test_initialize_cli_never_loads_training_library(tmp_path):
     repo, path = fake_repository(tmp_path)
     assert (
         training.main(
-            ["--task-id", "todo-019", "--budget-file", str(path), "--initialize-budget"], repo=repo
+            [
+                "--task-id",
+                "todo-019",
+                "--budget-file",
+                str(path),
+                "--initialize-budget",
+            ],
+            repo=repo,
         )
         == 0
     )
@@ -734,6 +746,109 @@ def test_resource_samples_label_scope_and_do_not_invent_missing_gpu(monkeypatch)
     assert sample["process_scope"] == "training worker process RSS"
 
 
+def formal_early_stopping():
+    from transformers import EarlyStoppingCallback, TrainerControl, TrainerState
+
+    recipe = {
+        "early_stopping_steps": 3,
+        "restore_callback_states_from_checkpoint": True,
+    }
+    _, callbacks = training.factory_training_arguments(recipe, "formal", object())
+    callback = next(item for item in callbacks if isinstance(item, EarlyStoppingCallback))
+    args = SimpleNamespace(
+        metric_for_best_model="loss",
+        greater_is_better=False,
+        load_best_model_at_end=True,
+        eval_strategy="steps",
+    )
+    state, control = TrainerState(), TrainerControl()
+    callback.on_train_begin(args, state, control)
+    return callback, args, state, control
+
+
+def evaluate_loss(callback, args, state, control, loss):
+    callback.on_evaluate(args, state, control, metrics={"eval_loss": loss})
+    # Trainer updates best_metric after on_evaluate, even for small improvements.
+    state.best_metric = loss if state.best_metric is None else min(loss, state.best_metric)
+
+
+def test_formal_early_stop_counts_three_subthreshold_improvements():
+    callback, args, state, control = formal_early_stopping()
+    evaluate_loss(callback, args, state, control, 1.0)
+    assert callback.early_stopping_patience_counter == 0
+    assert not control.should_training_stop
+    for loss in (0.9996, 0.9992):
+        evaluate_loss(callback, args, state, control, loss)
+        assert not control.should_training_stop
+    evaluate_loss(callback, args, state, control, 0.9988)
+    assert control.should_training_stop
+
+
+def test_formal_early_stop_resets_after_above_threshold_improvement():
+    callback, args, state, control = formal_early_stopping()
+    for loss in (1.0, 0.9996, 0.9992):
+        evaluate_loss(callback, args, state, control, loss)
+    assert callback.early_stopping_patience_counter == 2
+    evaluate_loss(callback, args, state, control, 0.9972)  # 0.002 exceeds native threshold.
+    assert callback.early_stopping_patience_counter == 0
+    for loss in (0.9968, 0.9964):
+        evaluate_loss(callback, args, state, control, loss)
+        assert not control.should_training_stop
+    evaluate_loss(callback, args, state, control, 0.9960)
+    assert control.should_training_stop
+
+
+def test_formal_early_stop_exports_and_restores_patience():
+    from transformers import EarlyStoppingCallback
+
+    callback, args, state, control = formal_early_stopping()
+    for loss in (1.0, 0.9996, 0.9992):
+        evaluate_loss(callback, args, state, control, loss)
+    restored = EarlyStoppingCallback.from_state(callback.state())
+    evaluate_loss(restored, args, state, control, 0.9988)
+    assert restored.early_stopping_patience_counter == 3
+    assert control.should_training_stop
+
+
+def test_formal_early_stop_uses_native_strict_threshold_boundary():
+    callback, args, state, control = formal_early_stopping()
+    evaluate_loss(callback, args, state, control, 0.001)
+    evaluate_loss(callback, args, state, control, 0.0)
+    assert callback.early_stopping_patience_counter == 1
+    assert not control.should_training_stop
+
+
+def test_budget_reports_early_stopping_separately_from_planned_completion(tmp_path):
+    callback = training.TrainingCallback(
+        IDENTITY,
+        tmp_path / "status.json",
+        deadline=time.monotonic() + 2000,
+        max_steps=200,
+    )
+    callback.on_train_end(
+        None, SimpleNamespace(global_step=7), SimpleNamespace(should_training_stop=True)
+    )
+    assert callback.status["reason"] == "early_stopping"
+
+
+@pytest.mark.parametrize("phase", ["preflight", "formal"])
+def test_effective_factory_args_avoid_duplicate_and_preflight_early_stop(phase):
+    from transformers import EarlyStoppingCallback
+
+    recipe = {
+        "early_stopping_steps": 3,
+        "restore_callback_states_from_checkpoint": True,
+    }
+    budget_callback = object()
+    args, callbacks = training.factory_training_arguments(recipe, phase, budget_callback)
+    assert "early_stopping_steps" not in args  # Factory's native append guard now stays false.
+    assert recipe["early_stopping_steps"] == 3  # Frozen semantic recipe was not mutated.
+    assert args["restore_callback_states_from_checkpoint"] is True
+    assert budget_callback in callbacks
+    early_stop = [item for item in callbacks if isinstance(item, EarlyStoppingCallback)]
+    assert len(early_stop) == (1 if phase == "formal" else 0)
+
+
 def test_real_cpu_trainer_resume_preserves_schedule_optimizer_rng(tmp_path):
     pytest.importorskip(
         "accelerate", reason="Real Trainer integration uses the separate training venv"
@@ -745,7 +860,9 @@ from pathlib import Path
 import numpy as np
 import torch
 from transformers import Trainer, TrainerCallback, TrainingArguments, set_seed
-from experiments.finetuning.run_training import TrainingCallback, read_checkpoint
+from experiments.finetuning.run_training import (
+    TrainingCallback, factory_training_arguments, read_checkpoint,
+)
 torch.set_num_threads(1)
 root = Path(sys.argv[1])
 identity = {"task_id":"todo-019", "model_hash":"a"*64,
@@ -792,6 +909,38 @@ for key, value in whole.state_dict().items():
     torch.testing.assert_close(resumed.state_dict()[key], value, rtol=0, atol=0)
 assert second.lr_scheduler.state_dict() == full.lr_scheduler.state_dict()
 print("REAL_CPU_RESUME_OK")
+
+def early_run(name, stop=None, resume=None):
+    import time
+    set_seed(42)
+    args = TrainingArguments(output_dir=str(root/name), max_steps=20,
+        per_device_train_batch_size=2, learning_rate=0.0, eval_strategy="steps", eval_steps=1,
+        save_strategy="steps", save_steps=1, save_total_limit=3, report_to=[],
+        load_best_model_at_end=True, metric_for_best_model="loss", greater_is_better=False,
+        restore_callback_states_from_checkpoint=True, disable_tqdm=True, use_cpu=True,
+        logging_steps=20, seed=42, dataloader_pin_memory=False)
+    budget_callback = Callback(identity, root/(name+".json"),
+        deadline=time.monotonic()+3600, utc_deadline=time.time()+3600,
+        max_steps=20, stop_after_step=stop)
+    effective, callbacks = factory_training_arguments(
+        {"early_stopping_steps":3, "restore_callback_states_from_checkpoint":True},
+        "formal", budget_callback)
+    assert "early_stopping_steps" not in effective
+    trainer = Trainer(model=Model(),args=args,train_dataset=data,eval_dataset=data,
+                      callbacks=callbacks)
+    trainer.train(resume_from_checkpoint=resume)
+    return trainer, budget_callback
+
+paused, paused_callback = early_run("early-partial", stop=4)
+cp = root/"early-partial/checkpoint-4"
+saved = json.loads((cp/"trainer_state.json").read_text())["stateful_callbacks"]
+assert saved["EarlyStoppingCallback"]["attributes"]["early_stopping_patience_counter"] == 2
+assert paused_callback.status["reason"] == "planned_pause"
+restored, restored_callback = early_run("early-resumed", resume=str(cp))
+assert restored.state.global_step == 5  # One more non-improvement, not three new evaluations.
+assert restored_callback.status["reason"] == "early_stopping"
+assert read_checkpoint(root/"early-resumed/checkpoint-5", identity)["global_step"] == 5
+print("REAL_CPU_EARLY_STOP_RESUME_OK")
 """
     import os
 
@@ -805,3 +954,4 @@ print("REAL_CPU_RESUME_OK")
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "REAL_CPU_RESUME_OK" in result.stdout
+    assert "REAL_CPU_EARLY_STOP_RESUME_OK" in result.stdout

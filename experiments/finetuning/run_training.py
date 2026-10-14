@@ -634,7 +634,11 @@ class TrainingCallback:
         if self.hook is not None:
             self.hook.remove()
         if self.status["reason"] == "running":
-            self.status["reason"] = "completed"
+            self.status["reason"] = (
+                "early_stopping"
+                if control.should_training_stop and state.global_step < self.max_steps
+                else "completed"
+            )
         self.publish()
         return control
 
@@ -681,7 +685,10 @@ class TrainingCallback:
         directory = Path(args.output_dir) / f"checkpoint-{state.global_step}"
         started = self.save_started or time.monotonic()
         record = mark_checkpoint(
-            directory, self.identity, self.max_steps, save_seconds=time.monotonic() - started
+            directory,
+            self.identity,
+            self.max_steps,
+            save_seconds=time.monotonic() - started,
         )
         # Hashing is part of the complete save duration, and thus part of the future reserve.
         duration = time.monotonic() - started
@@ -784,6 +791,21 @@ def guard_parent(parent):
         raise ValueError("Training worker parent identity changed")
 
 
+def factory_training_arguments(recipe, phase, budget_callback):
+    effective_recipe = dict(recipe)
+    # Factory would otherwise append a second callback using its default threshold of zero.
+    effective_recipe.pop("early_stopping_steps", None)
+    callbacks = [budget_callback]
+    if phase == "formal":
+        from transformers import EarlyStoppingCallback
+
+        callbacks.insert(
+            0,
+            EarlyStoppingCallback(early_stopping_patience=3, early_stopping_threshold=0.001),
+        )
+    return effective_recipe, callbacks
+
+
 def worker_main(spec_path):
     spec = read_json(spec_path)
     guard_parent(spec["parent"])
@@ -832,7 +854,10 @@ def worker_main(spec_path):
     sampler = threading.Thread(target=sample_resources, daemon=True)
     sampler.start()
     try:
-        run_exp(spec["recipe"], callbacks=[callback])
+        effective_recipe, callbacks = factory_training_arguments(
+            spec["recipe"], spec["phase"], callback
+        )
+        run_exp(effective_recipe, callbacks=callbacks)
         checkpoint = callback.status["last_valid_checkpoint"]
         if checkpoint is None or checkpoint["global_step"] != callback.status["steps"]:
             raise ValueError("Training ended without a complete final checkpoint")
@@ -922,6 +947,7 @@ def main(argv=None, *, repo=None):
         spec_path = prefix.with_suffix(".worker.json")
         spec = {
             "identity": identity,
+            "phase": options.phase,
             "recipe": recipe,
             "parent": ledger.active["parent"],
             "budget_file": str(path),
@@ -940,7 +966,8 @@ def main(argv=None, *, repo=None):
                 if status.get("last_valid_checkpoint"):
                     ledger.record["last_valid_checkpoint"] = status["last_valid_checkpoint"]
                 ledger.record["slowest_save_seconds"] = max(
-                    ledger.record["slowest_save_seconds"], status.get("slowest_save_seconds", 0)
+                    ledger.record["slowest_save_seconds"],
+                    status.get("slowest_save_seconds", 0),
                 )
             ledger.heartbeat(on_exhausted=worker.expire)
 
@@ -976,7 +1003,11 @@ def main(argv=None, *, repo=None):
                     }
                 )
             )
-            return 0 if reason in {"completed", "planned_pause", "budget_reserve"} else 1
+            return (
+                0
+                if reason in {"completed", "early_stopping", "planned_pause", "budget_reserve"}
+                else 1
+            )
         except BaseException as error:
             if worker and worker.process.poll() is None:
                 worker.stop(worker.process)
