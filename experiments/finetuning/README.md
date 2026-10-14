@@ -2,7 +2,7 @@
 
 本任务完成一个小数据、可恢复的本地训练案例：Qwen3-4B-Instruct-2507 基座、BNB 4-bit NF4、LoRA rank 8，在 RTX 5070 Ti 16GB 上进行 2 step smoke、指定 checkpoint-2 恢复至 step 4，以及独立 20 step 正式训练。训练材料是原创虚构校园资料，仅用于练习 RAG 原文选择 JSON 的输出格式。效果判断以 [同栈对照报告](reports/comparison-2026-10-01.md) 为准；低训练 loss 不能代表真实业务能力。
 
-上述 4B 案例属于已完成的 015。019 的 8B 数据、累计预算工具及真实 100→200 step 恢复已完成验证；正式 375-step 训练正在进行，最终 adapter 使用与对照效果尚待验收。进展见 [todo-019](../../docs/tasks/todo-019.md) 和下方 019 教程。020 未开始。
+上述 4B 案例属于已完成的 015。019 已完成真实 100→200 step 恢复和独立 375-step 正式训练，保存有限完整状态与选出的最佳 adapter；实际 API 使用与对照效果尚待验收。见 [019 训练报告](reports/todo-019-training.md)、[任务记录](../../docs/tasks/todo-019.md) 和下方教程。020 未开始。
 
 - [实际训练、恢复与资源记录](reports/training-2026-10-01.md)
 - [完整制品与配置哈希](reports/training-artifacts-2026-10-01.json)
@@ -167,7 +167,9 @@ PY
 
 两个预跑尝试累计占用 1,905.2937805 秒，包括加载、三次 dev 验证、保存和退出；释放 GPU 后的暂停间隔未计时。实际每次执行 100 个更新，首段 train_runtime 718.8813 秒，不能把 Factory 以名义 200 步计算的 0.278 steps/s 当成实际吞吐。预跑采样整卡峰值 9,168 MiB，Torch 分配/保留峰值分别 7,935,535,104 / 8,550,088,704 字节；整卡包含桌面进程，10 秒采样不保证捕获瞬时峰值。
 
-正式配置已根据实测 7.242648 秒/更新冻结为 `max_steps=375`（2,000 行、有效 batch 16、每 epoch 125 步，最多 3 epochs），save/eval_steps=250（预计约 30.18 分钟）、warmup 12 步；保持 NF4/double quant/BF16、LoRA rank16/alpha32/all、SDPA、gradient checkpointing、micro1/accum16、seed42、LR5e-5。首次正式运行从原始基座和独立空目录开始，无预跑 adapter 或 resume。当前正式训练正在运行，尚无正式完成或最终效果结论。
+正式配置根据实测 7.242648 秒/更新冻结为 `max_steps=375`（2,000 行、有效 batch 16、每 epoch 125 步，3 epochs），save/eval_steps=250（预计约 30.18 分钟）、warmup 12 步；保持 NF4/double quant/BF16、LoRA rank16/alpha32/all、SDPA、gradient checkpointing、micro1/accum16、seed42、LR5e-5。实际从原始基座、独立空目录开始，无预跑 adapter 或 resume，已完成375步并正常退出。正式训练 forward 输入2,227,176/监督目标164,508tokens精确等于三遍CPU全行数据，累计三次尝试4,878.797805346716秒；GPU已在API启动前释放。
+
+完整checkpoint-375保存504个有限Adam状态step375、scheduler375/LR0、Python/NumPy/CPU/CUDA RNG和有限LoRA张量。唯一周期dev在250（loss0.01013548020273447），测试前冻结选择的根目录adapter与checkpoint-250的weights/config均字节相同；所选weights SHA256 `46b2b53189c21b7ae5df206ad4aaae45136ae07cb3df1c282a0c17f8e324498b`，last375 weights为`0be0eca7e70e96b9152bcecb8df14d709886ddbcea7425591f90d2cac1e79617`。保存的末步状态与供推理所选adapter分开；训练/dev loss不证明最终生成效果。
 
 ## 019：累计预算、停止与恢复
 
@@ -175,7 +177,7 @@ PY
 
 权威账本位于 Git common directory 的 `codex-coordination/training-budgets/todo-019.json`，CLI 会对照领取记录核验该路径。019 已初始化一次；恢复继续使用原账本，不再执行 `--initialize-budget`，不删除、重建账本或 `.initialized` 标记，不选择新路径或提高上限。原始模型、冻结数据、输出和 checkpoint 保留在 019 独立 worktree 的忽略 `.local/` 中；主工作区的 `.local/` 不含这些制品。
 
-以下在保留制品的 019 WSL worktree 根目录运行。先将 `TRAIN_PY` 指向已有训练环境的 Python，`BUDGET` 指向上述共享账本；只在本轮获得 GPU 串行时段时运行。现有预跑已完成，当前正式训练期间不要再次启动这些命令。新的首次预跑须使用独立空输出目录；CLI 会拒绝非空目录。
+以下在保留制品的 019 WSL worktree 根目录运行。先将 `TRAIN_PY` 指向已有训练环境的 Python，`BUDGET` 指向上述共享账本；只在本轮获得 GPU 串行时段时运行。现有预跑与正式训练已完成，这些是复现/恢复用法，不要在实验API占用GPU时重复启动。新的首次预跑须使用独立空输出目录；CLI 会拒绝非空目录。
 
 ```bash
 : "${TRAIN_PY:?先指定现有 WSL 训练环境 Python}"
@@ -202,7 +204,7 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1
 
 预算回调在优化步边界预留 `max(600 秒, 2 × 最慢完整保存计时)` 后停止保存；外部截止机制只结束本次拥有的训练子进程，未完成保存不能覆盖上一完整指针。checkpoint-200 的 92.074 秒计时包含之前的同步 dev 验证与保存，不是纯磁盘写入时间；checkpoint-100 暂停保存计时 3.954 秒。实际占用不裁剪成虚假的 24 小时以内结果。闭合且已释放 GPU 的暂停不计时；异常退出的未观测间隔，在确认原进程均已退出后保守计时。账本损坏、身份无法确认、换主机或 UTC 倒退时停止自动恢复并调查，不重置预算。
 
-正式训练配置原生 Transformers patience=3、`eval_loss` 越低越好，改善必须严格大于 0.001，恰好等于算未充分改善；callback state 随完整 checkpoint 恢复。375/250 的配置仅有一次周期 dev 选择机会，不能在上限前观察三次连续失败；CPU 测试验证了计数恢复，当前正式运行不能据此宣称实际触发了三次失败早停。
+正式训练配置原生 Transformers patience=3、`eval_loss` 越低越好，改善必须严格大于 0.001，恰好等于算未充分改善；callback state 随完整 checkpoint 恢复。375/250 的配置仅有一次周期 dev 选择机会，不能在上限前观察三次连续失败；CPU 测试验证了计数恢复，正式运行实际结束原因为completed，未触发三次失败早停。
 
 账本旁的 `todo-019-attempt-N.log`、`.worker.json`、`.status.json`、`.resources.jsonl` 保留真实身份、退出原因与资源记录。input/target tokens 来自训练 forward 的非 padding 输入与 `labels != -100`，token/s 的计时包含回调阶段验证/保存开销；Torch 进程分配峰值与整卡 MiB 分开记录，缺失数据为 null。制品和原始请求/答案/输出/密钥保留忽略目录，不提交 Git。
 
@@ -218,7 +220,7 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1
 - `runtime_versions`：实际 torch/transformers/llamafactory/bitsandbytes/peft/accelerate/cuda 版本。未知字段、路径与密钥不会进入公开 runtime 元信息。
 - `generation_evidence`：未核验实际模式时为 null；核验后为 `{ "mode": "GREEDY_SEARCH", "do_sample": false, "evidence_sha256": "实际有效模式核验记录的64位SHA256" }`。必须先核验实际加载模型的有效模式；仅设置请求 temperature=0 不能填成已核验。清单是调用者制品旁证，HTTP 服务没有自动认证这些哈希。
 
-最终训练制品、API 配置/模型别名/私钥文件与实际 GREEDY_SEARCH 证明仍待完成；目前 11439 API 未启动，以下不是已执行的评测。准备完成后，在 019 Windows worktree 根目录的新终端设置操作方给出的实际 `TODO019_KEY_FILE`、`TODO019_MODEL_ID`、`TODO019_RUNTIME_MANIFEST`（文件用绝对路径），再设置本终端的 ModelSettings；不要修改业务 `.env`，不要把私钥直接放入命令或输出。
+训练制品身份已核验；11439基座API实际加载/贪心准备/鉴权中性调用已获分项批准，LoRA同样的运行证明与两组完整评测仍待验收，以下不是已执行的完整评测。准备完成后，在 019 Windows worktree 根目录的新终端设置操作方给出的实际 `TODO019_KEY_FILE`、`TODO019_MODEL_ID`、`TODO019_RUNTIME_MANIFEST`（文件用绝对路径），再设置本终端的 ModelSettings；不要修改业务 `.env`，不要把私钥直接放入命令或输出。
 
 ```powershell
 if (-not $env:TODO019_MODEL_ID -or -not $env:TODO019_KEY_FILE -or -not $env:TODO019_RUNTIME_MANIFEST) { throw '先填写操作方核验的实际模型别名、私钥文件与 v2 runtime 清单路径' }

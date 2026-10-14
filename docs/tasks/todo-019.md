@@ -44,7 +44,7 @@
 - [x] 完成独立代理数据 QA、实际 Factory 模板长度与 train/dev 全行 CPU 标签/padding 审计。
 - [x] 冻结新数据/许可/模型文件，完成真实 100–200 steps 预跑和实际恢复。
 - [x] 在代码9a1e1d3运行统一检查并通过分项独立代码评审；两项 Windows 跳过行为在 WSL 补验。
-- [ ] 独立从基座完成一轮有界正式训练，保存可恢复 checkpoint、最佳/末轮 adapter。
+- [x] 独立从基座完成一轮有界正式训练，保存完整恢复 checkpoint 与分别标识的最佳/末轮 adapter。
 - [ ] 完成同模型基座对照、遗忘回归、资源/预算/失败报告与本地使用教程。
 - [ ] 完成最终运行/交付独立评审、功能 PR 与状态收尾 PR；实际合入权威 main 后才 done。
 
@@ -54,7 +54,7 @@
 
 详细步骤、文件、接口和验证命令见 [todo-019-plan](todo-019-plan.md)。实施前核实 RTX 5070 Ti / WSL2 / 现有 CUDA 12.8 环境仍可用及存储容量；不把 015 的短序列显存或耗时外推为 8B 保证。不默认购买资源、调用付费模型、切换网页 provider、删除旧训练制品、发布公网或启用 018。
 
-官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。以上保留原验收设计；本轮真实准备、预跑及正在进行的正式训练见下方。功能尚未合入权威 main。
+官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。以上保留原验收设计；本轮真实准备、预跑与已完成的正式训练见下方。功能尚未合入权威 main。
 
 ## 2026-10-14 实施记录
 
@@ -82,9 +82,11 @@
 - 预跑最终训练loss0.0014，周期dev eval_loss0.004522998817265034；仅说明这批教学材料上的训练/验证。训练forward合计1,187,026非padding输入/87,793监督targettokens。首段100实际更新train_runtime718.8813秒；原生打印0.278steps/s以名义200为分子，不用于正式吞吐估算。正式折算采用7.242648秒/更新。CP100保存计时3.954秒，CP200计时92.074秒含同步dev验证+保存，不能称92秒纯写盘。
 - 10秒采样整卡最大9,168MiB，Torch allocated/reserved峰值7,935,535,104/8,550,088,704字节；整卡包含其他进程，采样不保证连续峰值。预跑未观察OOM或非有限故障，仍不据此宣称最终效果提高。
 
-### 正式训练正在运行；交付仍待完成
+### 正式训练已完成；加载与对照交付仍待完成
 
-- 经独立制品/冻结评审批准后，正式配置 SHA256 `82cc53eb038d75292c37ad2197f26d0a06a96abab753412c80b183494937a516` 已冻结并实际启动。固定max_steps375=3epochs×125，save/eval250约30.18分钟、warmup12，原始基座/独立空正式输出、首次无resume/预跑adapter；沿用同一86,400秒累计账本，预跑占用不退款。
-- 原生early-stop patience3/改善严格大于0.001/callback state恢复已实现并CPU验证；375/250仅能有一次周期dev选择，不能在上限前观察三次失败，因此不宣称实际三次失败早停已触发。正式末步完整恢复checkpoint、最佳/最终/实际服务adapter须分开验收，当前尚未完成。
+- 经独立制品/冻结评审批准后，正式配置 SHA256 `82cc53eb038d75292c37ad2197f26d0a06a96abab753412c80b183494937a516` 已实际运行至375步/epoch3.0并exit0。固定save/eval250约30.18分钟、warmup12，原始基座/独立空正式输出、首次无resume/预跑adapter；沿用同一86,400秒累计账本，正式2,973.50402484605秒+两次pilot1,905.293780500666秒=4,878.797805346716秒，剩余81,521.20219465328秒，三次attempt均闭合、无OOM/非有限故障。正式退出后实际所属进程均退出、GPU721MiB/util0，再启动基座API。
+- 实际GPU125步输入742392/监督target54836精确等于CPU审计的2000行一遍；375步2,227,176/164,508精确等于三遍。末步checkpoint375完整文件/身份/哈希验收通过，Adam504项均step375且有限、scheduler375/LR0、四类RNG、504有限LoRA张量43,646,976元素/all252B非零；正式mean train_loss0.08791322911312939，显示舍入0.0000不当作严格零loss或生成效果。
+- 周期dev仅250一次，loss0.01013548020273447，测试前冻结所选rootadapter weights/config与best250字节完全相同（weights `46b2b53189c21b7ae5df206ad4aaae45136ae07cb3df1c282a0c17f8e324498b` / config `43292c5dc94801f6606732bc8513045cf0fb5f9a3bf377b6725cf0ac1828a027`）；末步375完整恢复weights `0be0eca7e70e96b9152bcecb8df14d709886ddbcea7425591f90d2cac1e79617` 另存。实际保留完整250/375（recent2包含best）及根目录所选adapter，不虚构第三个不同checkpoint；实际API加载制品仍须核验。
+- 原生early-stop patience3/改善严格大于0.001/callback state恢复已实现并CPU验证；375/250仅能有一次周期dev选择，不能在上限前观察三次失败，实际结束completed/counter0，未触发三次失败早停。正式250计时88.346秒是验证+save复合；375末步save3.957秒。训练/source/环境/预算/资源/恢复完整记录见 [训练报告](../../experiments/finetuning/reports/todo-019-training.md)；正式终态独立制品复核已获批准，最终交付评审仍待完成。
 - 最终私有loopback API11439加载调用、实际GREEDY_SEARCH、同栈基座/adapter对照和普通任务退化评测待运行。计划14项/3,520次题目评估，不是实际结果：每模型给定证据800题（回答800/适用改写640）、新真实RAG800题、旧013回归60题、普通100题。全部真实RAG使用既有baseline vector/threshold0.65/topk5/不重排，配置SHA256 `b386a617d19ad1166455c46149dbf18bfcecb0fe92f66cb12fa939c4f6685a2b`；保留实际查询/候选差异、失败和负结果，精确参考匹配不当作语义正确性。
-- [PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36) 已创建并附到当前任务，仍为Draft；云端CI未运行，沿用本地验收+GitHub PR模式。权威main仍为adc0d408，尚未合并，任务保持in_progress。最终训练/对照/制品报告、本机可执行使用指南、最终独立评审与main合并/状态收尾均待完成。020未领取或执行，016本地停止边界、业务provider及018保持原约定。
+- [PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36) 已创建并附到当前任务，仍为Draft；云端CI未运行，沿用本地验收+GitHub PR模式。权威main仍为adc0d408，尚未合并，任务保持in_progress。纯文档提交 `f7f8d512c841fd0682626c0b514ba5822b6ef636` 未改变GPU启动源码9a1e1d3/runner13605adf/config82cc53。基座API实际身份/greedy准备/鉴权中性调用已获独立分项批准；LoRA运行证明与14项对照结果、最终制品清单、本机可执行使用指南、最终独立评审与main合并/状态收尾仍待完成。最终评测commit/working_tree_dirty如实保留，不因仅文档变化伪写干净或重复推理。020未领取或执行，016本地停止边界、业务provider及018保持原约定。
