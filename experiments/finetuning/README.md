@@ -2,7 +2,7 @@
 
 本任务完成一个小数据、可恢复的本地训练案例：Qwen3-4B-Instruct-2507 基座、BNB 4-bit NF4、LoRA rank 8，在 RTX 5070 Ti 16GB 上进行 2 step smoke、指定 checkpoint-2 恢复至 step 4，以及独立 20 step 正式训练。训练材料是原创虚构校园资料，仅用于练习 RAG 原文选择 JSON 的输出格式。效果判断以 [同栈对照报告](reports/comparison-2026-10-01.md) 为准；低训练 loss 不能代表真实业务能力。
 
-上述 4B 案例属于已完成的 015。019 已完成真实 100→200 step 恢复和独立 375-step 正式训练，保存有限完整状态与选出的最佳 adapter；实际 API 使用与对照效果尚待验收。见 [019 训练报告](reports/todo-019-training.md)、[任务记录](../../docs/tasks/todo-019.md) 和下方教程。020 未开始。
+上述4B案例属于已完成的015。019已完成真实100→200恢复、独立375-step正式训练、实际所选adapter加载与完整14项同栈对照；给定证据格式明显改善，真实RAG与普通指令仍有错误，任务正等待最终分支评审/合并。见 [019训练报告](reports/todo-019-training.md)、[对照结果](reports/todo-019-comparison.md)、[完整制品清单](reports/todo-019-artifacts.json) 与 [任务记录](../../docs/tasks/todo-019.md)。020保持pending未开始。
 
 - [实际训练、恢复与资源记录](reports/training-2026-10-01.md)
 - [完整制品与配置哈希](reports/training-artifacts-2026-10-01.json)
@@ -13,9 +13,9 @@
 
 ## 当前机器的位置
 
-独立训练环境：WSL Ubuntu 的 `/home/cdzdongdongcheng/.local/share/qa-training/venv`。实际验证版本为 Python 3.12.3、PyTorch 2.9.1+cu128、CUDA runtime 12.8、bitsandbytes 0.50.2、LLaMAFactory 0.9.5、Transformers 4.57.6、PEFT 0.18.1、Accelerate 1.11.0。FastAPI 0.142.2/uvicorn 0.54.0 仅服务实验 API；业务后端保持自己的 CPU 环境和锁文件。
+独立训练环境是WSL Ubuntu中的专用Python虚拟环境，实际路径只记录在本机忽略指南中。实际验证版本为Python3.12.3、PyTorch2.9.1+cu128、CUDA runtime12.8、bitsandbytes0.50.2、LLaMAFactory0.9.5、Transformers4.57.6、PEFT0.18.1、Accelerate1.11.0。FastAPI0.142.2/uvicorn0.54.0仅服务实验API；业务后端保持自己的CPU环境和锁文件。
 
-模型位于 `C:\Users\Administrator\.codex\worktrees\todo-014-ollama\aiSoftwareAttempt\.local\models\qwen3-4b-instruct-2507`，训练数据、生成配置和制品位于 `C:\Users\Administrator\.codex\worktrees\todo-015-qlora\aiSoftwareAttempt\.local\finetuning`。WSL 对应路径从 `/mnt/c/Users/...` 开始。模型缓存只读共享，训练输出、测试数据库和服务端口由 015 独立管理。
+4B原始缓存位于保留的014 worktree下 `.local/models/qwen3-4b-instruct-2507`；015数据、配置、制品位于其独立worktree的 `.local/finetuning/`。下面015命令在保留的015目录运行，019使用后文自己的目录；不要在main工作区用同名相对路径寻找权重。模型缓存只读共享，训练输出、测试数据库和服务端口分别管理。
 
 基座为 `Qwen/Qwen3-4B-Instruct-2507`，固定修订 `cdbee75f17c01a7cc42f958dc650907174af0554`，Apache-2.0 许可；三个原始 safetensors 分片共 8,044,982,000 字节。完整本机文件身份和许可见制品清单。Adapter 依赖这个原始基座和兼容的 PEFT/BNB 环境；当前交付格式为 safetensors adapter。
 
@@ -26,10 +26,12 @@
 以下操作在 WSL、该任务 worktree 根目录运行。当前机器已经安装好环境和模型。另机复现需要单独建立 Python 3.12 训练环境，按上面的精确版本安装 PyTorch CUDA 12.8 与训练库，下载固定修订的原始模型并核验制品清单；业务环境不安装训练依赖。
 
 ```bash
-source /home/cdzdongdongcheng/.local/share/qa-training/venv/bin/activate
-cd /mnt/c/Users/Administrator/.codex/worktrees/todo-015-qlora/aiSoftwareAttempt
+: "${TRAIN_VENV:?指定现有WSL训练虚拟环境绝对路径}"
+: "${TODO015_WORKTREE:?指定保留015 worktree的WSL绝对路径}"
+: "${MODEL_DIR:?指定已核验的原始4B模型缓存绝对路径}"
+source "$TRAIN_VENV/bin/activate"
+cd "$TODO015_WORKTREE"
 export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 WANDB_DISABLED=true
-MODEL_DIR=/mnt/c/Users/Administrator/.codex/worktrees/todo-014-ollama/aiSoftwareAttempt/.local/models/qwen3-4b-instruct-2507
 python experiments/finetuning/prepare_data.py --model-path "$MODEL_DIR" --runtime-root "$PWD/.local/finetuning"
 python experiments/finetuning/validate_data.py --manifest .local/finetuning/manifest.json
 ```
@@ -220,7 +222,9 @@ export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1
 - `runtime_versions`：实际 torch/transformers/llamafactory/bitsandbytes/peft/accelerate/cuda 版本。未知字段、路径与密钥不会进入公开 runtime 元信息。
 - `generation_evidence`：未核验实际模式时为 null；核验后为 `{ "mode": "GREEDY_SEARCH", "do_sample": false, "evidence_sha256": "实际有效模式核验记录的64位SHA256" }`。必须先核验实际加载模型的有效模式；仅设置请求 temperature=0 不能填成已核验。清单是调用者制品旁证，HTTP 服务没有自动认证这些哈希。
 
-训练制品身份已核验；11439基座API实际加载/贪心准备/鉴权中性调用已获分项批准，LoRA同样的运行证明与两组完整评测仍待验收，以下不是已执行的完整评测。准备完成后，在 019 Windows worktree 根目录的新终端设置操作方给出的实际 `TODO019_KEY_FILE`、`TODO019_MODEL_ID`、`TODO019_RUNTIME_MANIFEST`（文件用绝对路径），再设置本终端的 ModelSettings；不要修改业务 `.env`，不要把私钥直接放入命令或输出。
+两组实际加载、原生贪心与鉴权中性调用已获分项批准。完整14项已执行，历史结果保留；以下命令用于以后显式重放，不用于替换本次结果。当前操作方已完成两组API的拥有身份停止/释放边界；未来使用前协调GPU/端口。保留019 worktree中的忽略 `.local/finetuning-019/LOCAL-USAGE.md` 提供本机实际路径、相同native启动环境与见证helper命令；先完成历史证据归档，避免手动helper覆盖current-proof文件。公开文档使用相对位置/环境变量，不发布机器路径或密钥。
+
+在019 Windows worktree的新终端设置本机指南中实际 `TODO019_KEY_FILE`、`TODO019_MODEL_ID`、`TODO019_RUNTIME_MANIFEST`（文件用绝对路径），再设置本终端ModelSettings；不要修改业务 `.env`或显示私钥。private API绑定literal127.0.0.1:11439，alias为qwen3-8b-todo019-base/lora；LoRA使用formal-output所选best250，完整恢复checkpoint375另留。
 
 ```powershell
 if (-not $env:TODO019_MODEL_ID -or -not $env:TODO019_KEY_FILE -or -not $env:TODO019_RUNTIME_MANIFEST) { throw '先填写操作方核验的实际模型别名、私钥文件与 v2 runtime 清单路径' }
@@ -236,13 +240,15 @@ uv run --frozen --directory backend python ../experiments/finetuning/evaluate_mo
 uv run --frozen --directory backend python ../experiments/finetuning/evaluate_model.py --mode general --dataset ../.local/corpus-019/projection-preview-v2-r2/general-regression.json --split test --runtime-manifest $env:TODO019_RUNTIME_MANIFEST --output ../.local/finetuning-019/replay-general-test.json
 ```
 
-路径必须对应本轮实际冻结文件；例子不是训练/最终测试已执行的证据。grounded 分开调用生产给定证据回答与历史指代改写提示词，参考答案只用于评分。回答只含当前问题、独立查询和给定资料，历史助手答案不会进入证据；没有历史时改写不适用，不加入模型改写分母。真实检索/权限/RAG评估另走 `experiments/evaluation/run_eval.py --dataset PATH`，不能把给定证据的结果当成真实 RAG。
+路径必须对应实际冻结文件；重放输出不覆盖原始14项报告或评测元信息。grounded分开调用生产给定证据回答与历史指代改写提示词，参考答案只用于评分。回答只含当前问题、独立查询和给定资料，历史助手答案不进入证据；没有history改写不适用，不加入分母。真实检索/权限/RAG另走 `experiments/evaluation/run_eval.py --dataset PATH`，给定证据结果不能当成真实RAG。
 
 general 使用 `schema_version=1, mode=general` 的冻结普通任务集，正式回归100题；输入只含固定普通 system 和该题 user_prompt，不发送 expected。算术仅按去首尾空白后的规范整数精确匹配，17.0、+17、解释文字都不计正确；指令按原样精确格式匹配；JSON拒绝重复字段、NaN/Infinity、Markdown包装，并对预定字段做类型严格的递归子集匹配，布尔值不等于整数，2.0不等于2。受控格式/算术评分不代表全部泛化或语义质量。
 
 两模式回答上限512 tokens，改写128，输入最多12,000个 UTF-8 内容字节；真实生产 RAG 有改写时回答上限384，否则512，整体期限60秒，客户端120秒读取超时不会取消该期限。基座与微调组在各路径内复用同一推理栈、模板、提示词、上限和实际核验的贪心模式。报告记录真实 finish_reason、usage、失败与各自评分分母；length/缺失终止/无效JSON等保留为失败，不改写成成功。无引用时 citation_mapping 为 null。公开输出只含评分与脱敏元信息，实际请求和模型输出仅在输出位于本仓库忽略 `.local/` 下时写入邻接 `.private.json`；保留在本机，不提交私钥、原始参考答案或模型输出。
 
-计划完整对照每个模型各运行 7 项：给定证据 dev300/test500、真实 RAG dev300/test500、旧013 dev18/test42、普通任务100，共 14 项/3,520 次题目评估，当前尚未执行。给定证据每个模型有800个回答评分、640个适用历史改写评分；真实 RAG 可在意图/澄清/无候选阶段停止，题数不等于 API 调用数。真实 RAG 固定现有 [baseline.yaml](../evaluation/configs/baseline.yaml) 的 vector/threshold0.65/top-k5/不重排，SHA256 `b386a617d19ad1166455c46149dbf18bfcecb0fe92f66cb12fa939c4f6685a2b`；相同配置不保证两组模型生成相同改写查询或候选。精确参考匹配不等于语义正确性，实际错误、无检索候选、拒答及普通任务退化都必须保留。完成本终端工作后关闭它，避免实验变量影响普通检查。
+完整每组七项（given-evidence dev300/test500、新RAG dev300/test500、旧013 dev18/test42、普通100）共3,520题次/5,199真实API阶段，不是独立原始问题数。LoRA给定证据799/800回答与478/640改写参考匹配；162个改写仅query文本不同、flags正确，语义等价未评。新RAG状态760/800包含守卫/回退，仍有11false answers、29invalid选择回退和109wrong-reference accepted引用；mapping1.0为accepted-span条件指标。普通47/100（算术17/40、指令0/30、typed JSONsubset30/30），含两道实际算术错误，base floor0不能推出无遗忘。全部真实负结果与非零exit保留。
+
+真实RAG固定 [baseline.yaml](../evaluation/configs/baseline.yaml) vector/threshold0.65/top-k5/不重排，SHA256 `b386a617d19ad1166455c46149dbf18bfcecb0fe92f66cb12fa939c4f6685a2b`；初始诊断retrieval与模型改写后的生成检索分开，相同配置不保证实际query/candidates相同。所有14历史metadata保留d69d5b065844995faf28fa33642b066bd5145a53/dirtyfalse，最终dochead不替换它。两组所属API已退出，LoRA历史释放记录11439无监听/Windows绑定成功/GPU已用719MiB，未来启动先核对实际资源。原证明快照 `.local/finetuning-019/delivery-evidence-20261014T181337Z/` 已完成133复制文件及3份索引/清单/receipt的SHA绑定与独立操作制品审查；不是硬件WORM或自包含模型/benchmark raw备份，权重/keys/benchmark private reports仍在原忽略位置。未来helper会改写当前证明，本机指南说明如何保留快照并使用原nativeenv手动启动。云端CI未运行、PR/main未合并不称done。
 
 真实 RAG 的新报告隐私规则由数据集 v2 或 runtime v2 触发，检索模式及未提供/v1清单也不发布新数据标签。新报告中的模型名称仅来自已验证的 `base_repository`，没有 v2 身份时为空；原始 ModelSettings 模型别名可以是本地路径，不放入新公开报告。实际旧数据集配合缺省/v1运行清单的兼容报告保持原有行为。
 

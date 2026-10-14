@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-019 |
-| 状态 | in_progress |
+| 状态 | in_review |
 | depends_on | todo-013、todo-014、todo-015 |
 | 优先级 | P2：本机训练实践，不阻塞网站发布 |
 | 负责目录 | `experiments/finetuning/`、必要的 `experiments/evaluation/` 扩展 |
@@ -45,7 +45,7 @@
 - [x] 冻结新数据/许可/模型文件，完成真实 100–200 steps 预跑和实际恢复。
 - [x] 在代码9a1e1d3运行统一检查并通过分项独立代码评审；两项 Windows 跳过行为在 WSL 补验。
 - [x] 独立从基座完成一轮有界正式训练，保存完整恢复 checkpoint 与分别标识的最佳/末轮 adapter。
-- [ ] 完成同模型基座对照、遗忘回归、资源/预算/失败报告与本地使用教程。
+- [x] 完成同模型基座对照、遗忘回归、资源/预算/失败报告与本地使用教程，保留真实负结果与范围限制。
 - [ ] 完成最终运行/交付独立评审、功能 PR 与状态收尾 PR；实际合入权威 main 后才 done。
 
 验收允许负结果与提前停止，但必须有真实参数更新、完整可恢复制品、有限 loss/张量、可加载模型及两条评测路径。若没有这些证据，不能仅以“运行了 24 小时”验收。
@@ -82,11 +82,14 @@
 - 预跑最终训练loss0.0014，周期dev eval_loss0.004522998817265034；仅说明这批教学材料上的训练/验证。训练forward合计1,187,026非padding输入/87,793监督targettokens。首段100实际更新train_runtime718.8813秒；原生打印0.278steps/s以名义200为分子，不用于正式吞吐估算。正式折算采用7.242648秒/更新。CP100保存计时3.954秒，CP200计时92.074秒含同步dev验证+保存，不能称92秒纯写盘。
 - 10秒采样整卡最大9,168MiB，Torch allocated/reserved峰值7,935,535,104/8,550,088,704字节；整卡包含其他进程，采样不保证连续峰值。预跑未观察OOM或非有限故障，仍不据此宣称最终效果提高。
 
-### 正式训练已完成；加载与对照交付仍待完成
+### 正式训练、实际推理与完整对照已完成；最终评审/合并待完成
 
 - 经独立制品/冻结评审批准后，正式配置 SHA256 `82cc53eb038d75292c37ad2197f26d0a06a96abab753412c80b183494937a516` 已实际运行至375步/epoch3.0并exit0。固定save/eval250约30.18分钟、warmup12，原始基座/独立空正式输出、首次无resume/预跑adapter；沿用同一86,400秒累计账本，正式2,973.50402484605秒+两次pilot1,905.293780500666秒=4,878.797805346716秒，剩余81,521.20219465328秒，三次attempt均闭合、无OOM/非有限故障。正式退出后实际所属进程均退出、GPU721MiB/util0，再启动基座API。
 - 实际GPU125步输入742392/监督target54836精确等于CPU审计的2000行一遍；375步2,227,176/164,508精确等于三遍。末步checkpoint375完整文件/身份/哈希验收通过，Adam504项均step375且有限、scheduler375/LR0、四类RNG、504有限LoRA张量43,646,976元素/all252B非零；正式mean train_loss0.08791322911312939，显示舍入0.0000不当作严格零loss或生成效果。
-- 周期dev仅250一次，loss0.01013548020273447，测试前冻结所选rootadapter weights/config与best250字节完全相同（weights `46b2b53189c21b7ae5df206ad4aaae45136ae07cb3df1c282a0c17f8e324498b` / config `43292c5dc94801f6606732bc8513045cf0fb5f9a3bf377b6725cf0ac1828a027`）；末步375完整恢复weights `0be0eca7e70e96b9152bcecb8df14d709886ddbcea7425591f90d2cac1e79617` 另存。实际保留完整250/375（recent2包含best）及根目录所选adapter，不虚构第三个不同checkpoint；实际API加载制品仍须核验。
+- 周期dev仅250一次，loss0.01013548020273447，测试前冻结所选rootadapter weights/config与best250字节完全相同（weights `46b2b53189c21b7ae5df206ad4aaae45136ae07cb3df1c282a0c17f8e324498b` / config `43292c5dc94801f6606732bc8513045cf0fb5f9a3bf377b6725cf0ac1828a027`）；末步375完整恢复weights `0be0eca7e70e96b9152bcecb8df14d709886ddbcea7425591f90d2cac1e79617` 另存。实际保留完整250/375（recent2包含best）及根目录所选adapter，不虚构第三个不同checkpoint；后续实际API载入的504张量已逐项核验。
 - 原生early-stop patience3/改善严格大于0.001/callback state恢复已实现并CPU验证；375/250仅能有一次周期dev选择，不能在上限前观察三次失败，实际结束completed/counter0，未触发三次失败早停。正式250计时88.346秒是验证+save复合；375末步save3.957秒。训练/source/环境/预算/资源/恢复完整记录见 [训练报告](../../experiments/finetuning/reports/todo-019-training.md)；正式终态独立制品复核已获批准，最终交付评审仍待完成。
-- 最终私有loopback API11439加载调用、实际GREEDY_SEARCH、同栈基座/adapter对照和普通任务退化评测待运行。计划14项/3,520次题目评估，不是实际结果：每模型给定证据800题（回答800/适用改写640）、新真实RAG800题、旧013回归60题、普通100题。全部真实RAG使用既有baseline vector/threshold0.65/topk5/不重排，配置SHA256 `b386a617d19ad1166455c46149dbf18bfcecb0fe92f66cb12fa939c4f6685a2b`；保留实际查询/候选差异、失败和负结果，精确参考匹配不当作语义正确性。
-- [PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36) 已创建并附到当前任务，仍为Draft；云端CI未运行，沿用本地验收+GitHub PR模式。权威main仍为adc0d408，尚未合并，任务保持in_progress。纯文档提交 `f7f8d512c841fd0682626c0b514ba5822b6ef636` 未改变GPU启动源码9a1e1d3/runner13605adf/config82cc53。基座API实际身份/greedy准备/鉴权中性调用已获独立分项批准；LoRA运行证明与14项对照结果、最终制品清单、本机可执行使用指南、最终独立评审与main合并/状态收尾仍待完成。最终评测commit/working_tree_dirty如实保留，不因仅文档变化伪写干净或重复推理。020未领取或执行，016本地停止边界、业务provider及018保持原约定。
+- 两组实际loopback11439加载/nativeGREEDY_SEARCH/鉴权调用与14项完整评测已完成并获独立fidelity/公平比较分项批准，共3,520题次/5,199native API阶段（非独立原始问题）。LoRA所选250实际504个FP32张量精确等于保存值。基座7项全exit1；LoRA逐项0,1,0,0,0,0,1；两wrapper1，真实错误/负结果保留。测试前冻结baseline SHA `b386a617d19ad1166455c46149dbf18bfcecb0fe92f66cb12fa939c4f6685a2b`，无prompt/template/limits/data/retrieval/weights retune或补跑。
+- LoRA given-evidence回答799/800、改写478/640、160N/A；162改写差异仅query文本，flags正确、语义等价未评。保留单个validJSON/in-range index3但quote无任何证据支持的INVALID_CITATION，mapping1.0仅639accepted。新RAG状态760/800含守卫/回退，不是语义正确率；11falseanswers、29handledinvalid引用/false-refusals、480/589reference-correct和109wrong-reference accepted引用全部保留。旧60=25modelanswers+15正确noCandidate guards+20false-refusals；普通47/100=17/40arith、0/30instruction、30/30typedJSONsubset，23arith失败含21格式+2错误bare整数；base floor0不证明无遗忘。见 [完整对照](../../experiments/finetuning/reports/todo-019-comparison.md) 与 [制品清单](../../experiments/finetuning/reports/todo-019-artifacts.json)。
+- 实际9a源码统一检查内的完整专项命令为backend cwd `uv run --frozen pytest -c pyproject.toml ../experiments/finetuning/tests -q`（scripts/dev.mjs:53）；日志55–57行165pass/2Windows skip/13.45s，另有既有WSL补验。未重复literal standalone python-m命令或伪称新dochead跑过codecheck。所有14历史metadata d69d5b065844995faf28fa33642b066bd5145a53/working_tree_dirty=false原样保留。
+- 两组拥有API均核对身份后SIGTERM、实际session exit15；LoRA最后释放证明所属进程退出、WSL11439无listener、Windows bind成功、GPU16303/719/15277MiB/util1%/38°C。忽略本机指南 `.local/finetuning-019/LOCAL-USAGE.md` 已包含实际nativeenv/helper/私钥FILE路径与真实中性调用、正常停止/完整恢复/预算注意事项。快照 `.local/finetuning-019/delivery-evidence-20261014T181337Z/` 已逐字节核验133份复制文件，另有3份summary/manifest/receipt，共136只读标记；manifest SHA `4a1114f5e5eda84a93ad3330f6d6d1ffdd5045a91184a60b933e6a2c5f7b4c22`、receipt SHA `deaa8cc850e5d18390c4894c271ecef6c79733c50f205847331a64223dc62941`，最终操作制品独立审查Approved。普通只读+SHA不是WORM；权重/私钥未复制，原始私有问答仍在原忽略位置。首次错误源路径造成的partial archive无complete receipt，不当成完成。
+- [PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36) 已附到本任务，仍为Draft；root最新核实权威main仍adc0d408，功能/状态均未合并，任务`in_review`。全分支最终评审、功能PR与状态收尾仍待完成；云端CI未运行。后续文档提交不改变GPU source9a/runner13605/config82cc53，也不改历史评测metadata。020保持pending未执行，016本地停止边界、业务provider及018保持原约定。

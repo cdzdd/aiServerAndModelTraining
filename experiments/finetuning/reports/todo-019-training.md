@@ -2,7 +2,7 @@
 
 2026-10-14 完成真实 100→200 step 预跑恢复，以及另从原始基座开始的 375-step、3-epoch 正式训练。三次训练尝试均正常退出，累计占用 **4,878.797805346716 秒（约 81.31 分钟）**，未观察到 OOM 或非有限张量故障。上限是累计 86,400 秒，未要求耗满。正式训练的末步完整恢复点是 checkpoint-375；按唯一一次周期 dev 检查选出的 adapter 是 checkpoint-250，输出根目录 adapter 与其字节完全相同。
 
-本文件验收训练、恢复、计时与制品身份，不用训练 loss 宣称生成效果改善。正式终态制品已获独立分项批准；基座API身份、实际贪心准备与鉴权中性调用也另获分项批准，不是质量结论。LoRA实际加载/调用、两组完整给定证据/真实RAG对照及普通任务退化仍待后续证据。任务保持 `in_progress`，功能尚未合入权威 main。
+本文件验收训练、恢复、计时与制品身份，不用训练loss宣称生成效果改善。正式制品、两组实际载入/贪心/鉴权与全部14项对照已获独立分项fidelity批准，包含真实负结果；效果与分母见 [对照报告](todo-019-comparison.md)，身份与SHA见 [制品清单](todo-019-artifacts.json)。任务保持 `in_review`，全分支最终评审与功能/状态合入权威main尚待完成。
 
 ## 源码、模型与环境
 
@@ -21,7 +21,7 @@
 
 实际环境为 WSL2 Linux 6.6.87.2、Python 3.12.3、PyTorch 2.9.1+cu128 / CUDA runtime 12.8、Transformers 4.57.6、LLaMAFactory 0.9.5、bitsandbytes 0.50.2、PEFT 0.18.1、Accelerate 1.11.0、datasets 4.0.0。GPU 为 RTX 5070 Ti，整卡总量 16,303 MiB。沿用已安装训练环境，业务后端使用自己的冻结 CPU 依赖；本轮未升级共享依赖。
 
-源码 SHA、原始基座修订、全部文件身份、语义 recipe 与具体 YAML 的 SHA 分开保存。调用者提供的推理清单只能作制品旁证，不能证明 HTTP 服务自动认证这些哈希；基座已核验的有效模式与尚待核验的LoRA模式分别留证，不把一组证明当成另一组或全部评测调用的逐token证明。
+源码SHA、原始基座修订、全部文件身份、语义recipe与具体YAML的SHA分开保存。两组分别核验实际载入、原生16/128/384/512有效GREEDY_SEARCH与真实鉴权调用；LoRA504个实际FP32张量逐项等于best250根目录。调用者清单是实际制品旁证，不是HTTP服务自动认证或每个benchmark token的hook，不把一组证明替代另一组。
 
 ## 数据规模、审核与实际 token
 
@@ -144,9 +144,15 @@ Torch是训练进程分配器峰值；nvidia-smi是整卡采样，包含桌面/�
 
 ## 已核验代码与保留的限制
 
-`node scripts/dev.mjs check` 在9a1e1d3实际exit0：8Node、741后端、9评测、165微调+2Windows跳过、114Vitest、23Playwright，Ruff/迁移/构建通过。两项跳过行为在现有WSL CPU环境单独实测：真实Trainer100→200与原生early-stop counter恢复、Linux父进程死亡守卫。统一检查不隐式启动GPU或最终评测。Task1数据/代码、Task2预算修复、early-stop/config、Task3隐私修复、实际pilot连续性和正式终态制品均获独立分项评审批准；LoRA最终加载/完整对照及全任务最终评审仍待完成。专项独立命令与最终流程证据按 [任务记录](../../../docs/tasks/todo-019.md) 收尾，不把本次纯文档静态核对说成重复业务测试。
+`node scripts/dev.mjs check` 在9a1e1d3实际exit0：8Node、741后端、9评测、165微调+2Windows跳过、114Vitest、23Playwright，Ruff/迁移/构建通过。脚本第53行在backend cwd实际执行 `uv run --frozen pytest -c pyproject.toml ../experiments/finetuning/tests -q`；日志55–57行记录165passed/2skipped/13.45秒，是完整专项套件，未另跑计划中的literal standalone python-m命令。两项跳过行为在既有WSL CPU环境单独实测：真实Trainer100→200/原生early-stop counter恢复、Linux父进程死亡守卫。后续仅文档变化，不冒称最终dochead重复运行codecheck。统一检查不隐式启动GPU或最终评测。
 
-训练结束后的基座API首次startup在忽略的witness中因错误的32层架构断言失败于endpoint绑定前；改为逐项核验原始config的8项实际架构后重试通过，原失败保留。此为推理阶段失败，不添加或隐藏为训练attempt；已批准的中性HTTP调用仅证明可达/真实生成，token上限结束不能当作benchmark正确。最终结果须保留实际评测时的代码commit与working_tree_dirty值；仅文档变化且运行源码SHA不变，不伪写成当时工作区干净或重做推理来改变元数据。
+数据/代码、预算修复、early-stop/config、评测隐私修复、真实pilot连续性/正式制品、两组实际推理与14项完整结果均有独立分项fidelity批准；不是模型普遍质量或全分支最终评审批准。实际历史评测元信息d69d5b065844995faf28fa33642b066bd5145a53/working_tree_dirty=false原样保留。最终文档只做格式/链接/事实/哈希/隐私静态核对，流程见 [任务记录](../../../docs/tasks/todo-019.md)。
+
+训练结束后的基座API首次startup在忽略witness中因错误32层架构断言失败于endpoint绑定前；改为核验原始config的8项实际架构后重试通过，失败保留。此为推理阶段失败，不新增训练attempt；中性HTTP调用只证明可达/真实生成，token上限结束不当作benchmark正确。基座/LoRA各七项wrapper都实际exit1，逐项真实exit与负结果见对照报告，不伪写成0。
+
+两组API完成评测后仅由拥有操作方核验进程身份/命令后请求SIGTERM，实际session均exit15；LoRA最后释放边界确认所属进程退出、WSL11439无listener、Windows bind成功，GPU16303/719/15277MiB、利用率1%、38°C，保持字面退出码与观察范围。首次小文件归档因helper错误指向不存在的evaluation/evaluate_model.py中止，未生成complete receipt，不当作已完成快照；正确执行源是finetuning/evaluate_model.py，另建归档未改变运行源码/权重/密钥/预算。
+
+完成快照位于 `.local/finetuning-019/delivery-evidence-20261014T181337Z/`：133份复制文件全部逐字节SHA核验，另有3份summary/manifest/receipt文件，共136个只读标记。manifest SHA `4a1114f5e5eda84a93ad3330f6d6d1ffdd5045a91184a60b933e6a2c5f7b4c22`，receipt SHA `deaa8cc850e5d18390c4894c271ecef6c79733c50f205847331a64223dc62941`，summary-index SHA `2b5413e7648f0171ad706057cbcb88baf095adfdf4aa6061245ef0fff218b88a`。最终操作制品/全部14报告绑定/终态/闭合账本已获独立批准；普通只读+SHA绑定不是硬件WORM。原始私有评测问答仍保留原忽略结果位置，模型权重和私钥内容未复制。summary index时间显示转UTC+8但instant相同，未改实际历史评测时间。本机指南位于 `.local/finetuning-019/LOCAL-USAGE.md`，使用真实保留路径与原nativeenv/helper；未来启动会覆盖当前证明，历史快照必须另存保留。
 
 保留已知基线Starlette/AnyIO弃用、Node FORCE_COLOR/DEP0190和构建体积提示，以及快速CPU fixture checkpoint的mtime数值排序回退警告（EVIDENCE-03/ESC-01，非训练故障）。此前冻结source-map-js1.2.1的high audit发现未由本任务改依赖解决。警告存在不伪写检查失败，也不声称无告警。
 
@@ -161,4 +167,4 @@ Torch是训练进程分配器峰值；nvidia-smi是整卡采样，包含桌面/�
 | 使用原生strict>0.001 / ExportableState | 相等边界算不改善，可能早一个验证间隔停止；报告实际语义 |
 | 保持3epochs/约30分钟目标，即375/250 | 仅一次周期dev选择，实际不能触发三次失败早停；保留last375和best250分开 |
 
-后续对照将分别报告给定证据、真实检索/权限/RAG、旧013回归及普通100题的实际分母、失败和负结果；精确参考匹配不等于语义正确，不承诺零幻觉或广泛泛化。020未领取/运行，不启用018或公开模型端口，不改变业务provider及016的本地停止边界。[PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36)仍按最终证据评审/合并；云端CI未运行，不冒称main已经合并或任务done。
+完整对照分别记录给定证据、真实检索/权限/RAG、旧013回归与普通100题的实际分母/失败/负结果；精确参考匹配不等于语义正确，普通基座floor0不证明无遗忘，不承诺零幻觉或广泛泛化。020保持pending未运行，不启用018或公开模型端口，不改变业务provider及016本地停止边界。[PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36)仍待全分支最终评审/合并；云端CI未运行，不冒称main已合并或任务done。
