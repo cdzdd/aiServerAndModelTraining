@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-019 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-013、todo-014、todo-015 |
 | 优先级 | P2：本机训练实践，不阻塞网站发布 |
 | 负责目录 | `experiments/finetuning/`、必要的 `experiments/evaluation/` 扩展 |
@@ -14,7 +14,7 @@
 
 2026-10-13 用户选择一次 LoRA 路线、一次全量微调实践，各最多 24 小时，合计最多 48 小时；数据准备、下载和训练结束后的最终离线评测另外计时。本任务承担第一轮 8B QLoRA，并建立供 020 复用的新数据与最小训练预算工具。
 
-本次只登记目标、编写计划并通过文档 PR 保存。未开始收集大数据、下载新模型、安装训练依赖或启动训练；实施需后续明确接手。既有 015 保持 done，不重开或改写历史结果。
+2026-10-13 已通过 PR35 保存计划；2026-10-14 用户明确接手并授权自主准备数据，现按计划实施。既有015保持done，020未领取；当前真实训练/模型状态以工作记录为准。
 
 ## 已确定的设计
 
@@ -53,3 +53,13 @@
 详细步骤、文件、接口和验证命令见 [todo-019-plan](todo-019-plan.md)。实施前核实 RTX 5070 Ti / WSL2 / 现有 CUDA 12.8 环境仍可用及存储容量；不把 015 的短序列显存或耗时外推为 8B 保证。不默认购买资源、调用付费模型、切换网页 provider、删除旧训练制品、发布公网或启用 018。
 
 官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。这里只记录计划，尚无新训练结果、模型修订或功能合并 SHA。
+
+## 2026-10-14 实施记录
+
+- 本轮原子领取owner5071ddae-5c88-425b-9e34-1cf51e26d54c，原生独立worktree todo-019-8b-qlora，分支 feat/todo-019-8b-qlora；基点adc0d408。
+- API/Web/DB/实验模型端口8149/5249/15479/11439，Compose qa-todo-019-5071dd；私有配置独立生成，未输出凭据。
+- WSL原训练环境与CUDA12.8实际可用，精确软件版本已记录；正在完成隔离基线与实现准备。尚未启动本轮模型训练，不把安装或准备写成训练成功。
+
+- 隔离基线 node scripts/dev.mjs check 实际退出0：8Node、741后端、9评测、46微调、114Vitest、23Playwright，Ruff/构建/迁移通过；日志.local/baseline-check.txt，对应原始代码adc0d408。
+- 原始 Qwen/Qwen3-8B 固定修订b968826d9c46dd6066d109eabc6255188de91218，Apache-2.0；14文件共16,397,459,696字节下载完成且逐文件SHA核验，清单.local/verified-base-8b.json。
+- 会话中途工作区写权限受限，原生目录和Git共享记录均拒写；2026-10-14恢复完整访问并验证两处实际可写，沿用原Task1/2代理继续，没有重跑安装/模型下载。当前未启动训练，预算未消耗。
