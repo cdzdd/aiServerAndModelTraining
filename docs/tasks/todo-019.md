@@ -37,14 +37,16 @@
 
 ## 实施与验收
 
-- [ ] 按 WORKFLOW 正式领取实施任务，在独立 worktree 核实依赖与 GPU 占用。
-- [ ] 以 TDD 扩展新数据/多证据/拒答/改写验证，同时保持 015 的默认 8+2 教程行为。
-- [ ] 实现最小累计预算 CLI、恢复身份检查与资源记录；不创建调度平台。
-- [ ] 扩展显式数据集与版本化 base/lora/full 身份评测；保留旧 4B v1 与 loopback 守卫。
-- [ ] 冻结新数据/许可/模型文件，完成真实 100–200 steps 预跑和实际恢复。
+- [x] 按 WORKFLOW 正式领取实施任务，在独立 worktree 核实依赖与 GPU 占用。
+- [x] 以 TDD 扩展新数据/多证据/拒答/改写验证，同时保持 015 的默认 8+2 教程行为。
+- [x] 实现最小累计预算 CLI、恢复身份检查与资源记录；不创建调度平台。
+- [x] 扩展显式数据集与版本化 base/lora/full 身份评测；保留旧 4B v1 与 loopback 守卫。
+- [x] 完成独立代理数据 QA、实际 Factory 模板长度与 train/dev 全行 CPU 标签/padding 审计。
+- [x] 冻结新数据/许可/模型文件，完成真实 100–200 steps 预跑和实际恢复。
+- [x] 在代码9a1e1d3运行统一检查并通过分项独立代码评审；两项 Windows 跳过行为在 WSL 补验。
 - [ ] 独立从基座完成一轮有界正式训练，保存可恢复 checkpoint、最佳/末轮 adapter。
 - [ ] 完成同模型基座对照、遗忘回归、资源/预算/失败报告与本地使用教程。
-- [ ] 运行统一检查、独立评审、功能 PR 与状态收尾 PR；实际合入权威 main 后才 done。
+- [ ] 完成最终运行/交付独立评审、功能 PR 与状态收尾 PR；实际合入权威 main 后才 done。
 
 验收允许负结果与提前停止，但必须有真实参数更新、完整可恢复制品、有限 loss/张量、可加载模型及两条评测路径。若没有这些证据，不能仅以“运行了 24 小时”验收。
 
@@ -52,14 +54,37 @@
 
 详细步骤、文件、接口和验证命令见 [todo-019-plan](todo-019-plan.md)。实施前核实 RTX 5070 Ti / WSL2 / 现有 CUDA 12.8 环境仍可用及存储容量；不把 015 的短序列显存或耗时外推为 8B 保证。不默认购买资源、调用付费模型、切换网页 provider、删除旧训练制品、发布公网或启用 018。
 
-官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。这里只记录计划，尚无新训练结果、模型修订或功能合并 SHA。
+官方依据：[模型卡](https://huggingface.co/Qwen/Qwen3-8B)、[LLaMAFactory 显存估算](https://github.com/hiyouga/LlamaFactory#hardware-requirement)。以上保留原验收设计；本轮真实准备、预跑及正在进行的正式训练见下方。功能尚未合入权威 main。
 
 ## 2026-10-14 实施记录
 
 - 本轮原子领取owner5071ddae-5c88-425b-9e34-1cf51e26d54c，原生独立worktree todo-019-8b-qlora，分支 feat/todo-019-8b-qlora；基点adc0d408。
 - API/Web/DB/实验模型端口8149/5249/15479/11439，Compose qa-todo-019-5071dd；私有配置独立生成，未输出凭据。
-- WSL原训练环境与CUDA12.8实际可用，精确软件版本已记录；正在完成隔离基线与实现准备。尚未启动本轮模型训练，不把安装或准备写成训练成功。
+- 接手准备阶段确认 WSL 原训练环境与 CUDA12.8 实际可用并记录精确版本；当时只做隔离基线与实现准备，未启动训练。后续真实训练另行记录。
 
 - 隔离基线 node scripts/dev.mjs check 实际退出0：8Node、741后端、9评测、46微调、114Vitest、23Playwright，Ruff/构建/迁移通过；日志.local/baseline-check.txt，对应原始代码adc0d408。
 - 原始 Qwen/Qwen3-8B 固定修订b968826d9c46dd6066d109eabc6255188de91218，Apache-2.0；14文件共16,397,459,696字节下载完成且逐文件SHA核验，清单.local/verified-base-8b.json。
-- 会话中途工作区写权限受限，原生目录和Git共享记录均拒写；2026-10-14恢复完整访问并验证两处实际可写，沿用原Task1/2代理继续，没有重跑安装/模型下载。当前未启动训练，预算未消耗。
+- 准备阶段曾出现工作区与 Git 共享目录拒写；2026-10-14 恢复完整访问并验证两处实际可写，沿用原 Task1/2 代理继续，没有重跑安装/模型下载；该故障恢复时尚未启动训练、预算未消耗。
+
+### 实现、数据与检查已完成
+
+- 新数据准备、v2 兼容校验、预算 CLI 和显式评测已按 TDD 实现并完成分项独立评审；预算截止/缓存身份与评测公开隐私问题在真实复现后修复并通过复审。现有015默认8+2教程和旧4B v1保持兼容，未改共享依赖。源码/统一检查提交为 `9a1e1d3a310c58a07aa03962af4d07cc1a07d8fb`，runner SHA256 `13605adff21880929bcf05e9a57abb2bc3fd9c06b298e624f6a49504973be4f3`。
+- 原创虚构材料 `synthetic=true/human_reviewed=false`。7,200候选题/14,400双任务候选投影筛选为1,800题：train1000/dev300/test500，对应正式train2000/dev600/test1000投影；新评测文件只含dev/test800题，普通回归100题另列。5,400原始来源归一后2,016种文本，有限family和复用措辞限制外推；不把14,400称为训练行数。
+- 独立代理完成36family阅读、全部1,800题结构/问题证据关系检查、普通100题复核、train五类各20题语义抽查。五项初始条件/动作问题在r2修正后复核通过；跨split重复/近重复与旧013的60题/20来源筛查无命中，不据此承诺语义绝无泄漏或真实业务质量。原始资料/参考答案保留忽略目录。
+- 冻结r2原始输入 SHA256 `c0eda2cfc12bcf8d4475370763fe64d7664f8b0ddf8575ec1cd7ffcb9af56cad`，manifest `d28984112c49aa6d0c0a8199ffedaf9e8711532929d26a582d82c7d06a321ac3`，train `5253f93cb564d169a233b668e25b9915065bca70629912c89651bbeee045c61c`，validation `618f4f6bf0a4de11ba8b0fa59cd0d4bcc5dd726265ff73f31bdb84fab17c42a0`。原始来源示例ID按各自身份评分，不用归一文本把不同来源等同。
+- 实际 Factory qwen3_nothink 模板审计3,700行，最大完整序列536tokens；CPU真实Factory数据处理/collator核查全部train/dev2600行，输入/目标无截断，源及padding标签屏蔽正确。train742392非padding/54836监督targettokens；cutoff保持2048。CPU审计不冒充GPU模型更新。
+- `node scripts/dev.mjs check` 在9a1e1d3实际退出0：8Node、741后端、9评测、165微调（另2项Windows跳过）、114Vitest、23Playwright，Ruff/迁移/构建通过；日志 `.local/integration-check-9a1e1d3.txt`。两项跳过行为另在既有WSL CPU环境验证：完整Trainer100→200恢复/原生early-stop counter恢复，以及Linux父进程退出守卫；非8B质量结果。保留基线Starlette/AnyIO、Node FORCE_COLOR/DEP0190/构建体积提示及CPU快速checkpoint mtime回退警告；此前锁定source-map-js1.2.1高风险audit发现仍未通过本任务改依赖解决，不能称无告警。
+
+### 真实8B预跑与恢复已通过
+
+- 同一固定200-step配方先暂停100再完整恢复到200，两次CLI实际退出0，暂停后所属进程均已退出并释放GPU；两次尝试累计1,905.293780500666秒，正式启动前剩余84,494.70621949933秒。账本位于Git common directory `codex-coordination/training-budgets/todo-019.json`，只初始化一次，未重置；加载、验证、保存和退出均计时，闭合暂停间隔不计。
+- 真正加载的基座8,190,735,360参数+LoRA43,646,976=8,234,382,336，NF4/double quant/BF16/rank16/alpha32/SDPA/GC/micro1accum16与冻结配置一致。checkpoint100/200完整哈希验证通过，504个Adam状态分别step100/200且有限，固定200cosine/warmup6的scheduler到200时LR为0，Python/NumPy/CPU/CUDA RNG均保存；实际恢复日志与已安装Trainer恢复路径共同证明完整状态继续。全部504个LoRA张量有限且100→200继续变化；独立运行制品评审批准预跑连续性，不声称与不间断训练逐bit等同或已证明API可加载。
+- 预跑最终训练loss0.0014，周期dev eval_loss0.004522998817265034；仅说明这批教学材料上的训练/验证。训练forward合计1,187,026非padding输入/87,793监督targettokens。首段100实际更新train_runtime718.8813秒；原生打印0.278steps/s以名义200为分子，不用于正式吞吐估算。正式折算采用7.242648秒/更新。CP100保存计时3.954秒，CP200计时92.074秒含同步dev验证+保存，不能称92秒纯写盘。
+- 10秒采样整卡最大9,168MiB，Torch allocated/reserved峰值7,935,535,104/8,550,088,704字节；整卡包含其他进程，采样不保证连续峰值。预跑未观察OOM或非有限故障，仍不据此宣称最终效果提高。
+
+### 正式训练正在运行；交付仍待完成
+
+- 经独立制品/冻结评审批准后，正式配置 SHA256 `82cc53eb038d75292c37ad2197f26d0a06a96abab753412c80b183494937a516` 已冻结并实际启动。固定max_steps375=3epochs×125，save/eval250约30.18分钟、warmup12，原始基座/独立空正式输出、首次无resume/预跑adapter；沿用同一86,400秒累计账本，预跑占用不退款。
+- 原生early-stop patience3/改善严格大于0.001/callback state恢复已实现并CPU验证；375/250仅能有一次周期dev选择，不能在上限前观察三次失败，因此不宣称实际三次失败早停已触发。正式末步完整恢复checkpoint、最佳/最终/实际服务adapter须分开验收，当前尚未完成。
+- 最终私有loopback API11439加载调用、实际GREEDY_SEARCH、同栈基座/adapter对照和普通任务退化评测待运行。计划14项/3,520次题目评估，不是实际结果：每模型给定证据800题（回答800/适用改写640）、新真实RAG800题、旧013回归60题、普通100题。全部真实RAG使用既有baseline vector/threshold0.65/topk5/不重排，配置SHA256 `b386a617d19ad1166455c46149dbf18bfcecb0fe92f66cb12fa939c4f6685a2b`；保留实际查询/候选差异、失败和负结果，精确参考匹配不当作语义正确性。
+- [PR36](https://github.com/cdzdd/aiServerAndModelTraining/pull/36) 已创建并附到当前任务，仍为Draft；云端CI未运行，沿用本地验收+GitHub PR模式。权威main仍为adc0d408，尚未合并，任务保持in_progress。最终训练/对照/制品报告、本机可执行使用指南、最终独立评审与main合并/状态收尾均待完成。020未领取或执行，016本地停止边界、业务provider及018保持原约定。
