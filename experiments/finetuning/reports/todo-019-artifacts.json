@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "status": "actual_training_and_all14_operational_artifacts_verified_task_in_review",
+  "snapshot_scope": "2026-10-14 UTC original delivery assembly snapshot (local date2026-10-15); review/task/merge fields describe that instant, not current status",
+  "status_authority": "../../../docs/tasks/todo-019.md",
   "task_id": "todo-019",
   "synthetic": true,
   "human_reviewed": false,
@@ -3054,6 +3056,8 @@
   },
   "private_usage_guide_position": ".local/finetuning-019/LOCAL-USAGE.md",
   "verification": {
+    "snapshot_scope": "2026-10-14 UTC original delivery assembly snapshot (local date2026-10-15); review/task/merge fields describe that instant, not current status",
+    "status_authority": "../../../docs/tasks/todo-019.md",
     "code_commit": "9a1e1d3a310c58a07aa03962af4d07cc1a07d8fb",
     "unified_command": "node scripts/dev.mjs check",
     "unified_exit_code": 0,
@@ -3129,7 +3133,7 @@
     "prior frozen source-map-js1.2.1 highaudit finding not fixed or introduced by todo019"
   ],
   "current_docs_head": "d69d5b065844995faf28fa33642b066bd5145a53",
-  "current_docs_head_scope": "historical evaluation metadata commit; final documentation assembly is uncommitted and does not rewrite original metadata",
+  "current_docs_head_scope": "historical evaluation metadata commit; at original assembly final documentation was uncommitted; later documentation commits do not rewrite original metadata",
   "datasets": {
     "raw_r2_sha256": "c0eda2cfc12bcf8d4475370763fe64d7664f8b0ddf8575ec1cd7ffcb9af56cad",
     "candidate_cases": 7200,
@@ -3880,6 +3884,8 @@
     ]
   },
   "delivery": {
+    "snapshot_scope": "2026-10-14 UTC original delivery assembly snapshot (local date2026-10-15); review/task/merge fields describe that instant, not current status",
+    "status_authority": "../../../docs/tasks/todo-019.md",
     "task_status": "in_review",
     "branch": "feat/todo-019-8b-qlora",
     "pull_request": "https://github.com/cdzdd/aiServerAndModelTraining/pull/36",
@@ -3895,11 +3901,11 @@
   "reports": [
     {
       "position": "experiments/finetuning/reports/todo-019-training.md",
-      "sha256": "ab36bed40098d519c4b48562e2db0124718b78ce68f4c80e1f7638e1cf75b8d0"
+      "sha256": "d8f2e7161bc2e80db873423dcc496515ac8e86666bb6f186ba1987fa7b891c18"
     },
     {
       "position": "experiments/finetuning/reports/todo-019-comparison.md",
-      "sha256": "6a55ba7284c4a9bae1d883ee818cd2c3b70302e15fdcafeff329d88b58b0fa8f"
+      "sha256": "596cf68b18346d32ff14c59a92bbfeea0f480847d3093e877458d0563404f773"
     }
   ]
 }

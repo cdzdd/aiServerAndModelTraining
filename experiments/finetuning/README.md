@@ -2,7 +2,7 @@
 
 本任务完成一个小数据、可恢复的本地训练案例：Qwen3-4B-Instruct-2507 基座、BNB 4-bit NF4、LoRA rank 8，在 RTX 5070 Ti 16GB 上进行 2 step smoke、指定 checkpoint-2 恢复至 step 4，以及独立 20 step 正式训练。训练材料是原创虚构校园资料，仅用于练习 RAG 原文选择 JSON 的输出格式。效果判断以 [同栈对照报告](reports/comparison-2026-10-01.md) 为准；低训练 loss 不能代表真实业务能力。
 
-上述4B案例属于已完成的015。019已完成真实100→200恢复、独立375-step正式训练、实际所选adapter加载与完整14项同栈对照；给定证据格式明显改善，真实RAG与普通指令仍有错误，任务正等待最终分支评审/合并。见 [019训练报告](reports/todo-019-training.md)、[对照结果](reports/todo-019-comparison.md)、[完整制品清单](reports/todo-019-artifacts.json) 与 [任务记录](../../docs/tasks/todo-019.md)。020保持pending未开始。
+上述4B案例属于已完成的015。019已完成真实100→200恢复、独立375-step正式训练、实际所选adapter加载与完整14项同栈对照；给定证据格式明显改善，真实RAG与普通指令仍有错误。在2026-10-14 UTC交付组装时点（本机日期15日），任务等待最终分支评审/合并，020保持pending未开始；实时状态以 [任务记录](../../docs/tasks/todo-019.md) 为准。见 [019训练报告](reports/todo-019-training.md)、[对照结果](reports/todo-019-comparison.md) 与 [完整制品清单](reports/todo-019-artifacts.json)。
 
 - [实际训练、恢复与资源记录](reports/training-2026-10-01.md)
 - [完整制品与配置哈希](reports/training-artifacts-2026-10-01.json)
