@@ -258,3 +258,36 @@ CPU行为验证不加载模型、不下载、不运行最终基准：
 uv run --frozen --directory backend pytest -c pyproject.toml ../experiments/finetuning/tests/test_local_evaluation.py ../experiments/finetuning/tests/test_model_evaluation.py ../experiments/evaluation/tests -q
 uv run --frozen --directory backend ruff check --config pyproject.toml ../experiments/evaluation/run_eval.py ../experiments/finetuning/evaluate_model.py ../experiments/finetuning/tests/test_local_evaluation.py ../experiments/finetuning/tests/test_model_evaluation.py
 ```
+
+## 020：0.6B 完整模型本地使用
+
+正式full已完成375 steps/3 epochs，best250与true last375分别保留完整模型，根输出回载best。BASE/BEST/LAST均已完整评估7组/1760题位并获独立结果完整性及记录中的自有服务停止核准；两个full实际BF16参数222个不同、88个相同，实际共3模型/21组/5280评估题位。当前集成状态见下方任务记录。
+
+训练/恢复依据见[020训练报告](reports/todo-020-training.md)，实际分母、失败及能力边界见[020对照报告](reports/todo-020-comparison.md)，文件身份见[020制品清单](reports/todo-020-artifacts.json)，当前合入状态见[任务记录](../../docs/tasks/todo-020.md)。BEST给定证据参考选择800/800、精确rewrite439/640，RAG参考引用dev92/170和test170/311、二元拒答263/300和453/500，LAST对应精确rewrite436/640、RAG参考引用91/169和170/309、二元拒答262/300和452/500；两者普通严格proxy均35/100。仍有误拒答、引用错误与legacy原生exit1。参考选择/quote映射/二元拒答不是自由回答整体准确率，也不能由BASE0分地板证明无遗忘。模型可能输出结构化选择，不能按通用聊天助手预期解释。
+
+使用保留制品的独立 worktree 与已有 WSL Factory Python 环境；业务后端 CPU 环境不加载训练模型。以制品清单核验 complete.json 及全部绑定文件，`model_name_or_path` 指向完整 `formal-output/checkpoint-250` 或 `checkpoint-375`；`finetuning_type=full`，不填 adapter 或量化。配置采用 huggingface/BF16/qwen3_nothink/SDPA/do_sample=false/max_new_tokens512/trust_remote_code=false。标准 API 对完整模型仅转换参数至 BF16，保留原生 FP32 buffer，并在加载后固定实际贪心默认值。
+
+本次评估自有服务已按记录停止并释放资源。以后手工使用时先协调GPU/11440时段，填写下列占位路径，在保留制品的 worktree 根目录以前台方式启动。此处只列标准 CLI；真实本机路径与稳定配置/标准库聊天客户端位于忽略的 `.local/finetuning-020/LOCAL-USAGE.md`。不依赖历史启动包装器或临时执行目录。
+
+```bash
+# 指向已安装的 Factory 环境 Python；下面三个文件均为本机私有路径。
+FACTORY_PY=/path/to/existing-factory-venv/bin/python
+FULL_CONFIG=.local/finetuning-020/inference-best.yaml
+PRIVATE_KEY_FILE=/path/to/existing-private-key-file
+export HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1
+"$FACTORY_PY" -m experiments.finetuning.local_api --config "$FULL_CONFIG" --key-file "$PRIVATE_KEY_FILE" --model-id qwen3-06b-best250-manual --port 11440
+```
+
+服务只绑定 `127.0.0.1:11440`，`/v1/chat/completions` 需要 Bearer 私钥，客户端从本地文件只读密钥且不打印或另存。请求 model 必须匹配启动别名，`stream=true`、`temperature=0`，整数 `max_tokens` 在 1–512 内；附带客户端默认128。消息总数最多8（含可选首条system），余下严格按 user/assistant 交替、以user开始和结束；全部非空内容合计最多12,000个UTF-8字节。接口单并发，返回生成完成后的 buffered SSE，解析 `delta.content` 至 `[DONE]`；不支持 `stream=false`，也不代表逐token输出。普通聊天不替代质量评估。
+
+客户端按私有指南安装后，在另一WSL终端重新设置同一Factory Python路径，再运行以下命令；脚本只在手工执行时读取已有key文件，默认best别名，确认服务ready后再运行：
+
+```bash
+FACTORY_PY=/path/to/existing-factory-venv/bin/python
+"$FACTORY_PY" .local/finetuning-020/chat-client.py
+```
+
+
+停止时在自己启动服务的终端按 Ctrl+C，确认自有进程退出后再切换模型。last 使用 `.local/finetuning-020/inference-last.yaml` 与 `qwen3-06b-last375-manual`，客户端别名同步修改。仅操作自己手工启动的服务，切换前等待自有终端退出。以上手工命令在文档整理中仅作静态核对，没有执行或生成新模型结果。
+
+pilot 的同一200步计划已完成100→200完整状态恢复；正式375也已结束，不提供重跑命令，不延长计划、修改max_steps、重置/替换累计账本或把剩余额度当成新训练授权。保留原有制品；本步骤不修改业务provider，也不启用公网部署。
