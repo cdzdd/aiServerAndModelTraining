@@ -707,6 +707,10 @@ class TrainingCallback:
 
 
 def validate_recipe(recipe):
+    if recipe.get("finetuning_type") == "full":
+        from experiments.finetuning.audit_full_model import validate_full_recipe
+
+        validate_full_recipe(recipe)
     if "tokenized_path" in recipe:
         raise ValueError("tokenized_path is unsupported; load the hashed raw train/dev files")
     if not isinstance(recipe.get("max_steps"), int) or recipe["max_steps"] <= 0:
@@ -796,6 +800,14 @@ def factory_training_arguments(recipe, phase, budget_callback):
     # Factory would otherwise append a second callback using its default threshold of zero.
     effective_recipe.pop("early_stopping_steps", None)
     callbacks = [budget_callback]
+    if recipe.get("finetuning_type") == "full":
+        from experiments.finetuning.audit_full_model import FullModelAuditCallback
+        from transformers import TrainerCallback
+
+        class FullAudit(FullModelAuditCallback, TrainerCallback):
+            pass
+
+        callbacks.append(FullAudit())
     if phase == "formal":
         from transformers import EarlyStoppingCallback
 

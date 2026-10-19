@@ -27,7 +27,16 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
-def prepare(output, *, model_path, runtime_root, root=ROOT, manifest_path=None, recipe_path=None):
+def prepare(
+    output,
+    *,
+    model_path,
+    runtime_root,
+    root=ROOT,
+    manifest_path=None,
+    recipe_path=None,
+    token_lengths=None,
+):
     if manifest_path is None and recipe_path is None:
         return _prepare_v1(output, model_path=model_path, runtime_root=runtime_root, root=root)
     if manifest_path is None or recipe_path is None:
@@ -38,10 +47,13 @@ def prepare(output, *, model_path, runtime_root, root=ROOT, manifest_path=None, 
         runtime_root=runtime_root,
         manifest_path=manifest_path,
         recipe_path=recipe_path,
+        token_lengths=token_lengths,
     )
 
 
-def _prepare_v2(output, *, model_path, runtime_root, manifest_path, recipe_path):
+def _prepare_v2(
+    output, *, model_path, runtime_root, manifest_path, recipe_path, token_lengths=None
+):
     output = Path(output)
     if output.exists() and any(output.iterdir()):
         raise ValueError("refusing to overwrite nonempty frozen output directory")
@@ -50,6 +62,11 @@ def _prepare_v2(output, *, model_path, runtime_root, manifest_path, recipe_path)
     recipe = yaml.safe_load(Path(recipe_path).read_text(encoding="utf-8-sig"))
     if not isinstance(recipe, dict) or not recipe.get("model_revision"):
         raise ValueError("explicit recipe with immutable model_revision required")
+    full = recipe.get("finetuning_type") == "full"
+    if full:
+        from experiments.finetuning.audit_full_model import validate_full_recipe
+
+        validate_full_recipe(recipe)
     sources = {source["id"]: source for source in corpus["sources"]}
     samples = []
     for case in corpus["cases"]:
@@ -100,6 +117,11 @@ def _prepare_v2(output, *, model_path, runtime_root, manifest_path, recipe_path)
                     ],
                 }
             )
+    token_audit = {"status": "pending_actual_frozen_tokenizer", "counts": None}
+    if full and token_lengths is not None:
+        from experiments.finetuning.audit_full_model import audit_full_token_lengths
+
+        token_audit = audit_full_token_lengths(samples, token_lengths, recipe["cutoff_len"])
     output.mkdir(parents=True, exist_ok=True)
     write_json(output / "manifest-v2.json", dict(corpus, samples=samples))
     for split, filename in (("train", "train.json"), ("dev", "validation.json")):
@@ -148,7 +170,8 @@ def _prepare_v2(output, *, model_path, runtime_root, manifest_path, recipe_path)
         dataset_dir=runtime_root,
         output_dir=runtime_root + "/train",
     )
-    (configs / "qlora-train.yaml").write_text(yaml.safe_dump(recipe), encoding="utf-8")
+    train_filename = "full-train.yaml" if full else "qlora-train.yaml"
+    (configs / train_filename).write_text(yaml.safe_dump(recipe), encoding="utf-8")
     infer = {
         key: recipe[key]
         for key in (
@@ -167,14 +190,17 @@ def _prepare_v2(output, *, model_path, runtime_root, manifest_path, recipe_path)
     infer.update(
         infer_backend="huggingface",
         infer_dtype="bfloat16",
-        finetuning_type="lora",
+        finetuning_type="full" if full else "lora",
         do_sample=False,
         max_new_tokens=512,
     )
     for name in ("base", "finetuned"):
         config = dict(infer)
         if name == "finetuned":
-            config["adapter_name_or_path"] = runtime_root + "/train"
+            if full:
+                config["model_name_or_path"] = runtime_root + "/train"
+            else:
+                config["adapter_name_or_path"] = runtime_root + "/train"
         (configs / f"inference-{name}.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
     files = {
         str(path.relative_to(output)).replace("\\", "/"): hashlib.sha256(
@@ -211,7 +237,7 @@ def _prepare_v2(output, *, model_path, runtime_root, manifest_path, recipe_path)
             }
             for sample in samples
         ],
-        "token_audit": {"status": "pending_actual_frozen_tokenizer", "counts": None},
+        "token_audit": token_audit,
         "review": {
             "author_rule_checked": True,
             "independent_review": "pending",
