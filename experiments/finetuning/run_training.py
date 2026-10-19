@@ -520,6 +520,9 @@ def checkpoint_files(directory, task_id=None, *, verify_formats=True):
     else:
         raise ValueError("Checkpoint has no complete safetensors weights")
     if not adapter:
+        extra_templates = directory / "additional_chat_templates"
+        if extra_templates.exists() or extra_templates.is_symlink():
+            raise ValueError("Full checkpoint does not support additional_chat_templates")
         if any(
             (directory / name).exists()
             for name in (

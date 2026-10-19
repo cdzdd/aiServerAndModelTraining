@@ -353,6 +353,46 @@ def test_full_checkpoint_binds_complete_saved_model_and_external_template(tmp_pa
     training.read_checkpoint(directory, FULL_IDENTITY)
 
 
+@pytest.mark.parametrize("operation", ["mark", "resume"])
+@pytest.mark.parametrize("extra_kind", ["default_template", "empty_directory", "file"])
+def test_full_checkpoint_rejects_additional_template_inputs(tmp_path, operation, extra_kind):
+    from transformers import PreTrainedTokenizerFast
+
+    directory = full_checkpoint(tmp_path)
+    if operation == "resume":
+        record = training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    extra = directory / "additional_chat_templates"
+    if extra_kind == "file":
+        extra.write_text("unsupported template input")
+    else:
+        extra.mkdir()
+        if extra_kind == "default_template":
+            override = "OVERRIDE {{ messages[0]['content'] }}"
+            (extra / "default.jinja").write_text(override)
+            # The real installed loader prefers this unbound default to chat_template.jinja.
+            loaded = PreTrainedTokenizerFast.from_pretrained(directory, local_files_only=True)
+            assert loaded.chat_template == override
+    with pytest.raises(ValueError, match="additional_chat_templates"):
+        if operation == "resume":
+            training.validate_resume(record, FULL_IDENTITY)
+        else:
+            training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    if operation == "mark":
+        assert not (directory / "complete.json").exists()
+
+
+def test_adapter_checkpoint_retains_existing_additional_template_behavior(tmp_path):
+    directory = full_checkpoint(tmp_path)
+    (directory / "model.safetensors").rename(directory / "adapter_model.safetensors")
+    (directory / "adapter_config.json").write_text("{}")
+    identity = {**FULL_IDENTITY, "task_id": "todo-019"}
+    record = training.mark_checkpoint(directory, identity, 200, save_seconds=2)
+    extra = directory / "additional_chat_templates"
+    extra.mkdir()
+    (extra / "default.jinja").write_text("legacy adapter template")
+    training.validate_resume(record, identity)
+
+
 @pytest.mark.parametrize(
     "missing",
     [
