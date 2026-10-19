@@ -73,6 +73,37 @@ def test_resume_preserves_consumed_time(budget):
         assert ledger.remaining == 75600
 
 
+def test_two_tasks_have_independent_budgets(tmp_path):
+    clock = Clock()
+    first, second = tmp_path / "todo-019.json", tmp_path / "todo-020.json"
+    training.initialize_budget(first, "todo-019")
+    training.initialize_budget(second, "todo-020")
+    with training.BudgetLedger(first, "todo-019", clock=clock) as ledger:
+        ledger.start(IDENTITY, "preflight")
+        clock.advance(3600)
+        ledger.finish("completed")
+    original = first.read_bytes()
+    identity = {**IDENTITY, "task_id": "todo-020"}
+    with training.BudgetLedger(second, "todo-020", clock=clock) as ledger:
+        ledger.start(identity, "preflight")
+        clock.advance(600)
+        ledger.finish("planned_pause")
+    with training.BudgetLedger(second, "todo-020", clock=clock) as ledger:
+        assert ledger.remaining == 85800
+        with pytest.raises(ValueError, match="task"):
+            ledger.start(IDENTITY, "formal")
+        ledger.start(identity, "preflight")
+        clock.advance(1200)
+        ledger.finish("completed")
+        assert ledger.remaining == 84600
+    assert first.read_bytes() == original
+    with training.BudgetLedger(first, "todo-019", clock=clock) as ledger:
+        assert ledger.remaining == 82800
+    with pytest.raises(ValueError, match="ledger"):
+        with training.BudgetLedger(second, "todo-019", clock=clock):
+            pass
+
+
 def test_output_change_cannot_reset_task_budget(budget):
     clock = Clock()
     with training.BudgetLedger(budget, "todo-019", clock=clock) as ledger:
@@ -858,25 +889,34 @@ import json, random, sys
 from pathlib import Path
 import numpy as np
 import torch
-from transformers import Trainer, TrainerCallback, TrainingArguments, set_seed
+from transformers import (Trainer, TrainerCallback, TrainingArguments, set_seed,
+    PretrainedConfig, PreTrainedModel, PreTrainedTokenizerFast, default_data_collator)
+from tokenizers import Tokenizer
+from tokenizers.models import WordLevel
 from experiments.finetuning.run_training import (
     TrainingCallback, factory_training_arguments, read_checkpoint,
 )
 torch.set_num_threads(1)
 root = Path(sys.argv[1])
-identity = {"task_id":"todo-019", "model_hash":"a"*64,
+identity = {"task_id":"todo-020", "model_hash":"a"*64,
             "data_hash":"b"*64, "recipe_hash":"c"*64}
 class Callback(TrainingCallback, TrainerCallback):
     pass
-class Model(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
+class Config(PretrainedConfig):
+    model_type = "tiny-checkpoint"
+class Model(PreTrainedModel):
+    config_class = Config
+    def __init__(self, config=None):
+        super().__init__(config or Config())
         self.linear = torch.nn.Linear(2, 1)
     def forward(self, input_ids, labels):
         value = self.linear(torch.nn.functional.dropout(input_ids.float(), p=0.2,
                                                         training=self.training)).squeeze(-1)
         return {"loss": ((value-labels)**2).mean(), "logits": value}
 data = [{"input_ids": torch.tensor([1., 2.]), "labels": torch.tensor(1.)}] * 8
+tokenizer = PreTrainedTokenizerFast(
+    tokenizer_object=Tokenizer(WordLevel({"[UNK]":0, "hello":1}, unk_token="[UNK]")),
+    unk_token="[UNK]", chat_template="{{ messages[0]['content'] }}")
 def run(name, stop=None, resume=None):
     import time
     set_seed(42)
@@ -888,20 +928,28 @@ def run(name, stop=None, resume=None):
         dataloader_pin_memory=False)
     callback = Callback(identity, root/(name+".json"), deadline=time.monotonic()+3600,
                         max_steps=200, stop_after_step=stop)
-    trainer = Trainer(model=model,args=args,train_dataset=data,callbacks=[callback])
+    trainer = Trainer(model=model,args=args,train_dataset=data,callbacks=[callback],
+                      processing_class=tokenizer, data_collator=default_data_collator)
     trainer.train(resume_from_checkpoint=resume)
     return model, trainer
 partial, first = run("partial", stop=100)
 cp = root/"partial/checkpoint-100"
 record = read_checkpoint(cp, identity)
 assert record["max_steps"] == 200 and record["global_step"] == 100
+assert {"config.json", "tokenizer.json", "tokenizer_config.json",
+        "chat_template.jinja"} <= record["files"].keys()
+reloaded = Model.from_pretrained(cp, local_files_only=True)
+for key, value in partial.state_dict().items():
+    torch.testing.assert_close(reloaded.state_dict()[key], value, rtol=0, atol=0)
+reloaded_tokenizer = PreTrainedTokenizerFast.from_pretrained(cp, local_files_only=True)
+assert reloaded_tokenizer.chat_template == tokenizer.chat_template
 opt = torch.load(cp/"optimizer.pt", weights_only=True)
 schedule = torch.load(cp/"scheduler.pt", weights_only=True)
 rng = torch.load(cp/"rng_state.pth", weights_only=False)
 assert schedule["last_epoch"] == 100
 assert all(float(state["step"]) == 100 for state in opt["state"].values())
 assert {"python", "numpy", "cpu"} <= rng.keys()
-resumed, second = run("resumed", resume=str(cp))
+resumed, second = run("partial", resume=str(cp))
 whole, full = run("whole")
 assert second.state.global_step == 200
 for key, value in whole.state_dict().items():
@@ -926,7 +974,8 @@ def early_run(name, stop=None, resume=None):
         "formal", budget_callback)
     assert "early_stopping_steps" not in effective
     trainer = Trainer(model=Model(),args=args,train_dataset=data,eval_dataset=data,
-                      callbacks=callbacks)
+                      callbacks=callbacks, processing_class=tokenizer,
+                      data_collator=default_data_collator)
     trainer.train(resume_from_checkpoint=resume)
     return trainer, budget_callback
 
@@ -935,10 +984,10 @@ cp = root/"early-partial/checkpoint-4"
 saved = json.loads((cp/"trainer_state.json").read_text())["stateful_callbacks"]
 assert saved["EarlyStoppingCallback"]["attributes"]["early_stopping_patience_counter"] == 2
 assert paused_callback.status["reason"] == "planned_pause"
-restored, restored_callback = early_run("early-resumed", resume=str(cp))
+restored, restored_callback = early_run("early-partial", resume=str(cp))
 assert restored.state.global_step == 5  # One more non-improvement, not three new evaluations.
 assert restored_callback.status["reason"] == "early_stopping"
-assert read_checkpoint(root/"early-resumed/checkpoint-5", identity)["global_step"] == 5
+assert read_checkpoint(root/"early-partial/checkpoint-5", identity)["global_step"] == 5
 print("REAL_CPU_EARLY_STOP_RESUME_OK")
 """
     import os

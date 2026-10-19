@@ -434,6 +434,8 @@ def json_hash(value):
 
 
 def training_identity(task_id, recipe):
+    if task_id == "todo-020" and recipe.get("finetuning_type") != "full":
+        raise ValueError("todo-020 requires full training from its original base")
     model = Path(recipe["model_name_or_path"]).resolve()
     if not model.is_dir():
         raise ValueError("model_name_or_path must be a frozen local model directory")
@@ -484,32 +486,116 @@ def training_identity(task_id, recipe):
     }
 
 
-def checkpoint_files(directory):
+def checkpoint_files(directory, task_id=None, *, verify_formats=True):
     directory = Path(directory)
     required = ["optimizer.pt", "scheduler.pt", "rng_state.pth", "trainer_state.json"]
-    if (directory / "adapter_model.safetensors").is_file():
+    adapter = (directory / "adapter_model.safetensors").is_file()
+    single = (directory / "model.safetensors").is_file()
+    indexed = (directory / "model.safetensors.index.json").is_file()
+    weight_map = None
+    if adapter:
+        if task_id == "todo-020" or single or indexed:
+            raise ValueError("Full checkpoint cannot contain adapter weights")
         required += ["adapter_model.safetensors", "adapter_config.json"]
-    elif (directory / "model.safetensors").is_file():
+    elif single and indexed:
+        raise ValueError("Ambiguous full checkpoint weights/index")
+    elif single:
         required += ["model.safetensors"]
-    elif (directory / "model.safetensors.index.json").is_file():
+    elif indexed:
         index = read_json(directory / "model.safetensors.index.json")
-        required += ["model.safetensors.index.json", *set(index["weight_map"].values())]
+        weight_map = index.get("weight_map") if isinstance(index, dict) else None
+        if (
+            not isinstance(weight_map, dict)
+            or not weight_map
+            or any(
+                not isinstance(key, str)
+                or not key
+                or not isinstance(value, str)
+                or not value.endswith(".safetensors")
+                for key, value in weight_map.items()
+            )
+        ):
+            raise ValueError("Invalid full checkpoint weight_map index")
+        required += ["model.safetensors.index.json", *sorted(set(weight_map.values()))]
     else:
         raise ValueError("Checkpoint has no complete safetensors weights")
+    if not adapter:
+        if any(
+            (directory / name).exists()
+            for name in (
+                "adapter_config.json",
+                "adapter_model.bin",
+                "pytorch_model.bin",
+                "pytorch_model.bin.index.json",
+            )
+        ):
+            raise ValueError("Full checkpoint cannot contain adapter or alternate weights")
+        # The frozen Qwen fast tokenizer saves its actual template outside tokenizer_config.
+        required += [
+            "config.json",
+            "tokenizer_config.json",
+            "tokenizer.json",
+            "chat_template.jinja",
+        ]
+        required += [
+            name
+            for name in (
+                "generation_config.json",
+                "special_tokens_map.json",
+                "added_tokens.json",
+                "vocab.json",
+                "merges.txt",
+                "training_args.bin",
+            )
+            if (directory / name).exists()
+        ]
     for name in required:
         path = (directory / name).resolve()
         if (
-            not path.is_relative_to(directory.resolve())
+            "/" in name
+            or "\\" in name
+            or not path.is_relative_to(directory.resolve())
+            or (directory / name).is_symlink()
             or not path.is_file()
             or path.stat().st_size == 0
         ):
             raise ValueError(f"Incomplete checkpoint: {name}")
+    if not adapter and verify_formats:
+        validate_full_checkpoint_formats(directory, weight_map)
     return required
+
+
+def validate_full_checkpoint_formats(directory, weight_map):
+    from safetensors import safe_open
+    from tokenizers import Tokenizer
+
+    config = read_json(directory / "config.json")
+    tokenizer_config = read_json(directory / "tokenizer_config.json")
+    if not isinstance(config, dict) or not config.get("model_type"):
+        raise ValueError("Invalid full checkpoint config.json")
+    if not isinstance(tokenizer_config, dict) or not tokenizer_config.get("tokenizer_class"):
+        raise ValueError("Invalid full checkpoint tokenizer_config.json")
+    if not (directory / "chat_template.jinja").read_text(encoding="utf-8").strip():
+        raise ValueError("Invalid full checkpoint chat_template.jinja")
+    try:
+        Tokenizer.from_file(str(directory / "tokenizer.json"))
+        shards = set(weight_map.values()) if weight_map else {"model.safetensors"}
+        for name in shards:
+            # Read headers only: never instantiate the model or copy its tensors here.
+            with safe_open(str(directory / name), framework="numpy") as stream:
+                keys = set(stream.keys())
+            expected = (
+                {key for key, shard in weight_map.items() if shard == name} if weight_map else keys
+            )
+            if not keys or keys != expected:
+                raise ValueError(f"Full checkpoint shard membership mismatch: {name}")
+    except Exception as error:
+        raise ValueError(f"Invalid full checkpoint tokenizer/weights format: {error}") from error
 
 
 def mark_checkpoint(directory, identity, max_steps, *, save_seconds):
     directory = Path(directory).resolve()
-    names = checkpoint_files(directory)
+    names = checkpoint_files(directory, identity["task_id"])
     state = read_json(directory / "trainer_state.json")
     step = state.get("global_step")
     if (
@@ -543,7 +629,7 @@ def validate_resume(record: dict, current: dict) -> None:
     ):
         raise ValueError("Resume training identity mismatch")
     directory = Path(record["checkpoint_dir"])
-    names = checkpoint_files(directory)
+    names = checkpoint_files(directory, current["task_id"], verify_formats=False)
     if set(names) != set(record.get("files", {})):
         raise ValueError("Incomplete checkpoint hash manifest")
     for name in names:

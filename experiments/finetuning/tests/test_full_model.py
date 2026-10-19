@@ -8,6 +8,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 import yaml
+from experiments.finetuning import run_training as training
 from experiments.finetuning.prepare_data import prepare
 from experiments.finetuning.run_training import factory_training_arguments, validate_recipe
 from test_corpus import corpus_fixture
@@ -283,3 +284,249 @@ def test_training_arguments_register_full_audit_only_for_full():
     assert any(isinstance(item, module.FullModelAuditCallback) for item in callbacks)
     _, callbacks = factory_training_arguments({"finetuning_type": "lora"}, "preflight", budget)
     assert callbacks == [budget]
+
+
+FULL_IDENTITY = {
+    "task_id": "todo-020",
+    "model_hash": "a" * 64,
+    "data_hash": "b" * 64,
+    "recipe_hash": "c" * 64,
+}
+
+
+def full_checkpoint(tmp_path, *, sharded=False):
+    """Actual small safetensors/tokenizer artifacts, never production model weights."""
+    from safetensors.torch import save_file
+    from tokenizers import Tokenizer
+    from tokenizers.models import WordLevel
+    from transformers import PreTrainedTokenizerFast
+
+    directory = tmp_path / "checkpoint-100"
+    directory.mkdir()
+    (directory / "config.json").write_text(json.dumps({"model_type": "qwen3"}))
+    tokenizer = PreTrainedTokenizerFast(
+        tokenizer_object=Tokenizer(WordLevel({"[UNK]": 0, "hello": 1}, unk_token="[UNK]")),
+        unk_token="[UNK]",
+        chat_template="{% for message in messages %}{{ message['content'] }}{% endfor %}",
+    )
+    tokenizer.save_pretrained(directory)
+    if sharded:
+        save_file({"embedding.weight": torch.ones(2, 2)}, directory / "model-00001.safetensors")
+        save_file({"norm.weight": torch.ones(2)}, directory / "model-00002.safetensors")
+        (directory / "model.safetensors.index.json").write_text(
+            json.dumps(
+                {
+                    "weight_map": {
+                        "embedding.weight": "model-00001.safetensors",
+                        "norm.weight": "model-00002.safetensors",
+                    }
+                }
+            )
+        )
+    else:
+        save_file({"embedding.weight": torch.ones(2, 2)}, directory / "model.safetensors")
+    torch.save({"state": {}, "param_groups": []}, directory / "optimizer.pt")
+    torch.save({"last_epoch": 100}, directory / "scheduler.pt")
+    torch.save({"cpu": torch.get_rng_state()}, directory / "rng_state.pth")
+    (directory / "trainer_state.json").write_text(
+        json.dumps({"global_step": 100, "max_steps": 200, "log_history": [{"loss": 1.0}]})
+    )
+    return directory
+
+
+def test_full_checkpoint_binds_complete_saved_model_and_external_template(tmp_path):
+    directory = full_checkpoint(tmp_path)
+    (directory / "full-model-audit.json").write_text("mutable external evidence")
+    record = training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    assert {
+        "model.safetensors",
+        "config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "chat_template.jinja",
+        "optimizer.pt",
+        "scheduler.pt",
+        "rng_state.pth",
+        "trainer_state.json",
+    } == record["files"].keys()
+    training.read_checkpoint(directory, FULL_IDENTITY)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        "config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "chat_template.jinja",
+        "optimizer.pt",
+        "scheduler.pt",
+        "rng_state.pth",
+        "trainer_state.json",
+    ],
+)
+def test_full_checkpoint_rejects_missing_reload_or_resume_file(tmp_path, missing):
+    directory = full_checkpoint(tmp_path)
+    (directory / missing).unlink()
+    with pytest.raises(ValueError, match=missing):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    assert not (directory / "complete.json").exists()
+
+
+def test_full_checkpoint_requires_all_shards(tmp_path):
+    directory = full_checkpoint(tmp_path, sharded=True)
+    record = training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    assert {
+        "model.safetensors.index.json",
+        "model-00001.safetensors",
+        "model-00002.safetensors",
+    } <= record["files"].keys()
+    (directory / "model-00002.safetensors").unlink()
+    with pytest.raises(ValueError, match="model-00002"):
+        training.read_checkpoint(directory, FULL_IDENTITY)
+
+
+@pytest.mark.parametrize("field", ["task_id", "model_hash", "data_hash", "recipe_hash"])
+def test_full_resume_rejects_base_or_recipe_change(tmp_path, field):
+    record = training.mark_checkpoint(full_checkpoint(tmp_path), FULL_IDENTITY, 200, save_seconds=2)
+    with pytest.raises(ValueError, match="identity"):
+        training.validate_resume(record, {**FULL_IDENTITY, field: "changed"})
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "model.safetensors",
+        "config.json",
+        "tokenizer_config.json",
+        "tokenizer.json",
+        "chat_template.jinja",
+        "optimizer.pt",
+        "scheduler.pt",
+        "rng_state.pth",
+        "trainer_state.json",
+        "special_tokens_map.json",
+    ],
+)
+def test_full_resume_rejects_modified_files(tmp_path, name):
+    directory = full_checkpoint(tmp_path)
+    record = training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    with (directory / name).open("ab") as stream:
+        stream.write(b" ")
+    with pytest.raises(ValueError, match="hash"):
+        training.validate_resume(record, FULL_IDENTITY)
+
+
+@pytest.mark.parametrize("broken", ["weights", "config", "tokenizer", "template", "index"])
+def test_full_checkpoint_rejects_invalid_artifact_formats(tmp_path, broken):
+    directory = full_checkpoint(tmp_path, sharded=broken == "index")
+    name, payload = {
+        "weights": ("model.safetensors", b"not safetensors"),
+        "config": ("config.json", b"{}"),
+        "tokenizer": ("tokenizer.json", b"{}"),
+        "template": ("chat_template.jinja", b"   "),
+        "index": ("model.safetensors.index.json", b'{"weight_map": {}}'),
+    }[broken]
+    (directory / name).write_bytes(payload)
+    with pytest.raises(ValueError):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    assert not (directory / "complete.json").exists()
+
+
+@pytest.mark.parametrize("name", ["../escape.safetensors", "model-00001.safetensors"])
+def test_full_checkpoint_rejects_unsafe_or_wrong_shard_membership(tmp_path, name):
+    directory = full_checkpoint(tmp_path, sharded=True)
+    (tmp_path / "escape.safetensors").write_bytes(
+        (directory / "model-00001.safetensors").read_bytes()
+    )
+    (directory / "model.safetensors.index.json").write_text(
+        json.dumps({"weight_map": {"nonexistent.weight": name}})
+    )
+    with pytest.raises(ValueError):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+
+
+def test_full_checkpoint_rejects_adapter_identity_even_when_full_weights_exist(tmp_path):
+    directory = full_checkpoint(tmp_path)
+    (directory / "adapter_model.safetensors").write_bytes(b"adapter")
+    (directory / "adapter_config.json").write_text("{}")
+    with pytest.raises(ValueError, match="adapter"):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+
+
+def test_full_task_rejects_adapter_only_checkpoint(tmp_path):
+    directory = full_checkpoint(tmp_path)
+    (directory / "model.safetensors").rename(directory / "adapter_model.safetensors")
+    (directory / "adapter_config.json").write_text("{}")
+    with pytest.raises(ValueError, match="adapter"):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "adapter_config.json",
+        "adapter_model.bin",
+        "pytorch_model.bin",
+        "pytorch_model.bin.index.json",
+    ],
+)
+def test_full_checkpoint_rejects_alternate_loader_inputs(tmp_path, name):
+    # Trainer can choose a .bin instead of the indexed safetensors; from_pretrained
+    # treats adapter_config as a redirect. None may silently bypass the manifest.
+    directory = full_checkpoint(tmp_path, sharded=True)
+    (directory / name).write_bytes(b"alternate unbound loader input")
+    with pytest.raises(ValueError):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "generation_config.json",
+        "added_tokens.json",
+        "vocab.json",
+        "merges.txt",
+        "training_args.bin",
+    ],
+)
+def test_full_resume_binds_optional_loader_files_when_present(tmp_path, name):
+    directory = full_checkpoint(tmp_path)
+    (directory / name).write_bytes(b"original optional artifact")
+    record = training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+    assert name in record["files"]
+    (directory / name).write_bytes(b"modified optional artifact")
+    with pytest.raises(ValueError, match="hash"):
+        training.validate_resume(record, FULL_IDENTITY)
+    (directory / name).unlink()
+    with pytest.raises(ValueError, match="manifest"):
+        training.validate_resume(record, FULL_IDENTITY)
+
+
+def test_full_checkpoint_rejects_ambiguous_single_and_sharded_weights(tmp_path):
+    from safetensors.torch import save_file
+
+    directory = full_checkpoint(tmp_path, sharded=True)
+    save_file({"different.weight": torch.zeros(2)}, directory / "model.safetensors")
+    with pytest.raises(ValueError, match="Ambiguous"):
+        training.mark_checkpoint(directory, FULL_IDENTITY, 200, save_seconds=2)
+
+
+def test_full_task_rejects_lora_recipe_before_budget_start(tmp_path):
+    model, data = tmp_path / "model", tmp_path / "data"
+    model.mkdir()
+    data.mkdir()
+    (model / "config.json").write_text("{}")
+    (data / "train.json").write_text("[]")
+    (data / "dataset_info.json").write_text(json.dumps({"train": {"file_name": "train.json"}}))
+    with pytest.raises(ValueError, match="full"):
+        training.training_identity(
+            "todo-020",
+            {
+                "finetuning_type": "lora",
+                "model_name_or_path": str(model),
+                "dataset_dir": str(data),
+                "dataset": "train",
+            },
+        )
