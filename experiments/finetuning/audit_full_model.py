@@ -56,7 +56,7 @@ def audit_full_model(model, optimizer):
     """Count actual unique Parameter objects; reject frozen, adapted or quantized runs."""
     for name, module in model.named_modules():
         classes = [f"{base.__module__}.{base.__name__}".lower() for base in type(module).__mro__]
-        if any("peft." in cls or "lora" in cls for cls in classes) or any(
+        if any(cls.startswith("peft.") or "lora" in cls for cls in classes) or any(
             hasattr(module, field) for field in ("lora_A", "lora_B", "peft_config")
         ):
             raise ValueError(f"full model contains adapter module: {name}")

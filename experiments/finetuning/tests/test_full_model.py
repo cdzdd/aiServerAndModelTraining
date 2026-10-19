@@ -2,6 +2,9 @@
 
 import importlib
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -35,6 +38,71 @@ def test_full_requires_all_unique_params_trainable():
     model.bias.requires_grad_(False)
     with pytest.raises(ValueError, match="frozen"):
         audit_module().audit_full_model(model, torch.optim.AdamW(model.parameters()))
+
+
+def test_full_script_namespace_imports_callback_without_pythonpath(tmp_path):
+    # -I drops inherited search paths. Recreate a file entrypoint's script-directory path,
+    # load the real file without invoking main/budget, then exercise both full-only imports.
+    code = """
+import json
+import runpy
+import sys
+from pathlib import Path
+
+script, recipe_path = map(Path, sys.argv[1:])
+sys.path.insert(0, str(script.parent))
+namespace = runpy.run_path(str(script), run_name="isolated_training_script")
+import yaml
+recipe = yaml.safe_load(recipe_path.read_text(encoding="utf-8"))
+namespace["validate_recipe"](recipe)
+_, callbacks = namespace["factory_training_arguments"](recipe, "preflight", None)
+from experiments.finetuning.audit_full_model import FullModelAuditCallback
+assert isinstance(callbacks[1], FullModelAuditCallback)
+print(json.dumps({"full_callback_imported": True}))
+"""
+    environment = dict(os.environ)
+    environment.pop("PYTHONPATH", None)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-I",
+            "-c",
+            code,
+            str(ROOT / "experiments/finetuning/run_training.py"),
+            str(ROOT / "experiments/finetuning/configs/full-0.6b.yaml"),
+        ],
+        cwd=tmp_path,
+        env=environment,
+        text=True,
+        capture_output=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == {"full_callback_imported": True}
+
+
+def test_unadapted_huggingface_qwen3_is_full_despite_peft_integration_mixin():
+    from transformers import Qwen3Config, Qwen3ForCausalLM
+
+    model = Qwen3ForCausalLM(
+        Qwen3Config(
+            vocab_size=32,
+            hidden_size=16,
+            intermediate_size=32,
+            num_hidden_layers=1,
+            num_attention_heads=2,
+            num_key_value_heads=1,
+            head_dim=8,
+            max_position_embeddings=32,
+            tie_word_embeddings=True,
+        )
+    )
+    result = audit_module().audit_full_model(model, torch.optim.AdamW(model.parameters()))
+    # 512 tied embedding + 768 attention + 16 Q/K norms + 1,536 MLP + 48 layer/final norms.
+    assert result["total_parameters"] == result["trainable_parameters"] == 2880
+    assert result["optimizer_parameters"] == 2880
+    assert result["parameter_tensors"] == result["optimizer_parameter_tensors"] == 13
+    assert result["parameter_dtypes"] == {"torch.float32": 2880}
 
 
 @pytest.mark.parametrize("foreign", [False, True])

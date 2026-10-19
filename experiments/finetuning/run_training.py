@@ -14,6 +14,8 @@ import threading
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 BUDGET_SECONDS = 86400
 
 
