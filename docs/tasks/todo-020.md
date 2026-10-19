@@ -3,7 +3,7 @@
 | 字段 | 值 |
 |---|---|
 | id | todo-020 |
-| 状态 | pending |
+| 状态 | in_progress |
 | depends_on | todo-019 |
 | 优先级 | P2：本机训练实践，不阻塞网站发布 |
 | 负责目录 | `experiments/finetuning/`，必要的完整模型评测身份适配 |
@@ -51,3 +51,7 @@
 硬件基线为 Ultra 7 265K / 32GB RAM / RTX 5070 Ti 16GB。按常见混合精度 AdamW 的 18 字节/参数估算，0.6B 参数相关状态约 10.8GB，另需激活/临时缓冲；这不是本机实际峰值或必定适配的承诺。[官方训练显存说明](https://huggingface.co/docs/transformers/v4.57.1/en/model_memory_anatomy)、[模型卡](https://huggingface.co/Qwen/Qwen3-0.6B)。
 
 本任务不购买云 GPU、执行预训练、部署公网、自动切换网页模型、启用 018 或删除 015/019 制品。当前没有新训练结果、固定模型 revision 或功能合并 SHA。
+
+## 2026-10-19 接手记录
+
+用户明确授权开始020；019已实际done并合入origin/main。当前从main5620befe建立独立原生worktree和feat/todo-020-full-06b；已原子领取，独立API8150/Web5250/DB15480/实验模型11440，Compose project qa-todo-020-7dd724fb。累计训练账本绑定Git common directory的codex-coordination/training-budgets/todo-020.json，上限86400秒，不重置019或020已有额度。当前只完成准备，尚未下载新基座或启动训练；具体进展以本节后续记录与忽略的执行日志为准。
