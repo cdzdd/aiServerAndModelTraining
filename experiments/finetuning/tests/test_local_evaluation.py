@@ -241,3 +241,51 @@ def test_new_dataset_is_explicit_and_default_stays_legacy(tmp_path):
     assert actual_path == path and dataset["version"] == "fixture"
     _, legacy = loader()
     assert len(legacy["cases"]) == 60
+
+
+def test_full_identity_accepts_external_hf_chat_template_hash(tmp_path):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2("full")
+    value["base_repository"] = "Qwen/Qwen3-0.6B"
+    value["files_sha256"]["chat_template.jinja"] = "f" * 64
+    result = load_runtime_manifest(write_runtime(tmp_path, value))
+    assert result["files_sha256"]["chat_template.jinja"] == "f" * 64
+    assert result["base_repository"] == "Qwen/Qwen3-0.6B"
+    assert result["identity_assurance"] == "caller-verified artifacts; not server authentication"
+
+
+@pytest.mark.parametrize(
+    "name", ["../chat_template.jinja", "additional_chat_templates/default.jinja"]
+)
+def test_full_identity_rejects_template_paths_outside_supported_bare_files(tmp_path, name):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2("full")
+    value["files_sha256"][name] = "f" * 64
+    with pytest.raises(ValueError, match="bare"):
+        load_runtime_manifest(write_runtime(tmp_path, value))
+
+
+@pytest.mark.parametrize(
+    "missing", ["config.json", "tokenizer.json", "tokenizer_config.json", "model.safetensors"]
+)
+def test_full_reload_requires_complete_config_tokenizer_and_weights(tmp_path, missing):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2("full")
+    del value["files_sha256"][missing]
+    with pytest.raises(ValueError, match="files"):
+        load_runtime_manifest(write_runtime(tmp_path, value))
+
+
+@pytest.mark.parametrize("adapter_location", ["adapter_files_sha256", "files_sha256"])
+def test_full_identity_cannot_be_adapter(tmp_path, adapter_location):
+    from experiments.evaluation.run_eval import load_runtime_manifest
+
+    value = runtime_v2("full")
+    value[adapter_location] = dict.fromkeys(
+        ["adapter_config.json", "adapter_model.safetensors"], "e" * 64
+    )
+    with pytest.raises(ValueError):
+        load_runtime_manifest(write_runtime(tmp_path, value))

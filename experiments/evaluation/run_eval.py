@@ -150,6 +150,7 @@ class TracedProvider:
             "finish_reason": None,
             "usage": None,
             "error": None,
+            "provider_called": False,
             "text": "",
             "messages": [m.model_dump() for m in messages],
         }
@@ -159,6 +160,7 @@ class TracedProvider:
                 raise RAGError("INPUT_BYTE_LIMIT")
             if not 1 <= max_tokens <= 512 or temperature != 0:
                 raise RAGError("GENERATION_CONFIG_INVALID")
+            record["provider_called"] = True
             async with aclosing(
                 self.provider.stream(messages, max_tokens=max_tokens, temperature=temperature)
             ) as stream:
@@ -593,6 +595,7 @@ def _model_files(files):
         "added_tokens.json",
         "vocab.json",
         "merges.txt",
+        "chat_template.jinja",
         "model.safetensors",
         "model.safetensors.index.json",
     }
