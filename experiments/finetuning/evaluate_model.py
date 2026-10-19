@@ -71,6 +71,13 @@ def score_general(raw, case):
 
 
 def load_cases(path, mode):
+    if mode == "legacy-grounded":
+        dataset = load_dataset(path)
+        if "schema_version" in dataset:
+            raise ValueError("legacy grounded evaluation requires the original legacy schema")
+        if any(type(case["expected_refusal"]) is not bool for case in dataset["cases"]):
+            raise ValueError("legacy grounded evaluation requires binary refusal labels")
+        return dataset
     if mode == "grounded":
         dataset = load_dataset(path)
         if dataset.get("schema_version") != 2:
@@ -162,30 +169,34 @@ async def complete(trace, messages, max_tokens):
     return text, stage
 
 
-def supplied_hits(case, sources):
+def supplied_hits(case, sources, *, legacy=False):
+    source_ids = (
+        case["reference_sources"] if legacy else [item["source_id"] for item in case["evidence"]]
+    )
     return [
         SearchHit(
-            chunk_id=stable_id(item["source_id"] + "/golden"),
-            kb_id=stable_id(sources[item["source_id"]]["kb"]),
-            source_id=stable_id(item["source_id"]),
+            chunk_id=stable_id(source_id + "/golden"),
+            kb_id=stable_id(sources[source_id]["kb"]),
+            source_id=stable_id(source_id),
             source_type="faq",
             faq_version=1,
-            title=sources[item["source_id"]]["title"],
-            text=sources[item["source_id"]]["text"],
+            title=sources[source_id]["title"],
+            text=sources[source_id]["text"],
             score=1.0,
         )
-        for item in case["evidence"]
+        for source_id in source_ids
     ]
 
 
 async def evaluate_dataset(dataset, mode, split, provider, *, private_records=None):
     rows = []
+    legacy = mode == "legacy-grounded"
     sources = {source["id"]: source for source in dataset.get("sources", [])}
     for case in dataset["cases"]:
         if case["split"] != split:
             continue
         trace = TracedProvider(provider)
-        row = {"id": case["id"], "task": case.get("task", "grounded")}
+        row = {"id": case["id"], "task": case.get("task", mode)}
         if mode == "general":
             messages = [
                 LLMMessage(role="system", content=GENERAL_SYSTEM),
@@ -195,7 +206,8 @@ async def evaluate_dataset(dataset, mode, split, provider, *, private_records=No
             row.update(stage)
             row["correct"] = stage["error"] is None and score_general(raw, case)
         else:
-            hits = supplied_hits(case, sources)
+            hits = supplied_hits(case, sources, legacy=legacy)
+            citations = []
             try:
                 messages, retained = build_answer_prompt(
                     case["question"], hits, retrieval_query=case["retrieval_query"]
@@ -234,7 +246,8 @@ async def evaluate_dataset(dataset, mode, split, provider, *, private_records=No
                                     for citation in citations
                                 ],
                             }
-                            answer["reference_match"] = json_subset(actual, case["answer"])
+                            if not legacy:
+                                answer["reference_match"] = json_subset(actual, case["answer"])
                             answer["diagnosis"] = "model_" + status
                         except RAGError:
                             answer["error"] = "INVALID_CITATION"
@@ -248,6 +261,30 @@ async def evaluate_dataset(dataset, mode, split, provider, *, private_records=No
                     "citation_mapping": None,
                     "status": None,
                 }
+            if legacy:
+                status = answer["status"]
+                refused = status in {"clarify", "no_answer"}
+                quote_text = "\n".join(citation.quote for citation in citations)
+                answer.update(
+                    {
+                        # The original fixture has binary labels, never strict status gold.
+                        "reference_match": None,
+                        "binary_refusal_match": status is not None
+                        and refused == case["expected_refusal"],
+                        "false_answer": case["expected_refusal"] and status == "answered",
+                        "false_refusal": not case["expected_refusal"] and refused,
+                        "answer_term_count": len(case["answer_terms"]),
+                        "answer_term_match_count": sum(
+                            term in quote_text for term in case["answer_terms"]
+                        ),
+                        "forbidden_answer_term_count": len(case.get("forbidden_answer_terms", [])),
+                        "forbidden_answer_term_match_count": sum(
+                            term in quote_text for term in case.get("forbidden_answer_terms", [])
+                        ),
+                        "reference_source_count": len(case["reference_sources"]),
+                        "supported_reference_count": len({c.source_id for c in citations}),
+                    }
+                )
             row["answer"] = answer
             if case["history"]:
                 try:
@@ -255,7 +292,7 @@ async def evaluate_dataset(dataset, mode, split, provider, *, private_records=No
                         case["question"], [LLMMessage(**message) for message in case["history"]]
                     )
                     raw, rewrite = await complete(trace, messages, 128)
-                    rewrite["reference_match"] = False
+                    rewrite["reference_match"] = None if legacy else False
                     if rewrite["error"] is None:
                         try:
                             value = strict_json(raw)
@@ -271,11 +308,15 @@ async def evaluate_dataset(dataset, mode, split, provider, *, private_records=No
                                 )
                             ):
                                 raise ValueError("invalid rewrite")
-                            rewrite["reference_match"] = json_subset(value, case["rewrite"])
+                            if not legacy:
+                                rewrite["reference_match"] = json_subset(value, case["rewrite"])
                         except (ValueError, TypeError, RecursionError):
                             rewrite["error"] = "INVALID_REWRITE"
                 except RAGError as exc:
-                    rewrite = {"error": safe_error(exc), "reference_match": False}
+                    rewrite = {
+                        "error": safe_error(exc),
+                        "reference_match": None if legacy else False,
+                    }
                 row["rewrite"] = rewrite
             else:
                 row["rewrite"] = None  # Production skips a model rewrite without retained history.
@@ -286,30 +327,60 @@ async def evaluate_dataset(dataset, mode, split, provider, *, private_records=No
 
 
 def summarize_evaluation(rows, mode):
-    def metrics(stages, field):
+    def metrics(stages, field, *, has_gold=True):
         count = len(stages)
-        return {
-            "scored_count": count,
-            "correct_count": sum(bool(s.get(field)) for s in stages),
-            "accuracy": sum(bool(s.get(field)) for s in stages) / count if count else None,
+        result = {
+            "scored_count": count if has_gold else 0,
+            "correct_count": sum(bool(s.get(field)) for s in stages) if has_gold else None,
+            "accuracy": sum(bool(s.get(field)) for s in stages) / count
+            if count and has_gold
+            else None,
             "error_count": sum(s.get("error") is not None for s in stages),
             "finish_reason_counts": dict(Counter(s.get("finish_reason") for s in stages)),
             "error_counts": dict(Counter(s["error"] for s in stages if s.get("error"))),
         }
+        if mode == "legacy-grounded":
+            result.update(
+                attempted_count=count,
+                provider_call_count=sum(bool(s.get("provider_called")) for s in stages),
+            )
+        return result
 
     if mode == "general":
         return metrics(rows, "correct")
     answers = [row["answer"] for row in rows]
     rewrites = [row["rewrite"] for row in rows if row["rewrite"] is not None]
     count = sum(stage["citation_count"] for stage in answers)
+    legacy = mode == "legacy-grounded"
+    answer_metrics = metrics(answers, "reference_match", has_gold=not legacy)
+    if legacy:
+        answer_metrics["binary_refusal"] = metrics(answers, "binary_refusal_match")
+        for field in (
+            "answer_term_count",
+            "answer_term_match_count",
+            "forbidden_answer_term_count",
+            "forbidden_answer_term_match_count",
+            "reference_source_count",
+            "supported_reference_count",
+        ):
+            answer_metrics[field] = sum(stage[field] for stage in answers)
+        answer_metrics["answer_term_coverage"] = (
+            answer_metrics["answer_term_match_count"] / answer_metrics["answer_term_count"]
+            if answer_metrics["answer_term_count"]
+            else None
+        )
+        answer_metrics["false_answer_count"] = sum(stage["false_answer"] for stage in answers)
+        answer_metrics["false_refusal_count"] = sum(stage["false_refusal"] for stage in answers)
     return {
         "case_count": len(rows),
-        "answer": metrics(answers, "reference_match"),
-        "rewrite": metrics(rewrites, "reference_match"),
+        "answer": answer_metrics,
+        "rewrite": metrics(rewrites, "reference_match", has_gold=not legacy),
         "rewrite_not_applicable_count": len(rows) - len(rewrites),
         "citation_count": count,
         "citation_mapping": 1.0 if count else None,
-        "limit": "exact frozen-reference/format scores; no independent semantic-quality claim",
+        "limit": "legacy binary refusal/term/citation scores; strict status and rewrite gold absent"
+        if legacy
+        else "exact frozen-reference/format scores; no independent semantic-quality claim",
     }
 
 
@@ -329,16 +400,18 @@ async def evaluate_file(path, mode, split, runtime_path, provider, *, private_re
             "split": split,
             "evaluation_path": "given_evidence_and_rewrite"
             if mode == "grounded"
+            else "legacy_given_evidence_and_rewrite"
+            if mode == "legacy-grounded"
             else "ordinary_instructions",
             "created_at": datetime.now(UTC).isoformat(),
             "evaluation_dataset_sha256": digest,
             "evaluation_code_sha256": evaluation_code_hashes(),
             "dataset_sha256": digest,
-            "dataset_version": dataset.get("version", dataset["schema_version"]),
+            "dataset_version": dataset.get("version", dataset.get("schema_version")),
             "runtime_manifest": runtime,
             "code_commit": commit,
             "working_tree_dirty": dirty,
-            "prompt_version": PROMPT_VERSION if mode == "grounded" else "general-regression-v1",
+            "prompt_version": PROMPT_VERSION if mode != "general" else "general-regression-v1",
             "prompt_sha256": prompt_hashes(),
             "input_byte_limit": 12000,
             "answer_output_token_limit": 512,
@@ -356,7 +429,7 @@ async def evaluate_file(path, mode, split, runtime_path, provider, *, private_re
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=["grounded", "general"], required=True)
+    parser.add_argument("--mode", choices=["grounded", "legacy-grounded", "general"], required=True)
     parser.add_argument("--dataset", type=Path, required=True)
     parser.add_argument("--split", choices=["dev", "test"], required=True)
     parser.add_argument("--runtime-manifest", type=Path, required=True)

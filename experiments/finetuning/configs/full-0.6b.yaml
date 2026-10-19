@@ -1,0 +1,47 @@
+# Pilot only: stop at 100 and resume to 200 without changing the schedule.
+# Freeze the formal schedule once from measured throughput, capped at three epochs.
+# Qwen/Qwen3-0.6B; replace ordinary local paths in the ignored operational recipe.
+model_name_or_path: .local/models/qwen3-0.6b
+model_revision: c1899de289a04d12100db370d81485cdf75e47ca
+trust_remote_code: false
+stage: sft
+do_train: true
+finetuning_type: full
+bf16: true
+pure_bf16: false
+flash_attn: sdpa
+gradient_checkpointing: true
+disable_gradient_checkpointing: false
+template: qwen3_nothink
+dataset_dir: .local/finetuning-020/full-data
+output_dir: .local/finetuning-020/train
+dataset: teaching_train
+eval_dataset: teaching_validation
+cutoff_len: 1024
+packing: false
+train_on_prompt: false
+preprocessing_num_workers: 1
+dataloader_num_workers: 0
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 0.00001
+lr_scheduler_type: cosine
+warmup_ratio: 0.03
+optim: adamw_torch
+logging_steps: 1
+save_strategy: steps
+save_steps: 100
+eval_strategy: steps
+eval_steps: 100
+load_best_model_at_end: true
+metric_for_best_model: eval_loss
+greater_is_better: false
+save_total_limit: 3
+save_only_model: false
+save_safetensors: true
+restore_callback_states_from_checkpoint: true
+early_stopping_steps: 3
+report_to: none
+seed: 42
+max_steps: 200

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import sys
 from types import SimpleNamespace
 
 import pytest
@@ -220,3 +221,164 @@ def test_business_provider_consumes_actual_loopback_sse_without_relabeling(reaso
         server.should_exit = True
         thread.join(timeout=5)
         sock.close()
+
+
+def test_main_serves_requested_full_bf16_parameters(monkeypatch, tmp_path):
+    import torch
+    from experiments.finetuning import local_api
+
+    model = torch.nn.Linear(2, 2).eval().requires_grad_(False)
+    model.generation_config = SimpleNamespace(do_sample=True)
+    chat = SimpleNamespace(engine=SimpleNamespace(model=model))
+    config = tmp_path / "inference.yaml"
+    config.write_text("finetuning_type: full\ninfer_dtype: bfloat16\n", encoding="utf-8")
+    key = tmp_path / "private-key"
+    key.write_text("a" * 32, encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["local_api", "--config", str(config), "--key-file", str(key)])
+
+    def native_chat(parsed):
+        assert parsed == {"finetuning_type": "full", "infer_dtype": "bfloat16"}
+        assert all(parameter.dtype == torch.float32 for parameter in model.parameters())
+        return chat
+
+    served = []
+
+    def serve(app, **kwargs):
+        assert all(parameter.dtype == torch.bfloat16 for parameter in model.parameters())
+        assert model.generation_config.do_sample is False
+        served.append(app)
+
+    monkeypatch.setitem(sys.modules, "llamafactory.chat", SimpleNamespace(ChatModel=native_chat))
+    monkeypatch.setitem(sys.modules, "uvicorn", SimpleNamespace(run=serve))
+    local_api.main()
+    assert len(served) == 1
+
+
+def inference_module(dtype=None):
+    import torch
+
+    model = torch.nn.Module()
+    model.weight = torch.nn.Parameter(torch.tensor([0.1, -0.7], dtype=dtype or torch.float32))
+    model.tied_weight = model.weight
+    model.frozen = torch.nn.Parameter(torch.tensor([0.3], dtype=dtype or torch.float32), False)
+    model.register_buffer("inv_freq", torch.tensor([1.0, 0.01], dtype=torch.float32))
+    model.config = SimpleNamespace(dtype="float32", use_cache=True)
+    model.generation_config = SimpleNamespace(do_sample=True, num_beams=1)
+    model._hf_peft_config_loaded = False  # Native HF's unused adapter mixin is not PEFT state.
+    return model
+
+
+def parameter_identity(model):
+    return {
+        name: (id(parameter), parameter.data_ptr(), parameter.dtype, parameter.requires_grad)
+        for name, parameter in model.named_parameters(remove_duplicate=False)
+    }
+
+
+def test_full_bf16_cast_preserves_parameter_aliases_buffers_and_configs():
+    import torch
+    from experiments.finetuning.local_api import enforce_full_bf16
+
+    model = inference_module()
+    before = parameter_identity(model)
+    native_casts = {name: p.detach().to(torch.bfloat16) for name, p in model.named_parameters()}
+    buffer = model.inv_freq
+    buffer_bytes = buffer.view(torch.uint8).clone()
+    config = model.config
+    generation = model.generation_config
+    config_values = vars(config).copy()
+    generation_values = vars(generation).copy()
+    enforce_full_bf16(
+        SimpleNamespace(engine=SimpleNamespace(model=model)),
+        {"finetuning_type": "full", "infer_dtype": "bfloat16"},
+    )
+    for name, parameter in model.named_parameters(remove_duplicate=False):
+        assert parameter.dtype == torch.bfloat16
+        assert id(parameter) == before[name][0]
+        assert parameter.requires_grad == before[name][3]
+        assert parameter.device.type == "cpu"
+    for name, parameter in model.named_parameters():
+        assert torch.equal(parameter, native_casts[name])
+    assert model.weight is model.tied_weight
+    assert model.inv_freq is buffer
+    assert model.inv_freq.dtype == torch.float32
+    assert torch.equal(model.inv_freq.view(torch.uint8), buffer_bytes)
+    assert model.config is config and vars(config) == config_values
+    assert model.generation_config is generation and vars(generation) == generation_values
+
+
+def test_already_bf16_full_model_and_repeat_call_leave_storage_untouched():
+    import torch
+    from experiments.finetuning.local_api import enforce_full_bf16
+
+    model = inference_module(torch.bfloat16)
+    before = parameter_identity(model)
+    values = {name: p.detach().clone() for name, p in model.named_parameters()}
+    chat = SimpleNamespace(engine=SimpleNamespace(model=model))
+    config = {"finetuning_type": "full", "infer_dtype": "bfloat16"}
+    enforce_full_bf16(chat, config)
+    enforce_full_bf16(chat, config)
+    assert parameter_identity(model) == before
+    assert all(torch.equal(parameter, values[name]) for name, parameter in model.named_parameters())
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"finetuning_type": "lora", "infer_dtype": "bfloat16"},
+        {"finetuning_type": "freeze", "infer_dtype": "bfloat16"},
+        {"finetuning_type": "full", "infer_dtype": "auto"},
+        {"finetuning_type": "full", "infer_dtype": "float16"},
+        {},
+    ],
+)
+def test_other_inference_modes_retain_their_existing_parameters(config):
+    from experiments.finetuning.local_api import enforce_full_bf16
+
+    model = inference_module()
+    model.peft_config = {"default": object()}
+    model.is_loaded_in_4bit = True
+    before = parameter_identity(model)
+    enforce_full_bf16(SimpleNamespace(engine=SimpleNamespace(model=model)), config)
+    assert parameter_identity(model) == before
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("is_quantized", True),
+        ("is_loaded_in_4bit", True),
+        ("is_loaded_in_8bit", True),
+        ("hf_quantizer", object()),
+        ("peft_config", {"default": object()}),
+        ("_hf_peft_config_loaded", True),
+    ],
+)
+def test_quantized_or_peft_full_model_is_rejected_before_any_cast(attribute, value):
+    from experiments.finetuning.local_api import enforce_full_bf16
+
+    model = inference_module()
+    setattr(model, attribute, value)
+    before = parameter_identity(model)
+    with pytest.raises(ValueError, match="FULL_BF16.*QUANT_OR_ADAPTER"):
+        enforce_full_bf16(
+            SimpleNamespace(engine=SimpleNamespace(model=model)),
+            {"finetuning_type": "full", "infer_dtype": "bfloat16"},
+        )
+    assert parameter_identity(model) == before
+
+
+@pytest.mark.parametrize("dtype_name", ["float16", "float64", "int64"])
+def test_unsupported_full_parameter_dtype_rejects_without_partial_mutation(dtype_name):
+    import torch
+    from experiments.finetuning.local_api import enforce_full_bf16
+
+    model = inference_module()
+    model.frozen.data = model.frozen.data.to(getattr(torch, dtype_name))
+    before = parameter_identity(model)
+    with pytest.raises(ValueError, match="FULL_BF16.*PARAMETER_DTYPE"):
+        enforce_full_bf16(
+            SimpleNamespace(engine=SimpleNamespace(model=model)),
+            {"finetuning_type": "full", "infer_dtype": "bfloat16"},
+        )
+    assert parameter_identity(model) == before

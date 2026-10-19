@@ -445,3 +445,260 @@ def test_cli_actual_legacy_dataset_v1_keeps_existing_report_behavior(monkeypatch
     assert report["rows"][0]["question"] == "星桥社的登记窗口在哪？"
     assert report["metadata"]["generation_model"] == "C:/private/model/location"
     assert "evaluation_dataset_sha256" not in report["metadata"]
+
+
+def legacy_dataset(history=False, refusal=False):
+    dataset = grounded_dataset(history)
+    del dataset["schema_version"]
+    case = dataset["cases"][0]
+    for key in ("evidence", "answer", "rewrite"):
+        del case[key]
+    if refusal:
+        case.update(expected_refusal=True, reference_sources=[], answer_terms=[])
+    return dataset
+
+
+def test_legacy_grounded_loads_original_fixture_only_explicitly():
+    module = evaluator()
+    path = module.ROOT / "experiments/evaluation/dataset.json"
+    dataset = module.load_cases(path, "legacy-grounded")
+    assert len(dataset["cases"]) == 60
+    assert sum(c["split"] == "dev" for c in dataset["cases"]) == 18
+    assert sum(c["split"] == "test" for c in dataset["cases"]) == 42
+    assert all(type(c["expected_refusal"]) is bool for c in dataset["cases"])
+    with pytest.raises(ValueError, match="v2"):
+        module.load_cases(path, "grounded")
+
+
+def test_legacy_grounded_retains_dataset_validation_and_binary_label(tmp_path):
+    module = evaluator()
+    path = tmp_path / "legacy.json"
+    dataset = legacy_dataset()
+    dataset["cases"][0]["expected_refusal"] = 0
+    path.write_text(json.dumps(dataset), encoding="utf-8")
+    with pytest.raises(ValueError, match="binary"):
+        module.load_cases(path, "legacy-grounded")
+    dataset["cases"][0]["expected_refusal"] = False
+    dataset["sources"][0]["sha256"] = "0" * 64
+    path.write_text(json.dumps(dataset), encoding="utf-8")
+    with pytest.raises(ValueError, match="source hash"):
+        module.load_cases(path, "legacy-grounded")
+    path.write_text(json.dumps(grounded_dataset()), encoding="utf-8")
+    with pytest.raises(ValueError, match="legacy"):
+        module.load_cases(path, "legacy-grounded")
+
+
+@pytest.mark.parametrize("status", ["clarify", "no_answer"])
+def test_legacy_refusal_is_binary_and_strict_subtype_is_unscored(status):
+    module = evaluator()
+    provider = Provider([json.dumps({"status": status, "selections": []})])
+    rows = asyncio.run(
+        module.evaluate_dataset(legacy_dataset(refusal=True), "legacy-grounded", "test", provider)
+    )
+    answer = rows[0]["answer"]
+    assert answer["status"] == status
+    assert answer["binary_refusal_match"] is True
+    assert answer["reference_match"] is None
+    assert rows[0]["rewrite"] is None
+    assert len(provider.requests) == 1
+    summary = module.summarize_evaluation(rows, "legacy-grounded")
+    assert summary["answer"]["scored_count"] == 0
+    assert summary["answer"]["accuracy"] is None
+    assert summary["answer"]["binary_refusal"]["accuracy"] == 1
+    assert summary["answer"]["binary_refusal"]["scored_count"] == 1
+    assert summary["answer"]["answer_term_count"] == 0
+    assert summary["answer"]["answer_term_coverage"] is None
+
+
+def test_legacy_answer_terms_citations_and_forbidden_terms_have_actual_denominators():
+    module = evaluator()
+    dataset = legacy_dataset()
+    dataset["cases"][0].update(
+        answer_terms=["星桥社", "三层"], forbidden_answer_terms=["三层", "一层"]
+    )
+    provider = Provider(['{"status":"answered","selections":[{"index":1,"quote":"三层"}]}'])
+    rows = asyncio.run(module.evaluate_dataset(dataset, "legacy-grounded", "test", provider))
+    messages, cap, temperature = provider.requests[0]
+    payload = json.loads(messages[1].content)
+    assert set(payload) == {"question", "retrieval_query", "evidence"}
+    assert payload["evidence"] == [
+        {"index": 1, "title": "虚构教学政策", "text": "虚构星桥社的登记窗口在三层。"}
+    ]
+    assert cap == 512 and temperature == 0
+    answer = rows[0]["answer"]
+    assert answer["binary_refusal_match"] is True
+    assert answer["answer_term_match_count"] == 1
+    assert answer["answer_term_count"] == 2
+    assert answer["forbidden_answer_term_match_count"] == 1
+    assert answer["forbidden_answer_term_count"] == 2
+    summary = module.summarize_evaluation(rows, "legacy-grounded")
+    assert summary["citation_count"] == 1 and summary["citation_mapping"] == 1
+    assert summary["answer"]["supported_reference_count"] == 1
+    assert summary["answer"]["reference_source_count"] == 1
+    assert summary["answer"]["answer_term_coverage"] == 0.5
+    public = json.dumps(rows, ensure_ascii=False)
+    for private in ("星桥社", "三层", "question", "answer_terms", "expected_refusal"):
+        assert private not in public
+
+
+@pytest.mark.parametrize(
+    "refusal,output,error,false_refusal",
+    [
+        (True, '{"status":"answered","selections":[]}', "INVALID_CITATION", 0),
+        (False, '{"status":"clarify","selections":[]}', None, 1),
+    ],
+)
+def test_legacy_false_refusal_and_invalid_answer_are_separate(
+    refusal, output, error, false_refusal
+):
+    module = evaluator()
+    rows = asyncio.run(
+        module.evaluate_dataset(
+            legacy_dataset(refusal=refusal), "legacy-grounded", "test", Provider([output])
+        )
+    )
+    assert rows[0]["answer"]["error"] == error
+    summary = module.summarize_evaluation(rows, "legacy-grounded")["answer"]
+    assert summary["binary_refusal"]["accuracy"] == 0
+    assert summary["false_answer_count"] == 0
+    assert summary["false_refusal_count"] == false_refusal
+    assert summary["error_count"] == int(error is not None)
+
+
+@pytest.mark.parametrize(
+    "output,error",
+    [
+        ('{"query":"different","needs_clarification":false}', None),
+        ('{"query":"","needs_clarification":true}', None),
+        ('{"query":"x","needs_clarification":1}', "INVALID_REWRITE"),
+    ],
+)
+def test_legacy_history_rewrite_contract_without_invented_gold(output, error):
+    module = evaluator()
+    provider = Provider(['{"status":"no_answer","selections":[]}', output])
+    rows = asyncio.run(
+        module.evaluate_dataset(legacy_dataset(history=True), "legacy-grounded", "test", provider)
+    )
+    assert rows[0]["rewrite"]["reference_match"] is None
+    assert rows[0]["rewrite"]["error"] == error
+    messages, cap, temperature = provider.requests[1]
+    payload = json.loads(messages[1].content)
+    assert set(payload) == {"question", "history"}
+    assert cap == 128 and temperature == 0
+    summary = module.summarize_evaluation(rows, "legacy-grounded")["rewrite"]
+    assert summary["scored_count"] == 0 and summary["accuracy"] is None
+    assert summary["correct_count"] is None
+    assert summary["attempted_count"] == 1 and summary["provider_call_count"] == 1
+    assert summary["error_count"] == int(error is not None)
+
+
+def test_legacy_prompt_failure_keeps_zero_actual_calls_and_safe_errors():
+    module = evaluator()
+    dataset = legacy_dataset(history=True)
+    dataset["cases"][0]["question"] = "大" * 5000
+    provider = Provider([])
+    rows = asyncio.run(module.evaluate_dataset(dataset, "legacy-grounded", "test", provider))
+    summary = module.summarize_evaluation(rows, "legacy-grounded")
+    for stage in ("answer", "rewrite"):
+        assert summary[stage]["attempted_count"] == 1
+        assert summary[stage]["provider_call_count"] == 0
+        assert summary[stage]["error_count"] == 1
+        assert rows[0][stage]["error"] == "CONTEXT_LIMIT"
+    assert provider.requests == []
+    assert "大" not in json.dumps(rows, ensure_ascii=False)
+
+
+@pytest.mark.parametrize(
+    "reason,failure,error",
+    [
+        ("length", False, "PROVIDER_UNSUPPORTED_RESPONSE"),
+        ("stop", True, "EVALUATION_PROVIDER_ERROR"),
+    ],
+)
+def test_legacy_provider_errors_count_attempts_without_citation_or_label_success(
+    reason, failure, error
+):
+    module = evaluator()
+    provider = Provider(['{"status":"no_answer","selections":[]}'], reason=reason, failure=failure)
+    rows = asyncio.run(
+        module.evaluate_dataset(legacy_dataset(refusal=True), "legacy-grounded", "test", provider)
+    )
+    summary = module.summarize_evaluation(rows, "legacy-grounded")
+    assert rows[0]["answer"]["error"] == error
+    assert summary["answer"]["attempted_count"] == 1
+    assert summary["answer"]["provider_call_count"] == 1
+    assert summary["answer"]["binary_refusal"]["scored_count"] == 1
+    assert summary["answer"]["binary_refusal"]["accuracy"] == 0
+    assert summary["answer"]["error_counts"] == {error: 1}
+    assert summary["citation_count"] == 0 and summary["citation_mapping"] is None
+    assert summary["rewrite_not_applicable_count"] == 1
+    assert "private" not in json.dumps(rows)
+
+
+def test_legacy_file_metadata_and_private_trace_keep_original_identity(tmp_path):
+    from test_local_evaluation import runtime_v2, write_runtime
+
+    module = evaluator()
+    dataset = legacy_dataset()
+    dataset["cases"].append(
+        {
+            **dataset["cases"][0],
+            "id": "dev-case",
+            "split": "dev",
+            "group": "dev-group",
+            "reference_sources": [],
+            "expected_refusal": True,
+            "answer_terms": [],
+        }
+    )
+    path = tmp_path / "legacy.json"
+    path.write_text(json.dumps(dataset), encoding="utf-8")
+    private = []
+    report = asyncio.run(
+        module.evaluate_file(
+            path,
+            "legacy-grounded",
+            "test",
+            write_runtime(tmp_path, runtime_v2("full")),
+            Provider(['{"status":"answered","selections":[{"index":1,"quote":"三层"}]}']),
+            private_records=private,
+        )
+    )
+    assert report["metadata"]["dataset_version"] == "original-fixture"
+    assert report["metadata"]["evaluation_path"] == "legacy_given_evidence_and_rewrite"
+    assert report["metadata"]["prompt_version"] == "rag-extractive-v2"
+    assert [r["id"] for r in report["rows"]] == ["original-case"]
+    assert "三层" not in json.dumps(report, ensure_ascii=False)
+    assert "三层" in json.dumps(private, ensure_ascii=False)
+
+
+def test_legacy_cli_preserves_error_exit_and_private_output_boundary(monkeypatch, tmp_path):
+    from test_local_evaluation import runtime_v2, write_runtime
+
+    module = evaluator()
+    dataset_path = tmp_path / "legacy.json"
+    dataset_path.write_text(json.dumps(legacy_dataset()), encoding="utf-8")
+    output = tmp_path / "report.json"
+    monkeypatch.setattr(
+        module.sys,
+        "argv",
+        [
+            "evaluate_model.py",
+            "--mode",
+            "legacy-grounded",
+            "--dataset",
+            str(dataset_path),
+            "--split",
+            "test",
+            "--runtime-manifest",
+            str(write_runtime(tmp_path, runtime_v2("full"))),
+            "--output",
+            str(output),
+        ],
+    )
+    monkeypatch.setattr(module, "select_generation_provider", lambda *a, **kw: Provider(["bad"]))
+    assert module.main() == 1
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["summary"]["answer"]["error_counts"] == {"INVALID_JSON": 1}
+    assert report["summary"]["answer"]["provider_call_count"] == 1
+    assert not output.with_suffix(".private.json").exists()

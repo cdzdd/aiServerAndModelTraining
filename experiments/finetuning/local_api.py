@@ -163,6 +163,33 @@ def enforce_greedy(chat_model):
     chat_model.engine.model.generation_config.do_sample = False
 
 
+def enforce_full_bf16(chat_model, config):
+    if config.get("finetuning_type") != "full" or config.get("infer_dtype") != "bfloat16":
+        return
+
+    import torch
+
+    model = chat_model.engine.model
+    if (
+        any(
+            bool(getattr(model, name, False))
+            for name in ("is_quantized", "is_loaded_in_4bit", "is_loaded_in_8bit")
+        )
+        or getattr(model, "hf_quantizer", None) is not None
+        or getattr(model, "peft_config", None)
+        or getattr(model, "_hf_peft_config_loaded", False)
+    ):
+        raise ValueError("FULL_BF16_QUANT_OR_ADAPTER")
+    parameters = list(model.parameters())
+    if any(parameter.dtype not in (torch.float32, torch.bfloat16) for parameter in parameters):
+        raise ValueError("FULL_BF16_UNSUPPORTED_PARAMETER_DTYPE")
+    # Factory 0.9.5 loads with dtype=auto; preserve native FP32 rotary buffers.
+    with torch.no_grad():
+        for parameter in parameters:
+            if parameter.dtype != torch.bfloat16:
+                parameter.data = parameter.data.to(dtype=torch.bfloat16)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
@@ -181,6 +208,7 @@ def main():
 
     config = yaml.safe_load(args.config.read_text(encoding="utf-8-sig"))
     model = ChatModel(config)
+    enforce_full_bf16(model, config)
     enforce_greedy(model)
     uvicorn.run(
         create_app(model, token=token, model_id=args.model_id),
