@@ -1,6 +1,6 @@
 # 混合计算操作手册
 
-适用于todo-021的queued实现及购买前试验。网站、账号、PostgreSQL、原始资料、BGE和RAG留在服务端；桌面只主动领取固定Ollama生成任务。服务器/域名购买、公网HTTPS发布及整机2GiB验收尚须按[todo-021](../tasks/todo-021.md)记录实际结果；本手册不是完成声明。协议与上限见[CONTRACTS](../CONTRACTS.md#021-云端业务与桌面生成契约)。
+适用于todo-021的queued实现及购买前试验。网站、账号、PostgreSQL、原始资料、BGE和RAG留在服务端；桌面只主动领取固定Ollama生成任务。购买前整机2GiB验收结果见[资源报告](hybrid-preflight-report.md)；服务器/域名购买、备案及公网HTTPS发布另行操作。协议与上限见[CONTRACTS](../CONTRACTS.md#021-云端业务与桌面生成契约)。
 
 ## 配置服务端
 
@@ -58,9 +58,41 @@ uv run --directory backend --frozen python -m app.modules.compute.desktop --conf
 
 公网仅开放网站HTTP/HTTPS；数据库、Ollama和桌面不公开监听，不使用frp或通用流量转发。HTTPS配置与公网真实链路沿todo-016/017验收，购买与发布不能从本机脚本成功推断。
 
+## 2GiB演示资源配置
+
+[compose.hybrid-budget.yaml](../../infra/compose.hybrid-budget.yaml)须与compose.local.yaml按此顺序叠加；它不改变现有local-run.mjs默认行为。该配置只用于本次受控小型演示候选，实际通过范围与失败记录以[资源报告](hybrid-preflight-report.md)为准。
+
+| 服务 | 内存硬上限MiB | CPU配额 |
+| --- | --- | --- |
+| API | 576 | 0.75 |
+| 解析worker | 192 | 0.25 |
+| BGE索引worker | 640 | 0.75 |
+| PostgreSQL | 128 | 0.20 |
+| Caddy/web | 32 | 0.05 |
+| 合计 | 1568 | 2.00 |
+
+三个Python服务OMP_NUM_THREADS固定为1；每个服务memswap_limit等于mem_limit，不允许容器额外swap。Docker标准输出采用json-file，每文件5m、最多2文件；这不限制上传卷、数据库、Docker系统日志或磁盘总量，仍需监测、备份与容量告警。五个服务上限之和也不代表同时实际占用或操作系统余量。
+
+以下在**独立配置好的queued worktree**根目录执行；.env须包含该试验自己的数据库凭据、WEB_PORT及上述模型设置。BGE路径换为已验证且只读的实际模型目录；不要填入原演示环境的数据库。先建立PowerShell参数数组，后续每条命令检查成功再继续：
+
+```powershell
+$env:RUNTIME_IMAGE_TAG = (git rev-parse --short=12 HEAD).Trim()
+$env:BGE_HOST_PATH = 'C:/path/to/bge-small-zh-v1.5'
+$budgetCompose = @('compose', '--env-file', '.env', '-p', 'qa-hybrid-budget', '-f', 'infra/compose.local.yaml', '-f', 'infra/compose.hybrid-budget.yaml')
+docker @budgetCompose config --quiet
+docker @budgetCompose build api web
+docker @budgetCompose up -d --wait db
+docker @budgetCompose run --rm --no-deps api alembic upgrade head
+docker @budgetCompose up -d --wait api parse-worker index-worker web
+```
+
+同一PowerShell会话中使用 `docker @budgetCompose ps`、`docker @budgetCompose logs --tail 100` 和 `docker @budgetCompose stop`。该项目的注册节点操作在 `docker @budgetCompose exec api python -m app.modules.compute.manage ...` 执行，凭据交付遵循前文。不要再对同一项目混用未带budget叠加文件的启动命令，否则资源设置会回到默认值。
+
+首次验收须观察Docker历史oom/die/restart事件、各容器cgroup memory.events/peak及整机MemAvailable，而不只读取当前OOMKilled。原448MiB API配额曾在同一客服账号3个并行登录请求与BGE查询重叠时触发OOM；最终576MiB配额必须按报告中的完整并发负载核验。192MiB解析限额只覆盖已测的虚构TXT、64段DOCX和12页PDF，不能承诺任意20MiB上传、复杂扫描PDF或更高访客并发均能运行。公网HTTPS与备案后的真实云机还须复核资源、延迟和文件负载。
+
 ## 停止、撤销与故障恢复
 
-正常停止桌面用Ctrl+C；停止业务容器用该项目的 `node scripts/deploy/local-run.mjs stop`。API重启会把遗留生成恢复为失败并撤销旧计算；桌面重启不会重做旧任务。聊天页面重连只读历史，不自动重新生成。需再次提问时由用户明确发起，已受理的失败/取消请求仍计入限额。
+正常停止桌面用Ctrl+C；默认本机项目用 `node scripts/deploy/local-run.mjs stop`，budget项目用前述 `docker @budgetCompose stop`，始终选择该项目自己的配置。API重启会把遗留生成恢复为失败并撤销旧计算；桌面重启不会重做旧任务。聊天页面重连只读历史，不自动重新生成。需再次提问时由用户明确发起，已受理的失败/取消请求仍计入限额。
 
 撤销在目标数据库的管理员环境执行，worker UUID替换为注册命令的实际输出：
 
