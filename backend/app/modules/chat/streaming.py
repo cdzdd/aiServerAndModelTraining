@@ -5,15 +5,18 @@ import json
 import logging
 import time
 from contextlib import aclosing
+from datetime import timedelta
 
 import anyio
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import StreamingResponse
 
 from app.core.request_context import log_failure
+from app.core.security import SESSION_COOKIE, token_hash
 from app.modules.auth.schemas import Actor
 from app.modules.auth.service import find_session
 from app.modules.chat import service
+from app.modules.compute.context import GenerationScope, bind_scope
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +70,22 @@ class GenerationStream:
         return saved and status == requested
 
     async def events(self):
+        reservation = self.reservation
+        scope = GenerationScope(
+            conversation_id=reservation.conversation_id,
+            assistant_message_id=reservation.assistant_message_id,
+            generation_token=reservation.token,
+            actor_id=reservation.actor.user_id,
+            actor_role=reservation.actor.role,
+            session_hash=token_hash(self.request.cookies.get(SESSION_COOKIE, "")),
+            deadline=reservation.accepted_at + timedelta(seconds=60),
+        )
+        with bind_scope(scope):
+            async with aclosing(self._events()) as events:
+                async for event in events:
+                    yield event
+
+    async def _events(self):
         pending_text = ""
         citations_bound = False
         try:

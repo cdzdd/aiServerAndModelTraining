@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -74,7 +75,7 @@ class Message(Base):
     answer_status: Mapped[str | None] = mapped_column(String(12), nullable=True)
     evidence_level: Mapped[str | None] = mapped_column(String(12), nullable=True)
     intent: Mapped[str | None] = mapped_column(String(12), nullable=True)
-    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     request_id: Mapped[str] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)

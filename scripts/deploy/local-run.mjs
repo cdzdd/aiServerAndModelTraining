@@ -31,8 +31,8 @@ export function runAction(action, env, execute) {
   }
   if (!/^\d+$/.test(env.WEB_PORT ?? '')) throw new Error('Set WEB_PORT in .env.')
   if (['build', 'start'].includes(action)) {
-    if (!['mock', 'ollama'].includes(env.MODEL_PROVIDER ?? 'mock')) {
-      throw new Error('Local runtime allows mock or ollama only; cloud calls are not authorized.')
+    if (!['mock', 'ollama', 'queued'].includes(env.MODEL_PROVIDER ?? 'mock')) {
+      throw new Error('Local runtime allows mock or ollama or queued only; cloud calls are not authorized.')
     }
     if (!env.EMBEDDING_MODEL_PATH) throw new Error('Set the existing BGE EMBEDDING_MODEL_PATH.')
   }
