@@ -9,13 +9,23 @@ from .mock import MockProvider
 from .ollama import OllamaProvider
 
 
-def create_provider(settings: ModelSettings | None = None) -> Provider:
+def create_provider(settings: ModelSettings | None = None, *, session_factory=None) -> Provider:
     try:
         settings = settings if settings is not None else ModelSettings()
     except (ValidationError, SettingsError):
         raise ProviderError("PROVIDER_CONFIG_ERROR") from None
     if settings.model_provider == "mock":
         return MockProvider(max_output_tokens=settings.model_max_output_tokens)
+    if settings.model_provider == "queued":
+        if session_factory is None:
+            raise ProviderError("PROVIDER_CONFIG_ERROR")
+        from .queued import QueuedProvider
+
+        return QueuedProvider(
+            session_factory,
+            model_id=settings.model_id,
+            max_output_tokens=settings.model_max_output_tokens,
+        )
     if settings.model_provider == "ollama":
         return OllamaProvider(settings)
     return CloudProvider(settings)

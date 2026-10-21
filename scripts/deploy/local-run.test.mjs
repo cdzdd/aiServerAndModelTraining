@@ -67,3 +67,14 @@ test('host smoke rejects a proxy swallowing API errors in SPA fallback', async (
     } else { res.setHeader('Content-Type', 'text/html'); res.end('<div id="app"></div>') }
   }, async (url) => { await assert.rejects(verifyHostOrigin(url), /host smoke/) })
 })
+
+test('queued local runtime starts without cloud credentials or exposing a desktop port', () => {
+  const calls = []
+  runAction('start', { ...env, MODEL_PROVIDER: 'queued' }, (args) => {
+    calls.push(args)
+    return 0
+  })
+  assert.equal(calls.length, 3)
+  assert.ok(calls[1].includes('alembic'))
+  assert.ok(!calls.some((args) => args.includes('--publish')))
+})

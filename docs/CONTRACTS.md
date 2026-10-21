@@ -96,7 +96,7 @@ Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,tex
 
 `node scripts/dev.mjs worker` 使用本worktree数据库和上传目录。parse任务有持久租约与每次领取的新令牌，过期可重领；旧worker即使恢复也不能提交覆盖新领取者。解析与chunk写入/index排队在提交阶段再次验证知识库、文档启用状态及候选版本。独立解析进程默认60秒超时、512MiB内存上限，文档最多2000页、提取文本最多200万字符；DOCX按原始段落/表格顺序保留位置。空/扫描PDF、损坏格式、资源超限有明确失败状态。模型配置、下载与运行步骤见 [开发说明](../scripts/README.md#5-文档解析-workertodo-006)。
 
-## 4. 内部模块接口（todo-004/007/008/014）
+## 4. 内部模块接口（todo-004/007/008/014/021）
 
 以下类型在所属模块 `schemas.py` 中定义，跨模块复用定义，不复制不同版本。
 
@@ -109,7 +109,7 @@ Chunk：`id,kb_id,document_id?,faq_id?,revision_id?,faq_version?,chunk_index,tex
 | Citation（rag） | index: int, chunk_id, kb_id, source_type, source_id, title, page_number?, paragraph_number?, line_number?, revision_id?, faq_version?, quote |
 | AnswerEvent（rag） | type: delta/citations/done/error, payload: dict |
 
-Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temperature: float) -> AsyncIterator[LLMDelta]`。异步生成器，不接收数据库会话或用户权限。实现 `MockProvider`、`CloudProvider`、`OllamaProvider`，由配置选择。统一超时/取消、429/5xx、无有效输出处理；不把不同协议的错误内容直接展示给用户。
+Provider 接口：`stream(messages: list[LLMMessage], *, max_tokens: int, temperature: float) -> AsyncIterator[LLMDelta]`。异步生成器，不接收数据库会话或用户权限。实现 `MockProvider`、`CloudProvider`、`OllamaProvider`、`QueuedProvider`，由配置选择。统一超时/取消、429/5xx、无有效输出处理；不把不同协议的错误内容直接展示给用户。
 
 首版CloudProvider固定实现 **OpenAI-compatible Chat Completions文字流协议**，不要求用户购买特定厂商服务。`MODEL_BASE_URL`包括版本路径（例如`https://example.invalid/v1`），后端POST到其`/chat/completions`，Bearer认证；请求字段为`model,messages,stream:true,max_tokens,temperature`。首个真实提供商须支持此公共子集；若选定模型只支持其他上限字段/协议，在004接入时明确适配并补契约测试，不猜测兼容。返回按SSE `data:`行解码JSON，读取`choices[0].delta.content`、`finish_reason`，以`data: [DONE]`识别完整流结束；空role片段不产生文本，存在usage的末尾空choices块也应能处理。usage未提供则记录null，不伪造计费用量。不发送工具调用/图像请求，不展示提供商的推理过程字段。为已选定的 DeepSeek 模型增加显式后端配置 `MODEL_DISABLE_THINKING=true`，仅启用时额外发送 `thinking: {type: "disabled"}`；默认 false 保持公共子集。协议参考[Chat Completions官方结构](https://developers.openai.com/api/reference/resources/chat)。
 
@@ -125,6 +125,32 @@ Ollama 本批次接口兼容基线为 **0.35.0**，请求固定发送顶层 `tru
 
 本任务无对外代理 API；真实云连接按用户明确授权执行受控 smoke，当前提供商与结果见 [todo-004](tasks/todo-004.md) 最新工作记录。单次成功不替代 017 发布前对实际部署配置的真实验收。
 Retrieval 接口：`search(actor: Actor, kb_ids: list[UUID], query: str, top_k: int = 5) -> list[SearchHit]`，异步调用。内部重新验证权限；空授权集合返回空候选，不能退化为全库。初期 score 是余弦相似度；混合检索后类型/含义变化必须更新评测与阈值，不能视为同一概率。
+
+### 021 云端业务与桌面生成契约
+
+`MODEL_PROVIDER=queued` 时，网页、身份/权限、数据库、原始资料、BGE、检索、RAG 引用复核和历史写入都在服务端。桌面只通过认证 HTTPS 主动领取固定模型的 generate 任务并调用本机 Ollama；不直连数据库，不执行任意命令/路径/URL，不转发访客流量，也不开放桌面端口。桌面配置与启停见[操作手册](operations/hybrid-compute-runbook.md)。这项实现不代表已通过2GiB资源门槛或公网验收。
+
+`create_provider(..., session_factory=...)` 为 queued 注入服务端会话工厂；`stream` 签名保持不变。聊天受理后以 `GenerationScope(conversation_id, assistant_message_id, generation_token, actor_id, actor_role, session_hash, deadline)` 绑定任务局部 `ContextVar`，finally 恢复；所有标识来自服务端预约，session_hash 是登录会话令牌摘要。缺少作用域不能入队。QueuedProvider 每0.1秒查询结果，整份生成完成后只产生一个带 text/finish_reason/usage 的终止片段；现有 RAG 校验之前仍不展示模型原文。改写和答复可以各建一个任务，共享原请求60秒期限及512输出token预算。
+
+`ComputeWorker` 保存节点名、固定 model_id、可撤销凭据摘要和启用状态。`ComputeJob` 保存作用域、model_id、status、节点、租约摘要/期限、绝对deadline、有界payload/result、结果摘要及时间；状态为 `queued → running → succeeded → consumed`，失败/取消为 `failed|cancelled`。一次任务最多领取一次，失效后不重新排队；无透明重试或云模型回退。排队最多16项、元数据最多10000行，容量检查与状态转换通过数据库事务锁串行化；默认全局最多2个聊天生成仍适用。
+
+payload 为 `{model_id, messages:[LLMMessage], max_tokens, temperature}`：messages 非空、内容合计最多12000 UTF-8字节、max_tokens为1–512、temperature为有限0–2；服务端provider及桌面共同验证。成功结果为 `{model_id, text, finish_reason, usage}`，text最多8192字符，finish_reason仅 `stop|length`，截断由RAG拒绝；usage为null或包含可空非负整数 prompt_tokens/completion_tokens/total_tokens 的对象，缺失保持未知，不推算。失败结果仅 `{error_code}`，接受既有ProviderError允许的错误码，不接收异常正文。所有结构拒绝多余字段，payload/result序列化JSON各最多65536字节；机器HTTP完整请求体也限制为65536字节，因此结果信封需留出开销。
+
+机器入口独立于浏览器API，均为POST、逐请求校验有效 Bearer 节点凭据、响应 `Cache-Control: no-store`；Cookie不能替代Bearer。浏览器 `/api/v1` 的会话、Origin与CSRF保护保持适用。
+
+| 路径 | 请求JSON | 成功响应 |
+| --- | --- | --- |
+| `/internal/compute/claim` | `{}` | 200，`{job:null}` 或 `{job:{job_id,lease_token,deadline,payload}}` |
+| `/internal/compute/{job_id}/heartbeat` | `{lease_token}` | 204 |
+| `/internal/compute/{job_id}/result` | `{lease_token,result}` | 204 |
+
+job_id为UUID；deadline为带时区ISO8601；lease_token最多128字符。认证失败401；失效/冲突任务409；格式错误422；超大请求413；排队/元数据容量不足429（经provider映射为安全错误）。入口在分发前累积读取并限制实际字节，含无Content-Length的流体，超限不执行状态写入。反向代理精确匹配 `/internal/compute` 和 `/internal/compute/*` 到API，未知机器路径返回API错误，不能落入SPA。
+
+桌面串行运行，每次完成后等1秒领取，生成期间每5秒心跳，租约最多15秒且不越过deadline。排队、网络、生成和云端校验共用聊天剩余期限；心跳不能延长。领取、续租、提交、消费均重新核对节点、原generation、用户启用/角色、登录会话有效期及会话bot状态。服务函数使用调用方事务，`now`接受带时区UTC datetime或零参数时钟；生产传时钟回调，在阻塞锁取得后读取当前时间，不能复用锁等待前快照判断期限。
+
+提交还须匹配节点、模型及租约。相同节点/租约/结果摘要在原generation仍有效时可幂等确认，冲突结果拒绝；桌面不会自动重发未知确认的请求。成功结果由唯一消费者原子取回并转为consumed，立即清空payload/result；失败/取消也立即清空。停止、断连、转人工、删除会话、停用用户、撤销登录会话或节点，均使旧结果不能交给原generation；桌面在心跳拒绝、通信失败、取消或期限失效后关闭本地流并退出，检查Ollama空闲后才能人工重启。
+
+应用启动先恢复遗留generating消息为失败，再撤销旧计算；随后每分钟及队列操作时清理过期/失效工作，包括成功但失去有效消费者的正文。超过创建时间24小时的元数据在下次清理删除（约24小时加一个周期）；元数据不能清除到容量以内时拒绝新增。成功尚未消费的结果只保留到消费或原generation/deadline失效；清理与提交/消费共享队列和节点锁，清理仅以刷新后的非锁定授权读取撤销任务、不跨用户持有授权行锁，实际领取、续租、提交和消费仍在授权行锁下复核。保留无原文的有界结果摘要用于幂等确认；不借任务队列保存聊天副本。
 
 ### 007 已实现接入细则
 

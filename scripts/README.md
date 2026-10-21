@@ -137,3 +137,9 @@ logging:
 ```
 
 该设置控制每个容器标准输出/错误日志文件；直接从终端启动的API/worker不受它管理，生产进程管理器须分别配置输出轮转和磁盘限额。持久AuditEvent的保留期限、备份及访问策略在部署验收时确定；012不擅自删除审计或设置生产保留天数。自动化浏览器trace与截图只用于本地虚构测试数据，保存在忽略目录，不作为生产原始聊天日志。
+
+## 10. 云端业务与桌面生成（todo-021）
+
+服务器使用 `MODEL_PROVIDER=queued`、固定 `MODEL_ID` 和同值的 `MODEL_ALLOWED_IDS`；不需要模型API key或模型base URL。保留原开发 `.env` 的Mock，单独准备该运行环境；BGE模型、数据库、端口和资料目录仍按worktree隔离。`node scripts/deploy/local-run.mjs build|start|stop|status|logs|admin|smoke` 已接受queued，本机容器版仍只发布loopback HTTP，不能充当公网HTTPS部署。
+
+节点配置只由管理员注册命令写到显式的新私有文件；凭据不放 `.env`、命令参数或日志。完整的注册/撤销、桌面启动、loopback试验、HTTPS部署要求与取消/离线恢复步骤统一见[混合计算操作手册](../docs/operations/hybrid-compute-runbook.md)。协议、大小与租约限制见[契约](../docs/CONTRACTS.md#021-云端业务与桌面生成契约)。实际验证与购买门槛见[todo-021](../docs/tasks/todo-021.md)；这些配置说明不证明已通过整机2GiB或公网验收。

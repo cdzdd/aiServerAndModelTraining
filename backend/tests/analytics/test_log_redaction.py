@@ -3,12 +3,14 @@
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
 
 from app.core.audit import _redact
+from app.modules.chat.schemas import GenerationReservation
 from app.modules.chat.streaming import GenerationStream
 from app.modules.providers.errors import ProviderError
 from app.modules.rag.service import RAGService
@@ -68,8 +70,20 @@ def test_provider_error_without_http_has_null_request_and_no_payload(caplog):
 )
 def test_stream_persistence_failure_uses_reservation_id(caplog, path, event, code):
     request_id = str(uuid4())
-    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
-    generation = GenerationStream(request, SimpleNamespace(request_id=request_id))
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()), cookies={})
+    reservation = GenerationReservation(
+        conversation_id=uuid4(),
+        user_message_id=uuid4(),
+        assistant_message_id=uuid4(),
+        token=uuid4(),
+        actor=ACTOR,
+        kb_ids=KB_IDS,
+        question="开放时间？",
+        history=[],
+        accepted_at=datetime.now(UTC),
+        request_id=request_id,
+    )
+    generation = GenerationStream(request, reservation)
 
     def fail(*args, **kwargs):
         raise RuntimeError(SECRET)

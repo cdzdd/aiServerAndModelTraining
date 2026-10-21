@@ -16,7 +16,7 @@ class ModelSettings(BaseSettings):
         hide_input_in_errors=True,
         populate_by_name=True,
     )
-    model_provider: Literal["mock", "cloud", "ollama"] = "mock"
+    model_provider: Literal["mock", "cloud", "ollama", "queued"] = "mock"
     model_disable_thinking: bool = False
     model_base_url: str = ""
     model_id: str = ""
@@ -31,6 +31,14 @@ class ModelSettings(BaseSettings):
     @model_validator(mode="after")
     def validate_model(self):
         if self.model_provider == "mock":
+            return self
+        if (
+            not self.model_id.strip()
+            or self.model_id not in self.model_allowed_ids
+            or any(ord(char) < 32 for char in self.model_id)
+        ):
+            raise ValueError("MODEL_ID must be in MODEL_ALLOWED_IDS")
+        if self.model_provider == "queued":
             return self
         try:
             urlsplit(self.model_base_url)  # Reject malformed bracket syntax too.
@@ -53,12 +61,6 @@ class ModelSettings(BaseSettings):
             raise ValueError(
                 "MODEL_BASE_URL must be HTTPS or an allowed local HTTP host, without secrets"
             )
-        if (
-            not self.model_id.strip()
-            or self.model_id not in self.model_allowed_ids
-            or any(ord(char) < 32 for char in self.model_id)
-        ):
-            raise ValueError("MODEL_ID must be in MODEL_ALLOWED_IDS")
         if self.model_provider == "ollama":
             return self
         key = self.model_api_key.get_secret_value()

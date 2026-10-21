@@ -1,5 +1,6 @@
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from datetime import UTC, datetime
 from http import HTTPStatus
 from uuid import UUID, uuid4
@@ -24,6 +25,9 @@ from app.modules.auth.service import check_csrf
 from app.modules.chat.router import router as chat_router
 from app.modules.chat.runtime import ChatRuntime
 from app.modules.chat.service import recover_generations
+from app.modules.compute import service as compute_service
+from app.modules.compute.limits import ComputeBodyLimitMiddleware
+from app.modules.compute.router import router as compute_router
 from app.modules.feedback.router import router as feedback_router
 from app.modules.handoff.router import router as handoff_router
 from app.modules.ingestion.router import router as ingestion_router
@@ -42,15 +46,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine = create_db_engine(settings)
     configure_logging()
 
+    def cleanup_compute(app, *, recover=False):
+        with app.state.session_factory() as db:
+            compute_service.cleanup(db, now=app.state.chat_clock, recover=recover)
+            db.commit()
+
+    async def maintain_compute(app):
+        while True:
+            await asyncio.sleep(60)
+            try:
+                operation = asyncio.create_task(run_in_threadpool(cleanup_compute, app))
+                try:
+                    await asyncio.shield(operation)
+                except asyncio.CancelledError:
+                    # Finish the short transaction before disposing the app's connection pool.
+                    with suppress(Exception):
+                        await operation
+                    raise
+            except Exception:
+                log_failure(
+                    logging.getLogger("app.lifecycle"),
+                    "compute_cleanup_failed",
+                    "COMPUTE_CLEANUP_FAILED",
+                    request_id=None,
+                )
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         recovery_operation_id = uuid4()
+        cleanup_task = None
         try:
             try:
                 await run_in_threadpool(
                     recover_generations, app.state.session_factory, app.state.chat_clock()
                 )
+                await run_in_threadpool(cleanup_compute, app, recover=True)
                 app.state.chat_ready = True
+                cleanup_task = asyncio.create_task(maintain_compute(app))
             except SQLAlchemyError:
                 # Liveness remains available, but no chat traffic starts after failed recovery.
                 log_failure(
@@ -65,10 +97,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             try:
                 await app.state.chat_runtime.shutdown()
             finally:
+                if cleanup_task is not None:
+                    cleanup_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await cleanup_task
                 engine.dispose()
 
     app = FastAPI(title="Knowledge QA API", lifespan=lifespan)
     app.add_middleware(UploadLimitMiddleware)
+    app.add_middleware(ComputeBodyLimitMiddleware)
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = sessionmaker(bind=engine, expire_on_commit=False)
@@ -82,7 +119,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         BGEEmbedder(settings.embedding_model_path),
         threshold=settings.retrieval_threshold,
     )
-    app.state.chat_rag = RAGService(retrieval.search, retrieval.validate_hits, create_provider())
+    app.state.chat_rag = RAGService(
+        retrieval.search,
+        retrieval.validate_hits,
+        create_provider(session_factory=app.state.session_factory),
+    )
     app.state.login_limiter = LoginLimiter(
         account_limit=settings.login_account_limit,
         ip_limit=settings.login_ip_limit,
@@ -94,6 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(knowledge_router)
     app.include_router(ingestion_router)
     app.include_router(chat_router)
+    app.include_router(compute_router)
     app.include_router(feedback_router)
     app.include_router(handoff_router)
 
@@ -123,7 +165,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except Exception:
                 response = error_response(request, 500, "INTERNAL_ERROR", "服务暂时不可用")
             response.headers["X-Request-ID"] = request_id
-            if request.url.path.startswith("/api/v1/"):
+            if (
+                request.url.path.startswith("/api/v1/")
+                or request.url.path == "/internal/compute"
+                or request.url.path.startswith("/internal/compute/")
+            ):
                 response.headers["Cache-Control"] = "no-store"
             route = request.scope.get("route")
             log_http(
