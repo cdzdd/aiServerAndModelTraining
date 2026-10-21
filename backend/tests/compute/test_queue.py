@@ -467,6 +467,81 @@ def test_cleanup_refreshes_existing_session_before_expiring_a_lease(
         assert job.result == result()
 
 
+def test_cleanup_across_users_does_not_deadlock_with_login(
+    factory, current_time, setup_job, monkeypatch
+):
+    from threading import Event
+    from types import SimpleNamespace
+
+    from app.core.security import password_hasher
+    from app.modules.auth import service as auth
+    from app.modules.compute import service
+    from app.modules.compute.models import ComputeJob
+
+    first, _, _, first_job_id = setup_job
+    with factory.begin() as db:
+        second = new_scope(db, current_time)
+        second_job_id = service.enqueue(db, second, payload(), now=current_time)
+        db.get(ComputeJob, second_job_id).created_at = current_time + timedelta(seconds=1)
+        session = db.scalar(select(AuthSession).where(AuthSession.token_hash == first.session_hash))
+        session.expires_at = current_time + timedelta(seconds=1)
+        user = db.get(User, second.actor_id)
+        user.password_hash = password_hasher.hash("login-password")
+        username = user.username
+    checked_at = current_time + timedelta(seconds=2)
+    first_checked, login_locked, second_started = Event(), Event(), Event()
+    validate = service._scope_valid
+
+    def gated_scope(db, scope, now, **kwargs):
+        if scope == second:
+            second_started.set()
+        outcome = validate(db, scope, now, **kwargs)
+        if scope == first:
+            # The old cleanup retains A's expired session lock beyond this point.
+            first_checked.set()
+            assert login_locked.wait(timeout=5)
+        return outcome
+
+    monkeypatch.setattr(service, "_scope_valid", gated_scope)
+
+    def login_clock():
+        # authenticate has already taken B's real User row lock before reading its clock.
+        login_locked.set()
+        assert second_started.wait(timeout=5)
+        return checked_at
+
+    def clean():
+        with factory.begin() as db:
+            service.cleanup(db, now=checked_at)
+
+    def login():
+        request = SimpleNamespace(
+            cookies={},
+            state=SimpleNamespace(request_id="cleanup-login-regression"),
+            app=SimpleNamespace(state=SimpleNamespace(auth_clock=login_clock)),
+        )
+        with factory() as db:
+            return auth.authenticate(db, request, username, "login-password")
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        cleaning = pool.submit(clean)
+        assert first_checked.wait(timeout=5)
+        logging_in = pool.submit(login)
+        cleaning.result(timeout=10)
+        user, raw = logging_in.result(timeout=10)
+    assert user.id == second.actor_id
+    with factory() as db:
+        assert db.scalar(select(AuthSession).where(AuthSession.token_hash == token_hash(raw)))
+        assert (
+            db.scalar(select(AuthSession).where(AuthSession.token_hash == first.session_hash))
+            is None
+        )
+        first_job, second_job = db.get(ComputeJob, first_job_id), db.get(ComputeJob, second_job_id)
+        assert first_job.status == "cancelled"
+        assert first_job.payload is None and first_job.result is None
+        assert second_job.status == "queued" and second_job.payload == payload()
+
+
 def test_downgrade_rejects_big_latency_without_truncating_data(
     factory, migrated_engine, current_time
 ):
@@ -488,9 +563,15 @@ def test_downgrade_rejects_big_latency_without_truncating_data(
         assert db.get(Message, scope.assistant_message_id).latency_ms == 2592000000
 
 
-@pytest.mark.parametrize("lock_kind", ["advisory", "message", "worker"])
 @pytest.mark.parametrize(
-    "operation", ["take_deadline", "take_session", "cleanup_lease", "cleanup_deadline"]
+    ("operation", "lock_kind"),
+    [
+        (operation, lock_kind)
+        for operation in ("take_deadline", "take_session", "cleanup_lease", "cleanup_deadline")
+        for lock_kind in ("advisory", "message", "worker")
+        # Cleanup only invalidates work; only consumption must block on the scope rows.
+        if lock_kind != "message" or operation.startswith("take")
+    ],
 )
 def test_provider_consumption_and_cleanup_use_post_lock_time(
     factory, current_time, setup_job, monkeypatch, lock_kind, operation

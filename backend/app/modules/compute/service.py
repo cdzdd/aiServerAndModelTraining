@@ -39,12 +39,10 @@ def _conflict(code="COMPUTE_REVOKED"):
     return AuthError(409, code, "计算任务已结束或不可用")
 
 
-def _row(db, model, identity):
+def _row(db, model, identity, *, lock=True):
+    query = select(model).where(model.id == identity)
     return db.scalar(
-        select(model)
-        .where(model.id == identity)
-        .with_for_update()
-        .execution_options(populate_existing=True)
+        (query.with_for_update() if lock else query).execution_options(populate_existing=True)
     )
 
 
@@ -60,18 +58,16 @@ def _scope(job):
     )
 
 
-def _scope_valid(db, scope, now):
+def _scope_valid(db, scope, now, *, lock=True):
     # Match chat.finish_generation's User -> Conversation ordering. Locks also serialize
     # account/session revocation and browser cancellation with result acceptance/consumption.
-    actor = _row(db, User, scope.actor_id)
+    actor = _row(db, User, scope.actor_id, lock=lock)
+    query = select(AuthSession).where(AuthSession.token_hash == scope.session_hash)
     session = db.scalar(
-        select(AuthSession)
-        .where(AuthSession.token_hash == scope.session_hash)
-        .with_for_update()
-        .execution_options(populate_existing=True)
+        (query.with_for_update() if lock else query).execution_options(populate_existing=True)
     )
-    conversation = _row(db, Conversation, scope.conversation_id)
-    message = _row(db, Message, scope.assistant_message_id)
+    conversation = _row(db, Conversation, scope.conversation_id, lock=lock)
+    message = _row(db, Message, scope.assistant_message_id, lock=lock)
     checked_at = _time(now)
     return bool(
         scope.deadline > checked_at
@@ -178,7 +174,11 @@ def cleanup(db, *, now, recover=False) -> None:
     ).all()
     for job in jobs:
         worker = _row(db, ComputeWorker, job.worker_id) if job.worker_id else None
-        valid, checked_at = (False, _time(now)) if recover else _scope_valid(db, _scope(job), now)
+        # Cleanup only invalidates work; retaining scope locks across users can deadlock
+        # with login's expired-session deletion. Delivery paths recheck under scope locks.
+        valid, checked_at = (
+            (False, _time(now)) if recover else _scope_valid(db, _scope(job), now, lock=False)
+        )
         if not valid:
             _clear(job, "cancelled", checked_at, "COMPUTE_REVOKED")
         elif job.status == "running" and (
