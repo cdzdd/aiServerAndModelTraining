@@ -21,4 +21,14 @@
 
 - 原子领取todo-022，业务基线origin/main 8e70a79；Ferrari基线a414243。创建原生业务worktree及运维独立Git worktree；原生工具不接受非当前workspace的Ferrari源目录，故运维使用Git worktree回退。
 - 端口API8122、web5322、DB15482、独立容器入口5323；数据库、上传、环境及节点凭据均独立。Docker Desktop按需启动，既有容器按原重启策略恢复，未修改或清理它们。
-- 具体构建、测试、代码评审、PR、运行包及未测范围随真实执行补充；当前未宣称构建、测试或云端部署成功。
+- 初始登记时尚无本轮构建或测试成功声明；后续实际结果见下节，云端部署始终排除在本任务范围。
+
+## 业务与产物验收
+
+- 构建入口ce5feec，专项18通过、独立任务评审Approved；冻结源码8e7c602395ed41e3cc43556a8cfc68be0e05cdee含Vitest5.0.5补丁，npm audit0。
+- 统一检查exit0：9部署、893后端、44评测、287微调工具（另2平台跳过）、114前端、23浏览器；真实环境、命令及告警见[交付报告](../operations/ferrari-delivery-report.md)。
+- 镜像真实构建，PG attestation导出失败保留，classic26重导相同ID后通过运维校验。外包644881396字节、SHA256 `36a2af01268c62dd9d4675bc6ff5a399f4c14af1e12300a4a988ce4ccdc69c77`，私有草稿上传/重新下载核对通过。
+- 运维validate/plan/check-artifact、Compose渲染/契约通过；Windows62项60通过/2跳过，独立Linux62全通过。onboarding夹具新增登记的2失败经三行输入隔离修正，生产CLI不变。
+- 自有2GiB/2vCPU VM、Docker26.1.3/Compose2.27.0实际首装该包到021_compute。真实三格式/BGE/桌面生成/引用、三角色闭环、取消/重复、60.22秒离线、重启保留及撤销通过；活动任务和终态非空正文0。
+- PG+uploads同窗口备份及隔离restore-check通过18表/3文件/512维关联；恢复副本应用下载检索未测，不能替代017正式恢复验收。OOM事件0/末次自动重启0，不作容量压测结论。
+- 当前仍in_progress，待最终分支评审、业务PR/合并、正式运维接入PR和状态收尾。ECS/公网均未发布。
