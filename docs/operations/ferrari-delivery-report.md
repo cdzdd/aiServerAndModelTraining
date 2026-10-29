@@ -14,10 +14,10 @@
 | 外层包 | `knowledge-qa-8e7c602395ed.tar.gz`，644881396字节，仅manifest.json和images.tar |
 | 外层SHA256 | `36a2af01268c62dd9d4675bc6ff5a399f4c14af1e12300a4a988ce4ccdc69c77` |
 | 经典Docker-save | 2082709504字节；SHA256 `7bd62b6fc61b7bf70df3ea5083c3e6097947f2c5968661819b5393aad832873c` |
-| 私有草稿Release | [实际草稿链接](https://github.com/cdzdd/Ferrari_Server/releases/tag/untagged-376448dde4b01aee0245) |
+| 私有草稿Release | 取包位置见[实际运维接入PR14](https://github.com/cdzdd/Ferrari_Server/pull/14)，以固定交付tag查询最新草稿页 |
 | 交付tag | `artifact/knowledge-qa/8e7c602395ed41e3cc43556a8cfc68be0e05cdee`，target运维main，保持草稿 |
 
-从草稿附件实际重新下载644881396字节并核对相同SHA。链接需有私有运维权限，普通Git克隆不下载附件。后续文档提交不改变该冻结源码；功能合并和收尾另记任务文件，不将包改称另一源码版本。
+从草稿附件实际重新下载644881396字节并核对相同SHA。GitHub编辑草稿说明后其untagged页面位置可能变化；使用上表固定tag及运维PR当前实际链接取包，不发布Release来固定网址。链接需有私有运维权限，普通Git克隆不下载附件。后续文档提交不改变该冻结源码；功能合并和收尾另记任务文件，不将包改称另一源码版本。
 
 | 角色/tag | Docker配置ID（非Docker29 OCI index） |
 | --- | --- |
