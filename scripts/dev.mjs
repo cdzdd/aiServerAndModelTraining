@@ -47,7 +47,7 @@ switch (process.argv[2]) {
   case 'check':
     if (!process.env.TEST_DATABASE_URL) throw new Error('Set a dedicated TEST_DATABASE_URL before running checks.')
     run('node', ['--test', 'scripts/deploy/local-run.test.mjs'])
-    run('uv', ['run', '--frozen', 'ruff', 'check', '--config', 'pyproject.toml', '.', '../experiments/evaluation', '../experiments/finetuning', '../scripts/deploy/smoke.py'], backend)
+    run('uv', ['run', '--frozen', 'ruff', 'check', '--config', 'pyproject.toml', '.', '../experiments/evaluation', '../experiments/finetuning', '../scripts/deploy/smoke.py', '../scripts/deploy/ferrari_build.py'], backend)
     run('uv', ['run', '--frozen', 'pytest', '-q'], backend)
     run('uv', ['run', '--frozen', 'pytest', '-c', 'pyproject.toml', '../experiments/evaluation/tests', '-q'], backend)
     run('uv', ['run', '--frozen', 'pytest', '-c', 'pyproject.toml', '../experiments/finetuning/tests', '-q'], backend)
