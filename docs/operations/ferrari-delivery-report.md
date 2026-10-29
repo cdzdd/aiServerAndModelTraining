@@ -29,7 +29,7 @@ Python/Caddy/PG基底digest及BGE修订/十文件SHA严格沿契约。BGE在`/op
 
 ## 构建与离线验证
 
-Windows、Node24.11.0、Python3.12.14、uv0.12.17、Docker29.8.0；独立worktree、数据库和端口。冻结依赖安装后，将Vitest5.0.2开发工具链兼容升级至5.0.5，npm audit由两项moderate变为0，没有更新业务框架版本。
+Windows、Node24.11.0、Python3.12.14、uv0.12.17、Docker29.8.0；独立worktree、数据库和端口。冻结依赖安装后，将Vitest5.0.1开发工具链兼容升级至5.0.5，npm audit由两项moderate变为0，没有更新业务框架版本。
 
 构建入口先观察缺失入口RED，最终18项部署测试通过（15新增）；真实临时Git/文件覆盖脏版本、私有文件排除、HF链接物化、模型损坏、Docker失败和同名产物拒绝。单测只替代Docker边界，实际构建另行运行。
 
