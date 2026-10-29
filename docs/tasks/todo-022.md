@@ -3,7 +3,7 @@
 | 字段 | 值 |
 | --- | --- |
 | id | todo-022 |
-| 状态 | in_progress |
+| 状态 | in_review |
 | depends_on | todo-021；复用016本地阶段；Ferrari_Server PR13契约 |
 | 范围 | 业务镜像适配、真实隔离验证、离线包和运维接入PR；不合并运维PR、不部署ECS |
 | 分支 | codex/todo-022-ferrari-delivery |
@@ -31,4 +31,5 @@
 - 运维validate/plan/check-artifact、Compose渲染/契约通过；Windows62项60通过/2跳过，独立Linux62全通过。onboarding夹具新增登记的2失败经三行输入隔离修正，生产CLI不变。
 - 自有2GiB/2vCPU VM、Docker26.1.3/Compose2.27.0实际首装该包到021_compute。真实三格式/BGE/桌面生成/引用、三角色闭环、取消/重复、60.22秒离线、重启保留及撤销通过；活动任务和终态非空正文0。
 - PG+uploads同窗口备份及隔离restore-check通过18表/3文件/512维关联；恢复副本应用下载检索未测，不能替代017正式恢复验收。OOM事件0/末次自动重启0，不作容量压测结论。
-- 当前仍in_progress，待最终分支评审、业务PR/合并、正式运维接入PR和状态收尾。ECS/公网均未发布。
+- 整体业务分支评审Ready to merge，无P0/P1/P2；P3依赖起始版本文字已于653d591修正并经范围复核Addressed。冻结源码后只有文档变化，默认local目标也已实际构建通过。
+- 当前in_review，等待业务PR/合并、正式运维接入PR和状态收尾。ECS/公网均未发布。
