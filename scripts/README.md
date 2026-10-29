@@ -143,3 +143,21 @@ logging:
 服务器使用 `MODEL_PROVIDER=queued`、固定 `MODEL_ID` 和同值的 `MODEL_ALLOWED_IDS`；不需要模型API key或模型base URL。保留原开发 `.env` 的Mock，单独准备该运行环境；BGE模型、数据库、端口和资料目录仍按worktree隔离。`node scripts/deploy/local-run.mjs build|start|stop|status|logs|admin|smoke` 已接受queued，本机容器版仍只发布loopback HTTP，不能充当公网HTTPS部署。
 
 节点配置只由管理员注册命令写到显式的新私有文件；凭据不放 `.env`、命令参数或日志。完整的注册/撤销、桌面启动、loopback试验、HTTPS部署要求与取消/离线恢复步骤统一见[混合计算操作手册](../docs/operations/hybrid-compute-runbook.md)。协议、大小与租约限制见[契约](../docs/CONTRACTS.md#021-云端业务与桌面生成契约)。实际验证与购买门槛见[todo-021](../docs/tasks/todo-021.md)；这些配置说明不证明已通过整机2GiB或公网验收。
+
+## 11. Ferrari 提交绑定镜像导出（todo-022）
+
+在干净、已提交的独立 worktree 根目录，准备上述固定 BGE 修订的十个文件和可用的 Docker buildx，然后运行：
+
+```text
+python scripts/deploy/ferrari_build.py --model-dir .local/models/bge-small-zh-v1.5 --output-dir .local/ferrari-build
+```
+
+入口只读取 HEAD 中允许的受控构建文件，不读取 `.env`，不需要生产密钥。非忽略的未提交文件会阻止构建；输出目录必须位于本 worktree 的 Git 忽略目录，已有 `images.tar` 或 `build-report.json` 时拒绝覆盖，请为另一次导出使用新目录。
+
+脚本校验 BGE 摘要，将 HF 缓存链接物化为普通文件，再校验复制结果。API 显式选择 `ferrari` target，模型位于 `/opt/models/bge`；Dockerfile 默认 `local` target 保持既有本地行为。API 和 web 均构建 `linux/amd64`、禁用 provenance、加载本机镜像并携带源码标签；标签固定为 `ferrari-knowledge-qa-api/web:<HEAD前12位>`。数据库按固定 digest 拉取并核对批准的 pgvector tag，已有不符的 tag 会报错。
+
+成功输出三个明确 tag 的 `images.tar` 和不含秘密的 `build-report.json`，报告记录完整源码提交、平台、基底、模型和导出摘要。导出使用 Docker 的 `--platform linux/amd64`，需要支持该选项的本机 Docker；Docker29 的 inspect ID 可能为 OCI index，报告不将它当作配置 ID。后续由运维仓库 `scripts/package_qa.py` 从 save 归档计算真实配置 ID、装包并校验。本入口不启动服务、不安装宿主依赖、不推送或部署；实际构建与运行验证需单独记录。
+
+### Docker29上游证明元数据与经典导出
+
+平台过滤的Docker-save仍可能保留固定PG上游attestation，运维白名单会拒绝该额外图。保留原始导出和失败；在开发/验收隔离classic Docker26中对已核对来源的三镜像执行`docker image load --input <原始导出>`，再执行`docker image save --output <新导出> <api-tag> <web-tag> <db-tag>`，确认三个配置ID不变后装包。不要手改归档、放宽校验或在ECS先导入未校验的候选包。具体证据见[交付报告](../docs/operations/ferrari-delivery-report.md)。
