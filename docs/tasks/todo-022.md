@@ -3,7 +3,7 @@
 | 字段 | 值 |
 | --- | --- |
 | id | todo-022 |
-| 状态 | in_review |
+| 状态 | done |
 | depends_on | todo-021；复用016本地阶段；Ferrari_Server PR13契约 |
 | 范围 | 业务镜像适配、真实隔离验证、离线包和运维接入PR；不合并运维PR、不部署ECS |
 | 分支 | codex/todo-022-ferrari-delivery |
@@ -32,4 +32,14 @@
 - 自有2GiB/2vCPU VM、Docker26.1.3/Compose2.27.0实际首装该包到021_compute。真实三格式/BGE/桌面生成/引用、三角色闭环、取消/重复、60.22秒离线、重启保留及撤销通过；活动任务和终态非空正文0。
 - PG+uploads同窗口备份及隔离restore-check通过18表/3文件/512维关联；恢复副本应用下载检索未测，不能替代017正式恢复验收。OOM事件0/末次自动重启0，不作容量压测结论。
 - 整体业务分支评审Ready to merge，无P0/P1/P2；P3依赖起始版本文字已于653d591修正并经范围复核Addressed。冻结源码后只有文档变化，默认local目标也已实际构建通过。
-- 当前in_review，等待业务PR/合并、正式运维接入PR和状态收尾。ECS/公网均未发布。
+- 功能评审提交阶段为in_review；实际GitHub交付及本次状态收尾见下节，ECS/公网均未发布。
+
+## GitHub交付与状态收尾
+
+- 业务[PR42](https://github.com/cdzdd/aiServerAndModelTraining/pull/42)已于2026-10-29T07:13:47Z普通squash合并，功能SHA `6c3ba54e716a54ce820ff4e36e8429c6622cb607`，已验功能头 `87989385e53f86f611c1acefc02e825e9eec1e24`；合并树与已验头一致。冻结包源码8e7c602保持原身份，源分支保留可取。
+- 草稿Release编辑说明后untagged页面位置发生变化，tag和附件身份/大小不变；纯文档[PR43](https://github.com/cdzdd/aiServerAndModelTraining/pull/43)于2026-10-29T07:27:47Z合并，SHA `9a21c8b9888618669810ebb04882b442a5030dd7`，改用固定交付tag和实际运维PR作为长期入口。该取舍增加一个文档PR，避免过期草稿页影响接收，不发布Release来固定网址。
+- 正式运维接入[PR14](https://github.com/cdzdd/Ferrari_Server/pull/14)已提交并附到对话，当前头 `46ced439918b884bc805fd195fb3f9b6d380b769`、OPEN/DRAFT；包含真实Compose/release/env示例、登记提案、交接和三行onboarding测试fixture修正。资源、端口和ECS发布前核查待运维负责人确认；其后由负责人合并、部署、初始化及验收，本项目没有代为合并或部署。
+- 私有草稿tag `artifact/knowledge-qa/8e7c602395ed41e3cc43556a8cfc68be0e05cdee` 的实际包已认证上传、重新下载并经运维CLI校验；大小644881396字节、SHA256 `36a2af01268c62dd9d4675bc6ff5a399f4c14af1e12300a4a988ce4ccdc69c77`。取包入口及最新实际草稿页见PR14；包、账号、节点凭据、备份均未进入Git。
+- 验收采用本地验收+GitHub PR。业务云端CI未运行；运维最新头的push/PR运行均startup_failure，已在PR14记录真实链接与本地/独立Linux证据，未冒充CI通过或绕过强制门禁。
+- 已停止本轮五服务、开发数据库、桌面节点、私有转发和自有Ollama（确认模型卸载后）；自有独立26引擎停止、测试VM已关机。保留原卷、VM磁盘、冻结包、原始失败和评审证据，以及业务/运维工作树；未对其他项目执行清理。
+- 本收尾只更新本任务文件，经静态事实/链接核对和独立文档复核后普通PR集成。只有该收尾实际进入origin/main，本任务权威状态才为done；不记录自身收尾SHA以免自引用。done表示业务与产物/PR交接完成，运维PR及ECS/公网状态继续独立记录，不改变016/017状态。
