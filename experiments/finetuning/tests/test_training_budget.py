@@ -470,7 +470,10 @@ child.kill()
 child.wait()
 sys.exit(1)
 '''
-    parent = subprocess.Popen([sys.executable, "-c", parent_script, str(ready)])
+    parent = subprocess.Popen(
+        [sys.executable, "-c", parent_script, str(ready)],
+        cwd=Path(__file__).resolve().parents[3],
+    )
     try:
         assert parent.wait(timeout=5) == 0
         owner = json.loads(ready.read_text())
