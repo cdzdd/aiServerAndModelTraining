@@ -10,7 +10,10 @@ from app.modules.compute.schemas import MAX_BODY_BYTES
 
 
 def is_compute_path(path):
-    return path == "/internal/compute" or path.startswith("/internal/compute/")
+    return any(
+        path == prefix or path.startswith(prefix + "/")
+        for prefix in ("/internal/compute", "/internal/fund-assistant")
+    )
 
 
 class ComputeBodyLimitMiddleware:

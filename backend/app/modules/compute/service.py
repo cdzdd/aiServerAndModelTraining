@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from pydantic import ValidationError
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 
 from app.core.security import AuthError, token_hash
 from app.modules.auth.models import AuthSession, User
@@ -198,6 +198,7 @@ def claim(db, worker, *, now) -> dict | None:
     _lock(db)
     cleanup(db, now=now)
     worker = _worker(db, worker.id)
+    worker.last_seen_at = _time(now)
     active = db.scalar(
         select(ComputeJob.id).where(
             ComputeJob.worker_id == worker.id, ComputeJob.status == "running"
@@ -258,6 +259,9 @@ def _running(db, worker, job_id, lease_token, now):
 def heartbeat(db, worker, job_id: UUID, lease_token: str, *, now) -> None:
     _lock(db)
     job, checked_at = _running(db, worker, job_id, lease_token, now)
+    db.execute(
+        update(ComputeWorker).where(ComputeWorker.id == worker.id).values(last_seen_at=checked_at)
+    )
     job.lease_until = min(checked_at + timedelta(seconds=15), job.deadline)
     db.flush()
 

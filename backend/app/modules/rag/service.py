@@ -98,11 +98,14 @@ def _question(value: str) -> str:
 
 
 class RAGService:
-    def __init__(self, retriever, validate_hits, provider, *, timeout_seconds=60):
+    def __init__(
+        self, retriever, validate_hits, provider, *, timeout_seconds=60, system_instruction=""
+    ):
         self.retriever = retriever
         self.validate_hits = validate_hits
         self.provider = provider
         self.timeout_seconds = timeout_seconds
+        self.system_instruction = system_instruction
 
     async def stream_answer(
         self, actor: Actor, kb_ids: list[UUID], question: str, history: list[LLMMessage]
@@ -141,6 +144,12 @@ class RAGService:
             messages, prompt_hits = build_answer_prompt(
                 question, hits, retrieval_query=rewritten.query
             )
+            if self.system_instruction:
+                messages[0] = LLMMessage(
+                    role="system", content=self.system_instruction + "\n" + messages[0].content
+                )
+                if sum(len(item.content.encode("utf-8")) for item in messages) > 12000:
+                    return _events(SHORTEN, status="clarify", usages=usages)
             if not prompt_hits:
                 return _events(NO_ANSWER, usages=usages)
         except (RAGError, EmbeddingError, RetrievalError) as exc:

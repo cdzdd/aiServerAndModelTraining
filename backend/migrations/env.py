@@ -7,6 +7,7 @@ from app.modules.auth import models  # noqa: F401
 from app.modules.chat import models as chat_models  # noqa: F401
 from app.modules.compute import models as compute_models  # noqa: F401
 from app.modules.feedback import models as feedback_models  # noqa: F401
+from app.modules.fund_assistant import models as fund_assistant_models  # noqa: F401
 from app.modules.handoff import models as handoff_models  # noqa: F401
 from app.modules.ingestion import models as ingestion_models  # noqa: F401
 from app.modules.knowledge import models as knowledge_models  # noqa: F401
