@@ -23,3 +23,5 @@
 - 已实现固定服务鉴权、专属KB名称/标记校验、不可交互影子身份、异步受控生成、现有compute队列绑定、取消/短期会话清理、状态和受限来源摘要、Markdown导入与迁移。未改变原队列的授权校验，也未重新注册桌面节点。
 - 锁定Ruff0.16.8全backend、Python编译与diff检查通过。专项首轮14通过/2因测试PUBLIC_ORIGIN误配导致CSRF失败；移除本任务测试环境的固定origin后16通过（77.86秒）。其后追加专属KB误配和若干边界测试，当前正在对最新代码执行完整`node scripts/dev.mjs check`，尚不将这轮全检查记录为通过。
 - 环境：Windows、Python3.12.13、uv0.12.4、Node24.22.2，隔离Linux PG16.15/pgvector经本机15459私有隧道；没有连接生产数据库。Playwright1.63.0所需Chromium1243按冻结版本从官方源下载。npm ci沿现锁文件安装，报告16个moderate通知，未升级或声称全部供应链问题已清零。
+- 运维指定Docker26 classic构建环境，原`docker image save --platform`仅API1.48+支持。已在正式构建入口增加逐镜像实际ID/OS/arch检查及daemon API/store核验；只有已确认classic的旧API省略save平台参数，新API保留过滤，其他旧store拒绝；构建recipe和buildx参数不变。build-report记录实际inspect结果、兼容分支与命令，不把Docker29的inspect ID冒认成config ID。
+- 构建兼容专项Windows真实Git+Docker命令stub：`python -m pytest backend/tests/deploy/test_ferrari_build.py -q`，30通过、1个宿主无法创建symlink跳过（39.49秒）。真实Docker26导出、Linux完整统一检查和最终发布仍待root准备的新独立builder验证，不将这些stub检查写成实机导出成功。

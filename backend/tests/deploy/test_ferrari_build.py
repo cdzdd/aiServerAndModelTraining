@@ -95,7 +95,15 @@ def source(tmp_path):
 def docker_stub(build_module, monkeypatch):
     calls = []
     contexts = []
-    state = {"tag_id": None, "fail": None}
+    state = {
+        "tag_id": None,
+        "fail": None,
+        "api": "1.52",
+        "driver": "overlayfs",
+        "driver_status": [["driver-type", "io.containerd.snapshotter.v1"]],
+        "inspections": {},
+    }
+    pinned_id = "sha256:" + "a" * 64
 
     def docker(args, *, cwd=None, check=True):
         calls.append(args)
@@ -113,9 +121,32 @@ def docker_stub(build_module, monkeypatch):
             assert not any(p.is_symlink() for p in context.rglob("*"))
         if args[:2] == ["image", "inspect"]:
             target = args[-1]
+            if args[args.index("--format") + 1] == "{{json .}}":
+                return json.dumps(
+                    state["inspections"].get(
+                        target,
+                        {
+                            "Id": pinned_id
+                            if target == build_module.DB_IMAGE
+                            else "sha256:" + hashlib.sha256(target.encode()).hexdigest(),
+                            "Os": "linux",
+                            "Architecture": "amd64",
+                        },
+                    )
+                )
             if target == build_module.DB_IMAGE and state["tag_id"] is None:
                 return None
-            return state["tag_id"] if target == build_module.DB_IMAGE else "sha256:pinned"
+            return state["tag_id"] if target == build_module.DB_IMAGE else pinned_id
+        if args[:2] == ["image", "tag"]:
+            state["tag_id"] = pinned_id
+        if args[0] == "version":
+            return state["api"]
+        if args[0] == "info":
+            return (
+                json.dumps(state["driver_status"])
+                if "{{json .DriverStatus}}" in args
+                else state["driver"]
+            )
         if args[:2] == ["image", "save"]:
             Path(args[args.index("--output") + 1]).write_bytes(b"fixture docker archive")
         return ""
@@ -180,6 +211,9 @@ def test_build_exports_only_committed_allowed_inputs(source, build_module, docke
     assert report["images"]["db"] == build_module.DB_IMAGE
     assert report["files"]["images.tar"] == hashlib.sha256(b"fixture docker archive").hexdigest()
     assert "imageIds" not in report  # Docker29 inspect IDs may be OCI indexes.
+    assert set(report["imageInspection"]) == {"api", "web", "db"}
+    assert report["exportCompatibility"]["savePlatformFlag"] is True
+    assert report["commands"] == calls
     assert "SECRET" not in (output / "build-report.json").read_text("utf-8")
 
 
@@ -258,6 +292,93 @@ def test_refuses_conflicting_database_tag(source, build_module, docker_stub):
         build_module.build(root, model, output)
     assert not (output / "build-report.json").exists()
     assert not any(call[:2] == ["image", "tag"] for call in docker_stub[0])
+
+
+def test_docker26_classic_export_omits_only_save_platform_flag(source, build_module, docker_stub):
+    root, model, output, _ = source
+    calls, _, state = docker_stub
+    state.update(api="1.45", driver="overlay2", driver_status=[["Backing Filesystem", "extfs"]])
+    report = build_module.build(root, model, output)
+    saves = [call for call in calls if call[:2] == ["image", "save"]]
+    assert len(saves) == 1 and "--platform" not in saves[0]
+    assert all("--platform" in call for call in calls if call[:2] == ["buildx", "build"])
+    assert report["exportCompatibility"] == {
+        "serverApiVersion": "1.45",
+        "storageDriver": "overlay2",
+        "imageStore": "classic",
+        "savePlatformFlag": False,
+    }
+    inspect_calls = [call for call in calls if "{{json .}}" in call]
+    assert len(inspect_calls) == 3
+    assert max(calls.index(call) for call in inspect_calls) < calls.index(saves[0])
+    assert report["commands"] == calls
+
+
+@pytest.mark.parametrize("role", ["api", "web", "db"])
+@pytest.mark.parametrize("platform", [("linux", "arm64"), ("windows", "amd64")])
+def test_wrong_platform_is_rejected_before_any_export(
+    source, build_module, docker_stub, role, platform
+):
+    root, model, output, _ = source
+    commit = git(root, "rev-parse", "HEAD")
+    target = build_module.DB_IMAGE if role == "db" else f"ferrari-knowledge-qa-{role}:{commit[:12]}"
+    docker_stub[2]["inspections"][target] = {
+        "Id": "sha256:" + "a" * 64,
+        "Os": platform[0],
+        "Architecture": platform[1],
+    }
+    with pytest.raises(build_module.BuildError, match="linux/amd64"):
+        build_module.build(root, model, output)
+    assert not any(call[:2] == ["image", "save"] for call in docker_stub[0])
+    assert not (output / "images.tar").exists()
+    assert not (output / "build-report.json").exists()
+
+
+@pytest.mark.parametrize(
+    "problem",
+    ["containerd", "unknown-driver", "malformed-version", "malformed-store", "store-marker"],
+)
+def test_old_api_requires_verified_classic_store(source, build_module, docker_stub, problem):
+    root, model, output, _ = source
+    state = docker_stub[2]
+    state["api"] = "1.45"
+    if problem == "unknown-driver":
+        state.update(driver="unknown", driver_status=[])
+    elif problem == "malformed-version":
+        state["api"] = "unverified"
+    elif problem == "malformed-store":
+        state.update(driver="overlay2", driver_status={})
+    elif problem == "store-marker":
+        state["driver"] = "overlay2"
+    with pytest.raises(build_module.BuildError, match="Docker"):
+        build_module.build(root, model, output)
+    assert not any(call[:2] == ["image", "save"] for call in docker_stub[0])
+    assert not (output / "build-report.json").exists()
+
+
+@pytest.mark.parametrize("image_id", [None, "sha256:truncated", "sha256:" + "b" * 64])
+def test_database_id_must_be_real_and_still_pinned_before_export(
+    source, build_module, docker_stub, image_id
+):
+    root, model, output, _ = source
+    docker_stub[2]["inspections"][build_module.DB_IMAGE] = {
+        "Id": image_id,
+        "Os": "linux",
+        "Architecture": "amd64",
+    }
+    with pytest.raises(build_module.BuildError):
+        build_module.build(root, model, output)
+    assert not any(call[:2] == ["image", "save"] for call in docker_stub[0])
+    assert not (output / "images.tar").exists()
+
+
+def test_api148_retains_platform_filter_on_classic_store(source, build_module, docker_stub):
+    root, model, output, _ = source
+    docker_stub[2].update(api="1.48", driver="overlay2", driver_status=[])
+    report = build_module.build(root, model, output)
+    save = next(call for call in docker_stub[0] if call[:2] == ["image", "save"])
+    assert save[save.index("--platform") + 1] == "linux/amd64"
+    assert report["exportCompatibility"]["savePlatformFlag"]
 
 
 def test_dockerfile_keeps_default_local_target():
