@@ -299,3 +299,9 @@ GET `/admin/audit-events`支持标准page/page_size及from/to、action、outcome
 每worktree变量：`COMPOSE_PROJECT_NAME, API_PORT, WEB_PORT, DB_PORT, DATABASE_URL, UPLOAD_DIR`。`DATABASE_URL` 是后端配置，不暴露在前端；Compose 内连接使用db:5432，主机运行后端才用独立DB_PORT。
 
 CI默认使用Mock模型和可复现的小型 embedding fixture，数据库权限和向量查询测试使用真实 PostgreSQL/pgvector；真实 embedding/云模型/Ollama 验收由明确标记的集成检查执行并记录。Mock结果不证明真实模型接通或算法质量。
+
+## 9. 基金业务助手服务接入（todo-023）
+
+专属内部接口`/internal/fund-assistant`的字段、异步状态、鉴权、知识导入和网络边界见[模块契约](../backend/app/modules/fund_assistant/README.md)。基金用户沿基金登录，由基金后端固定服务密钥和认证用户ID调用，不接收浏览器选择的QA用户、知识库、模型或工具。只对专有标记的私有KB提供业务解释，永不执行交易。
+
+`FUND_ASSISTANT_SERVICE_KEY`和`FUND_ASSISTANT_KB_ID`未配置或为空时集成禁用，不改变原QA用户路由。每基金用户的技术身份/会话隔离，生成复用原chat全局槽、compute队列及既有台式机认证；原节点token和协议不变，不为接入默认注册新节点或加载第二模型。服务端内部连接由运维核定，秘密不下发浏览器、不提交Git。
