@@ -36,6 +36,7 @@ node scripts/dev.mjs check
 | [接口与数据契约](docs/CONTRACTS.md) | 并行开发共用的接口、状态和命名约定 |
 | [多对话与 Git 工作流](docs/WORKFLOW.md) | 领取、worktree、验证、合并、GitHub、恢复 |
 | [Ferrari 运维交接](docs/operations-handoff.md) | 镜像构建、运行包和运维PR入口 |
+| [基金业务助手内部接口](backend/app/modules/fund_assistant/README.md) | 固定专属知识库、基金身份隔离及既有计算队列接入；只提供业务指导 |
 | [AGENTS.md](AGENTS.md) | 新对话应遵循的项目规则 |
 
 ## 如何交给新对话

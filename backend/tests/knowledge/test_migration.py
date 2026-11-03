@@ -32,12 +32,12 @@ def test_upgrade_preserves_existing_users_and_downgrade_only_removes_knowledge(d
             )
             command.upgrade(config, "head")
             assert {"knowledge_bases", "knowledge_memberships", "faqs"} <= set(
-                inspect(connection).get_table_names()
+                inspect(connection).get_table_names(schema=schema)
             )
             assert connection.scalar(text("SELECT id FROM users")) == user_id
             command.check(config)
             command.downgrade(config, "002_auth")
-            assert "knowledge_bases" not in inspect(connection).get_table_names()
+            assert "knowledge_bases" not in inspect(connection).get_table_names(schema=schema)
             assert connection.scalar(text("SELECT id FROM users")) == user_id
             command.upgrade(config, "head")
             command.check(config)

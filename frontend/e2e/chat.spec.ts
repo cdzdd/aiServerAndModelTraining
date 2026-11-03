@@ -55,6 +55,8 @@ test('real login, cited stream, history, stop/retry, revocation and ownership',a
     await page.getByRole('textbox',{name:'消息内容'}).fill('办理业务需要什么？')
     await page.getByRole('button',{name:'发送问题'}).click()
     await expect(page.getByText('资料原文：办理业务需要身份证。 [1]')).toBeVisible()
+    // Final history reconciliation replaces the optimistic title and closes stale evidence panels.
+    await expect(page.getByRole('heading',{name:'办理业务需要什么？',exact:true})).toBeVisible()
     await expect(page.getByRole('button',{name:'查看引用'})).toBeVisible()
     await page.getByRole('button',{name:'查看引用'}).click()
     await expect(page.getByRole('complementary',{name:'回答引用'}).getByText('办理业务需要身份证。')).toBeVisible()

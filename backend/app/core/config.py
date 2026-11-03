@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlsplit
+from uuid import UUID
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,6 +54,15 @@ class Settings(BaseSettings):
     )
 
     public_origin: str | None = Field(default=None, validation_alias="PUBLIC_ORIGIN")
+    fund_assistant_service_key: SecretStr | None = Field(
+        default=None, validation_alias="FUND_ASSISTANT_SERVICE_KEY"
+    )
+    fund_assistant_kb_id: UUID | None = Field(default=None, validation_alias="FUND_ASSISTANT_KB_ID")
+
+    @field_validator("fund_assistant_kb_id", mode="before")
+    @classmethod
+    def empty_fund_assistant_scope(cls, value):
+        return None if value == "" else value
 
     login_account_limit: int = Field(default=5, ge=1, validation_alias="LOGIN_ACCOUNT_LIMIT")
     login_ip_limit: int = Field(default=30, ge=1, validation_alias="LOGIN_IP_LIMIT")

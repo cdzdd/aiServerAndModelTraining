@@ -29,6 +29,8 @@ from app.modules.compute import service as compute_service
 from app.modules.compute.limits import ComputeBodyLimitMiddleware
 from app.modules.compute.router import router as compute_router
 from app.modules.feedback.router import router as feedback_router
+from app.modules.fund_assistant.router import router as fund_assistant_router
+from app.modules.fund_assistant.service import READ_ONLY_INSTRUCTION
 from app.modules.handoff.router import router as handoff_router
 from app.modules.ingestion.router import router as ingestion_router
 from app.modules.ingestion.upload_limit import UploadLimitMiddleware
@@ -124,6 +126,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         retrieval.validate_hits,
         create_provider(session_factory=app.state.session_factory),
     )
+    app.state.fund_assistant_rag = RAGService(
+        retrieval.search,
+        retrieval.validate_hits,
+        app.state.chat_rag.provider,
+        system_instruction=READ_ONLY_INSTRUCTION,
+    )
     app.state.login_limiter = LoginLimiter(
         account_limit=settings.login_account_limit,
         ip_limit=settings.login_ip_limit,
@@ -136,6 +144,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ingestion_router)
     app.include_router(chat_router)
     app.include_router(compute_router)
+    app.include_router(fund_assistant_router)
     app.include_router(feedback_router)
     app.include_router(handoff_router)
 
@@ -169,6 +178,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 request.url.path.startswith("/api/v1/")
                 or request.url.path == "/internal/compute"
                 or request.url.path.startswith("/internal/compute/")
+                or request.url.path == "/internal/fund-assistant"
+                or request.url.path.startswith("/internal/fund-assistant/")
             ):
                 response.headers["Cache-Control"] = "no-store"
             route = request.scope.get("route")
