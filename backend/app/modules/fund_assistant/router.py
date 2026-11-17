@@ -13,7 +13,7 @@ from app.modules.chat.schemas import Content
 from app.modules.fund_assistant import runner, service
 
 router = APIRouter(prefix="/internal/fund-assistant", tags=["fund-assistant"])
-Identity = Annotated[tuple[str, str], Depends(service.authenticate)]
+Identity = Annotated[tuple[str, str, str], Depends(service.authenticate)]
 
 
 class ConversationInput(BaseModel):
@@ -57,23 +57,33 @@ def create(data: ConversationInput, request: Request, identity: Identity):
 
 @router.get("/conversations/{conversation_id}")
 def conversation(conversation_id: UUID, request: Request, identity: Identity):
-    with request.app.state.session_factory() as db:
+    state = request.app.state
+    subject, _, role = identity
+    with state.session_factory() as db:
         return service.conversation_view(
-            db, identity[0], request.app.state.settings.fund_assistant_kb_id, conversation_id
+            db,
+            subject,
+            state.settings.fund_assistant_kb_id,
+            conversation_id,
+            role,
+            guide_enabled=state.settings.fund_guide_deepseek_key is not None,
         )
 
 
 @router.post("/conversations/{conversation_id}/messages", status_code=202)
 async def ask(conversation_id: UUID, data: QuestionInput, request: Request, identity: Identity):
     state = request.app.state
-    subject, digest = identity
+    subject, digest, role = identity
     kb_id = state.settings.fund_assistant_kb_id
+    guide_enabled = state.settings.fund_guide_deepseek_key is not None
 
     def preflight():
         with state.session_factory() as db:
             service.require_knowledge(db, kb_id)
             actor, _ = service.owned_conversation(db, subject, kb_id, conversation_id)
-            prior = service.prior_request(db, actor, conversation_id, data)
+            prior = service.prior_request(
+                db, actor, conversation_id, data, guide_enabled=guide_enabled
+            )
             if prior is None:
                 service.require_available(db, state)
             return prior
@@ -104,7 +114,9 @@ async def ask(conversation_id: UUID, data: QuestionInput, request: Request, iden
     except BaseException:
         state.chat_runtime.release(conversation_id, slot)
         raise
-    task = asyncio.create_task(runner.run(state, subject, digest, reservation, session_hash, slot))
+    task = asyncio.create_task(
+        runner.run(state, subject, digest, reservation, session_hash, slot, role)
+    )
     state.chat_runtime.bind(conversation_id, slot, task)
     if interrupted:
         raise asyncio.CancelledError

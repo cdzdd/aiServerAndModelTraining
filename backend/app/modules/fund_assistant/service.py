@@ -17,6 +17,7 @@ from app.modules.auth.schemas import Actor
 from app.modules.chat import service as chat
 from app.modules.chat.models import Conversation, Message
 from app.modules.compute.models import ComputeJob, ComputeWorker
+from app.modules.fund_assistant import guidance
 from app.modules.fund_assistant.knowledge_contract import KB_MARKER, KB_NAME
 from app.modules.fund_assistant.models import FundConversation, FundSubject
 from app.modules.ingestion.models import Chunk
@@ -55,7 +56,10 @@ def authenticate(request: Request):
     subject = request.headers.get("x-fund-user-id", "")
     if not re.fullmatch(r"[1-9][0-9]{0,18}", subject) or int(subject) > 9223372036854775807:
         raise AuthError(422, "ASSISTANT_SUBJECT_INVALID", "业务助手身份无效")
-    return subject, expected
+    role = request.headers.get("x-fund-role", "INVESTOR")
+    if role not in {"INVESTOR", "ADMIN", "OPERATOR"}:
+        raise AuthError(422, "ASSISTANT_ROLE_INVALID", "业务助手角色无效")
+    return subject, expected, role
 
 
 def require_knowledge(db, kb_id):
@@ -160,11 +164,13 @@ def list_conversations(db, subject, kb_id):
     return dict(items=[summary(row) for row in rows], total=total)
 
 
-def message_status(db, message):
+def message_status(db, message, *, guide_enabled):
     if message.status != "generating":
         return {"complete": "completed", "failed": "failed", "cancelled": "cancelled"}[
             message.status
         ]
+    if guide_enabled:
+        return "generating"
     running = db.scalar(
         select(ComputeJob.id)
         .where(ComputeJob.assistant_message_id == message.id, ComputeJob.status == "running")
@@ -173,7 +179,7 @@ def message_status(db, message):
     return "generating" if running else "queued"
 
 
-def conversation_view(db, subject, kb_id, conversation_id):
+def conversation_view(db, subject, kb_id, conversation_id, role, *, guide_enabled):
     require_knowledge(db, kb_id)
     actor, conversation = owned_conversation(db, subject, kb_id, conversation_id)
     rows = list(
@@ -190,20 +196,26 @@ def conversation_view(db, subject, kb_id, conversation_id):
     messages = []
     for row, view in zip(rows, views, strict=True):
         client_id = row.client_message_id or request_ids.get(row.in_reply_to_id)
-        messages.append(
-            dict(
-                id=str(row.id),
-                role=row.role,
-                content=view.content,
-                status=message_status(db, row),
-                createdAt=row.created_at,
-                requestId=str(client_id) if client_id else None,
-                errorCode=row.error_code,
-                sources=[
-                    dict(title=item.title[:200], quote=item.quote[:800]) for item in view.citations
-                ],
-            )
+        message = dict(
+            id=str(row.id),
+            role=row.role,
+            content=view.content,
+            status=message_status(db, row, guide_enabled=guide_enabled),
+            createdAt=row.created_at,
+            requestId=str(client_id) if client_id else None,
+            errorCode=row.error_code,
+            sources=[
+                dict(title=item.title[:200], quote=item.quote[:800]) for item in view.citations
+            ],
         )
+        if row.role == "assistant":
+            if row.status == "complete":
+                projected = guidance.view(view.content, role)
+                if projected is not None:
+                    message.update(projected)
+            elif row.status in {"failed", "cancelled"}:
+                message.update(content="", sources=[])
+        messages.append(message)
     assistants = [item for item in messages if item["role"] == "assistant"]
     # A whole-history proxy response must fit comfortably below the fund backend's 256 KiB cap.
     while (
@@ -218,7 +230,7 @@ def conversation_view(db, subject, kb_id, conversation_id):
     )
 
 
-def prior_request(db, actor, conversation_id, data):
+def prior_request(db, actor, conversation_id, data, *, guide_enabled):
     prior = db.scalar(
         select(Message).where(
             Message.conversation_id == conversation_id,
@@ -234,7 +246,7 @@ def prior_request(db, actor, conversation_id, data):
     return dict(
         conversationId=str(conversation_id),
         requestId=str(data.requestId),
-        status=message_status(db, reply) if reply else "failed",
+        status=message_status(db, reply, guide_enabled=guide_enabled) if reply else "failed",
     )
 
 
@@ -273,13 +285,20 @@ def status(db, state):
         capacity=state.chat_runtime.max_active,
         queueDepth=0,
     )
-    if not state.chat_ready or not isinstance(state.chat_rag.provider, QueuedProvider):
+    guide_enabled = state.settings.fund_guide_deepseek_key is not None
+    if not guide_enabled and (
+        not state.chat_ready or not isinstance(state.chat_rag.provider, QueuedProvider)
+    ):
         return base
     kb_id = state.settings.fund_assistant_kb_id
     try:
         require_knowledge(db, kb_id)
     except AuthError:
         return dict(base, reason="knowledge_pending")
+    if guide_enabled:
+        if active >= state.chat_runtime.max_active:
+            return dict(base, reason="busy")
+        return dict(base, available=True, reason="ready")
     faqs = list(db.scalars(select(FAQ).where(FAQ.kb_id == kb_id, FAQ.is_active.is_(True))))
     indexed = db.scalar(
         select(Chunk.id).where(Chunk.kb_id == kb_id, Chunk.embedding.is_not(None)).limit(1)
