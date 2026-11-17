@@ -1,4 +1,4 @@
-"""App-owned tasks share the existing chat slots and authenticated compute queue."""
+"""App-owned fund answers run under the existing authenticated chat slots."""
 
 import asyncio
 import logging
@@ -13,12 +13,12 @@ from app.core.request_context import log_failure
 from app.modules.auth.models import AuthSession
 from app.modules.chat import service as chat
 from app.modules.compute.context import GenerationScope, bind_scope
-from app.modules.fund_assistant import service
+from app.modules.fund_assistant import guidance, service
 
 logger = logging.getLogger(__name__)
 
 
-async def run(state, subject, expected_digest, reservation, session_hash, slot):
+async def run(state, subject, expected_digest, reservation, session_hash, slot, role):
     started = time.monotonic()
     content, citations, done = "", [], {}
     status, error_code = "failed", "ASSISTANT_UNAVAILABLE"
@@ -65,6 +65,23 @@ async def run(state, subject, expected_digest, reservation, session_hash, slot):
     try:
         if not await run_in_threadpool(current):
             status, error_code = "cancelled", "ASSISTANT_AUTHORITY_CHANGED"
+            return
+        key = state.settings.fund_guide_deepseek_key
+        if key is not None:
+            remaining = max(0, (scope.deadline - state.chat_clock()).total_seconds())
+            async with asyncio.timeout(remaining):
+                content = await guidance.answer(
+                    key.get_secret_value(), role, reservation.question, reservation.history
+                )
+            if not await run_in_threadpool(current):
+                status, error_code = "cancelled", "ASSISTANT_AUTHORITY_CHANGED"
+                return
+            rendered = guidance.view(content, role)
+            if rendered is None:
+                raise ValueError("Invalid guide result")
+            if rendered["sources"]:
+                done = {"answer_status": "answered", "evidence_level": "sufficient"}
+            status, error_code = "complete", None
             return
         with bind_scope(scope):
             async with asyncio.timeout(

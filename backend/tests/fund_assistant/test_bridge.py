@@ -14,8 +14,8 @@ from app.modules.auth.models import AuthSession, User
 from app.modules.chat.models import Conversation, GenerationUsage, Message
 from app.modules.compute import service as compute
 from app.modules.compute.context import generation_scope
-from app.modules.compute.models import ComputeWorker
-from app.modules.fund_assistant import service
+from app.modules.compute.models import ComputeJob, ComputeWorker
+from app.modules.fund_assistant import guidance, service
 from app.modules.fund_assistant.knowledge_contract import KB_DESCRIPTION, KB_NAME
 from app.modules.fund_assistant.models import FundSubject
 from app.modules.knowledge.models import FAQ, KnowledgeBase, KnowledgeMembership
@@ -43,9 +43,11 @@ def test_optional_blank_environment_values_keep_integration_disabled(tmp_path):
         UPLOAD_DIR=tmp_path,
         FUND_ASSISTANT_SERVICE_KEY="",
         FUND_ASSISTANT_KB_ID="",
+        FUND_GUIDE_DEEPSEEK_KEY="   ",
     )
     assert settings.fund_assistant_kb_id is None
     assert service.credential_digest(settings) is None
+    assert settings.fund_guide_deepseek_key is None
 
 
 @pytest.fixture
@@ -213,6 +215,52 @@ def test_offline_and_pending_knowledge_never_enqueue_and_keep_health_ready(bridg
     assert client.get("/health/ready").status_code == 200
     with factory() as db:
         assert db.scalar(select(func.count()).select_from(Message)) == 0
+
+
+def test_cloud_guidance_without_online_worker_and_role_downgrade(bridge, monkeypatch):
+    app, client, factory, worker_id, _, _ = bridge
+    app.state.settings.fund_guide_deepseek_key = SecretStr("fake-provider-test-key")
+    with factory.begin() as db:
+        db.get(ComputeWorker, worker_id).is_active = False
+        db.scalar(select(FAQ)).indexed_version = None
+
+    calls = []
+
+    async def classify(_key, payload):
+        calls.append(json.loads(payload))
+        return {"status": "guide", "ids": ["admin-reclearing"]}
+
+    monkeypatch.setattr(guidance, "_classify", classify)
+    admin_headers = {**headers(), "X-Fund-Role": "ADMIN"}
+    assert client.get(PREFIX + "/status", headers=admin_headers).json()["available"]
+    invalid_role = client.get(PREFIX + "/status", headers={**headers(), "X-Fund-Role": "unknown"})
+    assert invalid_role.status_code == 422
+    assert invalid_role.json()["error"]["code"] == "ASSISTANT_ROLE_INVALID"
+
+    conversation_id = create(client)
+    path = PREFIX + f"/conversations/{conversation_id}"
+    body = {"content": "已确认的净值录错了，怎么重清？", "requestId": str(uuid4())}
+    for _ in range(2):
+        accepted = client.post(path + "/messages", headers=admin_headers, json=body)
+        assert accepted.status_code == 202
+        assert accepted.json()["requestId"] == body["requestId"]
+    result = finished(client, conversation_id)
+    assert result["status"] == "completed"
+    assert len(calls) == 1
+    assert "admin-reclearing" in {item["id"] for item in calls[0]["available_guides"]}
+    assert "investor-first-purchase" not in {item["id"] for item in calls[0]["available_guides"]}
+    admin_answer = client.get(path, headers=admin_headers).json()["messages"][-1]
+    assert "重新清算" in admin_answer["content"]
+    assert "admin_trading" in admin_answer["suggested_actions"]
+    assert admin_answer["sources"]
+    for role in ({}, {"X-Fund-Role": "OPERATOR"}):
+        downgraded = client.get(path, headers={**headers(), **role}).json()["messages"][-1]
+        assert "重新清算" not in downgraded["content"]
+        assert not downgraded["sources"]
+        assert not downgraded["suggested_actions"]
+    assert client.get(path, headers={**headers("2"), "X-Fund-Role": "ADMIN"}).status_code == 404
+    with factory() as db:
+        assert db.scalar(select(func.count()).select_from(ComputeJob)) == 0
 
 
 def test_unindexed_knowledge_and_compute_token_cannot_bypass_bridge_scope(bridge):
