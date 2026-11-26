@@ -15,7 +15,7 @@ enableAutoUnmount(afterEach)
 const transfer={id:'h',conversation_id:'c',state:'human' as const,requested_at:'2026-09-26T00:00:00Z',claimed_at:'2026-09-26T00:01:00Z',closed_at:null,assigned_agent_id:'agent'}
 const conversation={id:'c',user_id:'owner',title:'需要人工处理',kb_ids:['kb'],mode:'human' as const,assigned_agent_id:'agent',created_at:'',updated_at:''}
 const message={id:'m',conversation_id:'c',role:'user' as const,author_id:'owner',content:'用户留言',status:'complete' as const,citations:[],client_message_id:null,in_reply_to_id:null,answer_status:null,evidence_level:null,intent:null,latency_ms:null,error_code:null,created_at:'2026-09-26T00:00:00Z',evidence_hidden:false}
-const page=(items:typeof message[])=>({items,total:items.length,page:1,page_size:50})
+const page=(items:MessageView[])=>({items,total:items.length,page:1,page_size:50})
 async function mountPage(role:Role) {
   vi.stubGlobal('fetch',async()=>new Response(JSON.stringify({user:{id:role,username:role,display_name:role,role,is_active:true,created_at:''},csrf_token:'test'})))
   await session.login({username:role,password:'test'})
@@ -99,6 +99,32 @@ it('keeps loaded older messages after polling current history',async()=>{
   await vi.advanceTimersByTimeAsync(3000)
   await flushPromises()
   expect(wrapper.findAll('.message')).toHaveLength(51)
+})
+
+it('keeps authorized citations across polls, respects close and hides revoked evidence',async()=>{
+  vi.useFakeTimers()
+  const wrapper=await mountPage('agent')
+  const citation={index:1,chunk_id:'chunk',kb_id:'kb',source_type:'faq' as const,source_id:'faq',title:'借阅指南',quote:'请核对条码。'}
+  const answer:MessageView={...message,role:'assistant',author_id:null,content:'请核对条码。 [1]',citations:[citation]}
+  const poll=async()=>{
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+  }
+  const panel='aside[aria-label="回答引用"]'
+  vi.mocked(chat.listMessages).mockResolvedValue(page([answer]))
+  await poll()
+  await wrapper.get('.details .source').trigger('click')
+  await poll()
+  expect(wrapper.get(panel).text()).toContain(citation.quote)
+  await wrapper.get(panel).get('button').trigger('click')
+  await poll()
+  expect(wrapper.find(panel).exists()).toBe(false)
+  await wrapper.get('button[aria-label="查看引用"]').trigger('click')
+  expect(wrapper.get(panel).text()).toContain(citation.quote)
+  vi.mocked(chat.listMessages).mockResolvedValue(page([{...answer,citations:[],evidence_hidden:true,content:'该资料当前不可访问'}]))
+  await poll()
+  expect(wrapper.find(panel).exists()).toBe(false)
+  expect(wrapper.find('.details .source').exists()).toBe(false)
 })
 
 it('ignores an old reply after leaving the workbench',async()=>{
