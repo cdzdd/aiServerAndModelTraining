@@ -9,6 +9,8 @@ from starlette.concurrency import run_in_threadpool
 from app.core.security import AuthError
 from app.modules.compute import service
 from app.modules.compute.context import generation_scope
+from app.modules.compute.models import ComputeJob
+from app.modules.compute.progress import report_stage
 
 from .base import validate_request
 from .errors import MESSAGES, ProviderError
@@ -31,6 +33,18 @@ class QueuedProvider:
                 raise
             db.commit()
             return result
+
+    def _take_result(self, job_id, scope, *, now):
+        with self.session_factory() as db:
+            try:
+                result = service.take_result(db, job_id, scope, now=now)
+            except AuthError:
+                db.commit()
+                raise
+            job = db.get(ComputeJob, job_id)
+            running = job is not None and job.status == "running"
+            db.commit()
+        return result, running
 
     async def _critical_transaction(self, operation, *args):
         task = asyncio.create_task(run_in_threadpool(self._transaction, operation, *args))
@@ -57,17 +71,22 @@ class QueuedProvider:
         }
         job_id = None
         consumed = False
+        reported_running = False
         try:
             # Retain ownership until enqueue commits and its ID can be cancelled in finally.
             job_id, interrupted = await self._critical_transaction(service.enqueue, scope, payload)
             if interrupted:
                 raise asyncio.CancelledError
+            report_stage("queued")
             while True:
                 if datetime.now(UTC) >= scope.deadline:
                     raise ProviderError("PROVIDER_TIMEOUT")
-                result = await run_in_threadpool(
-                    self._transaction, service.take_result, job_id, scope
+                result, running = await run_in_threadpool(
+                    self._take_result, job_id, scope, now=lambda: datetime.now(UTC)
                 )
+                if running and not reported_running:
+                    report_stage("generating")
+                    reported_running = True
                 if result is not None:
                     consumed = True
                     yield LLMDelta(

@@ -20,8 +20,14 @@ from app.modules.chat.schemas import (
     MessageInput,
     MessagePage,
     MessageView,
+    ModelStatusView,
 )
 from app.modules.chat.streaming import ChatStreamingResponse, GenerationStream
+from app.modules.compute import service as compute_service
+from app.modules.providers.cloud import CloudProvider
+from app.modules.providers.mock import MockProvider
+from app.modules.providers.ollama import OllamaProvider
+from app.modules.providers.queued import QueuedProvider
 
 router = APIRouter(prefix="/api/v1")
 
@@ -42,6 +48,36 @@ PageSize = Annotated[int, Query(ge=1, le=100)]
 def require_ready(request):
     if not request.app.state.chat_ready:
         raise AuthError(503, "CHAT_UNAVAILABLE", "会话服务尚未就绪，请稍后重试")
+
+
+@router.get("/model/status", response_model=ModelStatusView)
+def model_status(request: Request, response: Response, actor: CurrentActor):
+    require_ready(request)
+    provider = getattr(request.app.state.chat_rag, "provider", None)
+    busy = len(request.app.state.chat_runtime._active) >= request.app.state.chat_runtime.max_active
+    response.headers["Cache-Control"] = "no-store"
+    if isinstance(provider, QueuedProvider):
+        with request.app.state.session_factory() as db:
+            current = compute_service.get_model_status(
+                db, provider.model_id, now=request.app.state.auth_clock
+            )
+        status = "busy" if busy and current["state"] == "ready" else current["state"]
+        return ModelStatusView(
+            state=status, available=status == "ready", provider="queued", model_id=provider.model_id
+        )
+    if isinstance(provider, MockProvider):
+        kind, model_id = "mock", ""
+    elif isinstance(provider, (CloudProvider, OllamaProvider)):
+        kind = "cloud" if isinstance(provider, CloudProvider) else "ollama"
+        model_id = provider.settings.model_id
+    else:
+        raise AuthError(503, "MODEL_UNAVAILABLE", "暂时无法确认模型配置")
+    return ModelStatusView(
+        state="busy" if busy else "ready",
+        available=not busy,
+        provider=kind,
+        model_id=model_id,
+    )
 
 
 def duplicate_response(request, user_id, assistant_id):
@@ -131,7 +167,11 @@ def text_message(conversation_id: UUID, data: MessageInput, request: Request, ac
 
 @router.post("/conversations/{conversation_id}/messages/stream")
 async def stream_message(
-    conversation_id: UUID, data: MessageInput, request: Request, actor: CurrentActor
+    conversation_id: UUID,
+    data: MessageInput,
+    request: Request,
+    actor: CurrentActor,
+    progress: bool = Query(default=False),
 ):
     require_ready(request)
 
@@ -182,4 +222,6 @@ async def stream_message(
     except BaseException:
         state.chat_runtime.release(conversation_id, slot)
         raise
-    return ChatStreamingResponse(GenerationStream(request, reservation), state.chat_runtime, slot)
+    return ChatStreamingResponse(
+        GenerationStream(request, reservation, progress=progress), state.chat_runtime, slot
+    )

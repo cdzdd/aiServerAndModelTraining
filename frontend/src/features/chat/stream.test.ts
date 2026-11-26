@@ -29,6 +29,17 @@ it('accepts a terminal error event without a success done',async()=>{
   expect(events.at(-1)).toEqual({type:'error',code:'MODEL_FAILED',message:'生成失败'})
 })
 
+it('accepts only known progress stages after meta without exposing extra payload fields',async()=>{
+  const stages=['preparing','rewriting','retrieving','queued','generating','validating']
+  const updates=stages.map(stage=>'event: progress\ndata: '+JSON.stringify({stage})+'\n\n').join('')
+  const events=await collect([encoder.encode(meta+updates+done)])
+  expect(events.slice(1,-1)).toEqual(stages.map(stage=>({type:'progress',stage})))
+  for(const payload of [{stage:'unknown'},{stage:'queued',text:'unvalidated model text'},{stage:42}]) {
+    await expect(collect([encoder.encode(meta+'event: progress\ndata: '+JSON.stringify(payload)+'\n\n'+done)])).rejects.toThrow()
+  }
+  await expect(collect([encoder.encode(updates+done)])).rejects.toThrow()
+})
+
 it('rejects missing meta, unknown event, duplicate done, and incomplete EOF',async()=>{
   await expect(collect([encoder.encode('event: delta\ndata: {"text":"x"}\n\n'+done)])).rejects.toThrow()
   await expect(collect([encoder.encode(meta+'event: surprise\ndata: {}\n\n'+done)])).rejects.toThrow()

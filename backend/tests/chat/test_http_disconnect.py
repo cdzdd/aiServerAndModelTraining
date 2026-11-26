@@ -67,13 +67,16 @@ def wait_cancelled(app, cid):
 
 
 @pytest.mark.parametrize("after_delta", [False, True])
-def test_real_http_disconnect_closes_upstream_and_persists_cancelled(stream_app, after_delta):
+@pytest.mark.parametrize("progress", [False, True])
+def test_real_http_disconnect_closes_upstream_and_persists_cancelled(
+    stream_app, after_delta, progress
+):
     rag = ScriptedRAG(reply()[:2] if after_delta else [], hold=True)
     stream_app.state.chat_rag = rag
     with live_server(stream_app) as url, httpx2.Client(base_url=url, timeout=5) as client:
         _, headers = sign_in(client)
         cid = conversation(client, stream_app, headers)
-        path = f"/api/v1/conversations/{cid}/messages/stream"
+        path = f"/api/v1/conversations/{cid}/messages/stream?progress={str(progress).lower()}"
         with client.stream(
             "POST",
             path,
@@ -87,7 +90,10 @@ def test_real_http_disconnect_closes_upstream_and_persists_cancelled(stream_app,
             assert str(assistant(stream_app, cid).id) == metadata["assistant_message_id"]
             assert rag.started.wait(2)
             if after_delta:
-                assert read_event(lines)[0] == "delta"
+                kind = read_event(lines)[0]
+                while kind == "progress":
+                    kind = read_event(lines)[0]
+                assert kind == "delta"
         assert rag.closed.wait(2), "Closing HTTP must cancel the blocked RAG await"
         saved = wait_cancelled(stream_app, cid)
         assert saved.content == ("当前资料中没有依据。" if after_delta else "")
@@ -101,7 +107,8 @@ def test_real_http_disconnect_closes_upstream_and_persists_cancelled(stream_app,
         assert "event: done" in again.text
 
 
-def test_real_http_disconnect_before_first_delta_closes_actual_provider(stream_app):
+@pytest.mark.parametrize("progress", [False, True])
+def test_real_http_disconnect_before_first_delta_closes_actual_provider(stream_app, progress):
     from app.modules.providers.schemas import LLMDelta
     from app.modules.rag.service import RAGService
     from app.modules.retrieval.schemas import SearchHit
@@ -140,7 +147,7 @@ def test_real_http_disconnect_before_first_delta_closes_actual_provider(stream_a
         cid = conversation(client, stream_app, headers)
         with client.stream(
             "POST",
-            f"/api/v1/conversations/{cid}/messages/stream",
+            f"/api/v1/conversations/{cid}/messages/stream?progress={str(progress).lower()}",
             headers=headers,
             json={"content": "图书馆几点开放？", "client_message_id": str(uuid4())},
         ) as response:

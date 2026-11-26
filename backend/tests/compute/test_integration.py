@@ -144,6 +144,11 @@ def test_startup_recovers_chat_then_invalidates_old_compute(migrated_engine, tmp
         deadline=r.accepted_at + timedelta(seconds=60),
     )
     with factory() as db:
+        worker, _ = compute_api[1].register_worker(
+            db, name=uuid4().hex, model_id="local-model", now=r.accepted_at
+        )
+        worker.last_seen_at = r.accepted_at
+        db.flush()
         job_id = compute_api[1].enqueue(
             db,
             scope,
@@ -266,6 +271,7 @@ def test_queued_result_passes_real_rag_citation_and_source_revalidation(
         worker, _ = compute_api[1].register_worker(
             db, name=uuid4().hex, model_id="local-model", now=now
         )
+        worker.last_seen_at = now
         db.commit()
 
     async def run():

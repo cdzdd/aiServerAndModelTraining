@@ -81,6 +81,8 @@ def setup_job(factory, current_time):
         worker, token = service.register_worker(
             db, name="desktop", model_id="test-model", now=current_time
         )
+        worker.last_seen_at = current_time
+        db.flush()
         job_id = service.enqueue(db, scope, payload(), now=current_time)
     return scope, worker, token, job_id
 

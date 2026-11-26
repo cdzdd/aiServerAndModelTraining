@@ -115,3 +115,40 @@ uv run --directory backend --frozen python -m app.modules.compute.manage revoke 
 关闭Python流或节点退出不等于GPU已释放。每次取消/异常后都要用本机Ollama状态与GPU监测确认当前计算结束；未确认前不再起新节点、模型评测或训练。心跳失败、提交确认丢失及受控模型错误均结束节点，禁止配置进程管理器无限自动重启。
 
 任务正文在消费、失败或取消后清空；失效的未消费成功结果由清理撤销。应用启动与每分钟执行清理，元数据约保留24小时加一个周期；这不是业务历史、上传资料或审计数据的删除策略。查看故障时仅保留安全错误码、worker/job UUID及脱敏时间，不导出任务payload/result或机器凭据。
+
+## 节点诊断与受控启停
+
+从 QA 源码根目录对已交付的正式配置运行只读诊断：
+
+```powershell
+$nodeConfig = 'C:\path\to\private\knowledge-qa-desktop.json'
+uv run --directory backend --frozen python -m app.modules.compute.doctor --config "$nodeConfig"
+```
+
+诊断依次检查云端 ready、无 Authorization 的空 JSON claim、本机 Ollama 版本和精确模型缓存。输出每项安全代码与 HTTP 状态，全部通过退出0，任一失败退出1。原 token 只留在读取配置的内存中，此命令的网络请求不发送它。模型生成、节点注册和凭据变更仍通过各自明确的操作完成。
+
+| 诊断代码 | 含义与处理 |
+| --- | --- |
+| `NODE_CLOUD_READY` | 云端业务与数据库就绪。 |
+| `NODE_ENTRY_REACHABLE` | 计算入口返回401，允许当前来源到达认证层。实际节点认证继续由持续程序与云端最近活动时间确认。 |
+| `NODE_SOURCE_DENIED` | 计算入口返回403。交由运维核对真实出口及已授权白名单，处理完成后复查。 |
+| `NODE_TLS_ERROR` | TLS校验失败。核对目标地址、证书与本机时间，保持证书校验。 |
+| `NODE_CLOUD_UNREACHABLE` | 连接或读取超时等网络故障，先检查目标与网络。 |
+| `NODE_AUTH_ENDPOINT_UNSAFE` | 无认证请求意外返回200，应由运维核对接口与认证配置，启动检查将失败。 |
+| `NODE_MODEL_MISSING` | 精确model_id没有出现在已有缓存列表中。核对已有缓存路径与模型清单。 |
+| `NODE_OLLAMA_UNAVAILABLE` | Ollama不可访问或版本响应异常，按前文启动已有便携服务。 |
+
+Windows 在 PowerShell 7（pwsh）中使用一个脚本管理本配置启动的节点：
+
+```powershell
+./scripts/compute-node/node.ps1 -Action doctor -ConfigPath "$nodeConfig"
+./scripts/compute-node/node.ps1 -Action start -ConfigPath "$nodeConfig"
+./scripts/compute-node/node.ps1 -Action status -ConfigPath "$nodeConfig"
+./scripts/compute-node/node.ps1 -Action stop -ConfigPath "$nodeConfig"
+```
+
+`start` 先做上述诊断，通过后使用冻结依赖以隐藏窗口启动一个持续节点，日志和进程收据放在正式配置同一受保护目录。收据只保存PID、创建时间、可执行路径、配置路径和日志路径。目录与JSON应继续保持当前用户专属ACL，日志和收据均留在Git忽略目录。
+
+节点CLI通过配置规范路径对应的OS侧车锁拒绝重复运行。锁随进程退出释放，空侧车文件可以保留。`--once` 也受相同保护。正常输出只有 `node_started`、`node_stopped`、`node_failed`、UTC时间及安全错误码，未确认任务不会自动重放。空闲节点原有每秒轮询与运行任务原有续租机制保持。
+
+`status` 报告本机进程状态，云端在线以最近活动及实际任务为准。`stop` 只停止本脚本记录且PID、创建时间、可执行路径、源码目录和配置路径仍匹配的UV监督进程及其对应节点子进程。若收据丢失而存在同配置节点，脚本要求人工核对身份；用原启动方式处理。停止后按原恢复步骤确认Ollama/GPU空闲，再重新启动或运行训练。

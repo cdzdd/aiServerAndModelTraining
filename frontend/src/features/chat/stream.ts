@@ -5,8 +5,11 @@ export interface Citation {
   title:string;page_number?:number|null;paragraph_number?:number|null;line_number?:number|null;
   revision_id?:string|null;faq_version?:number|null;quote:string
 }
+export const progressStages = ['preparing','rewriting','retrieving','queued','generating','validating'] as const
+export type ProgressStage = typeof progressStages[number]
 export type ChatEvent =
   | {type:'meta';user_message_id:string;assistant_message_id:string}
+  | {type:'progress';stage:ProgressStage}
   | {type:'delta';text:string}
   | {type:'citations';items:Citation[]}
   | {type:'done';answer_status:'answered'|'clarify'|'no_answer';evidence_level:'sufficient'|'limited'|'none';intent:'knowledge'|'complaint'|'handoff'|'other';usage?:{prompt_tokens?:number|null;completion_tokens?:number|null;total_tokens?:number|null}|null}
@@ -32,6 +35,9 @@ export async function* decodeChatEvents(chunks:AsyncIterable<Uint8Array>):AsyncG
         return {type,user_message_id:payload.user_message_id,assistant_message_id:payload.assistant_message_id}
       }
       if(!seenMeta) throw protocolError()
+      if(type==='progress' && Object.keys(payload).length===1 && progressStages.some(stage=>stage===payload.stage)) {
+        return {type,stage:payload.stage as ProgressStage}
+      }
       if(type==='delta' && typeof payload.text==='string') return {type,text:payload.text}
       if(type==='citations' && Array.isArray(payload.items)) return {type,items:payload.items as Citation[]}
       if(type==='done' && typeof payload.answer_status==='string' && typeof payload.evidence_level==='string' && typeof payload.intent==='string') {

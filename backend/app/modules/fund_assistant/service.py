@@ -16,7 +16,8 @@ from app.modules.auth.models import AuthSession, User
 from app.modules.auth.schemas import Actor
 from app.modules.chat import service as chat
 from app.modules.chat.models import Conversation, Message
-from app.modules.compute.models import ComputeJob, ComputeWorker
+from app.modules.compute.models import ComputeJob
+from app.modules.compute.service import get_model_status
 from app.modules.fund_assistant import guidance
 from app.modules.fund_assistant.knowledge_contract import KB_MARKER, KB_NAME
 from app.modules.fund_assistant.models import FundConversation, FundSubject
@@ -306,25 +307,11 @@ def status(db, state):
     if not faqs or any(row.indexed_version != row.version for row in faqs) or indexed is None:
         return dict(base, reason="knowledge_pending")
     model_id = state.chat_rag.provider.model_id
-    seen_since = state.auth_clock() - timedelta(seconds=30)
-    online = db.scalar(
-        select(ComputeWorker.id)
-        .where(
-            ComputeWorker.is_active.is_(True),
-            ComputeWorker.model_id == model_id,
-            ComputeWorker.last_seen_at >= seen_since,
-        )
-        .limit(1)
-    )
-    queued = db.scalar(
-        select(func.count())
-        .select_from(ComputeJob)
-        .where(ComputeJob.status == "queued", ComputeJob.model_id == model_id)
-    )
-    base["queueDepth"] = queued
-    if online is None:
+    model = get_model_status(db, model_id, now=state.auth_clock)
+    base["queueDepth"] = model["queue_depth"]
+    if model["state"] == "offline":
         return dict(base, reason="offline")
-    if active >= state.chat_runtime.max_active:
+    if active >= state.chat_runtime.max_active or model["state"] == "busy":
         return dict(base, reason="busy")
     return dict(base, available=True, reason="ready")
 

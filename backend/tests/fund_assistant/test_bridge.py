@@ -217,6 +217,26 @@ def test_offline_and_pending_knowledge_never_enqueue_and_keep_health_ready(bridg
         assert db.scalar(select(func.count()).select_from(Message)) == 0
 
 
+def test_valid_model_lease_is_busy_even_if_seen_timestamp_is_old(bridge):
+    from tests.compute.test_queue import new_scope, payload
+
+    _, client, factory, worker_id, _, _ = bridge
+    conversation_id = create(client)
+    now = datetime.now(UTC)
+    with factory.begin() as db:
+        worker = db.get(ComputeWorker, worker_id)
+        scope = new_scope(db, now)
+        compute.enqueue(db, scope, dict(payload(), model_id=MODEL), now=now)
+        assert compute.claim(db, worker, now=now) is not None
+        worker.last_seen_at = now - timedelta(seconds=31)
+    current = client.get(PREFIX + "/status", headers=headers()).json()
+    assert not current["available"] and current["reason"] == "busy"
+    response = ask(client, conversation_id)
+    assert response.status_code == 429
+    assert response.json()["error"]["code"] == "ASSISTANT_BUSY"
+    assert client.get("/health/ready").status_code == 200
+
+
 def test_cloud_guidance_without_online_worker_and_role_downgrade(bridge, monkeypatch):
     app, client, factory, worker_id, _, _ = bridge
     app.state.settings.fund_guide_deepseek_key = SecretStr("fake-provider-test-key")

@@ -30,5 +30,5 @@ class Citation(BaseModel):
 
 class AnswerEvent(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
-    type: Literal["delta", "citations", "done", "error"]
+    type: Literal["delta", "citations", "done", "error", "progress"]
     payload: dict

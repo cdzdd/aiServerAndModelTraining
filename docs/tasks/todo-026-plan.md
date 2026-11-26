@@ -19,6 +19,7 @@
 
 ### 2 等待阶段
 
+- 新前端用查询参数progress=true申请进度事件。未申请的旧客户端仍收到原事件序列，避免缓存旧页面在升级后解码失败。
 - SSE在meta之后支持progress事件，payload为stage，枚举preparing、rewriting、retrieving、queued、generating、validating。
 - GenerationStream用轻量上下文收集RAG/provider当前阶段，在等待异步结果时发送阶段变化，先重新校验当前请求身份和会话状态。
 - 不增加数据库进度列或通用消息系统，不改变基金内部轮询协议。progress不携带问题、证据或模型token。

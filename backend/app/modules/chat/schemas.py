@@ -71,6 +71,13 @@ class ConversationPage(BaseModel):
     page_size: int
 
 
+class ModelStatusView(BaseModel):
+    state: Literal["ready", "busy", "offline"]
+    available: bool
+    provider: Literal["mock", "ollama", "cloud", "queued"]
+    model_id: str
+
+
 class MessagePage(BaseModel):
     items: list[MessageView]
     total: int

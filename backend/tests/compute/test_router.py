@@ -46,6 +46,8 @@ def api(migrated_engine):
         db.execute(delete(ComputeJob))
         scope = new_scope(db, now)
         worker, token = register_worker(db, name="test", model_id="test-model", now=now)
+        worker.last_seen_at = now
+        db.flush()
         enqueue(db, scope, payload(), now=now)
     return app, factory, worker, token
 

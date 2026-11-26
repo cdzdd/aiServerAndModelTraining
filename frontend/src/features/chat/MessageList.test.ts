@@ -38,3 +38,27 @@ it('labels the customer and support agent distinctly in shared history',()=>{
   const wrapper=mount(MessageList,{props:{messages:[{...base,id:'customer',role:'user',content:'客户问题'},{...base,id:'agent',role:'agent',content:'客服回复'}]}})
   expect(wrapper.findAll('.message-heading strong').map(value=>value.text())).toEqual(['用户','客服'])
 })
+
+it('shows safe persisted failure reasons, falls back for old rows and never displays unknown codes',()=>{
+  const wrapper=mount(MessageList,{props:{messages:[
+    {...base,id:'offline',content:'',status:'failed',error_code:'MODEL_OFFLINE'},
+    {...base,id:'timeout',content:'',status:'failed',error_code:'RAG_TIMEOUT'},
+    {...base,id:'legacy',content:'',status:'failed',error_code:null},
+    {...base,id:'unknown',content:'',status:'failed',error_code:'PRIVATE_TRACE_secret'},
+  ]}})
+  expect(wrapper.text()).toContain('本地模型未连接')
+  expect(wrapper.text()).toContain('回答处理超时')
+  expect(wrapper.text()).toContain('回答未能完成')
+  expect(wrapper.text()).not.toContain('PRIVATE_TRACE_secret')
+})
+
+it('places the current stage and a manual retry at their own message',async()=>{
+  const wrapper=mount(MessageList,{props:{
+    messages:[{...base,id:'waiting',content:'',status:'generating'},{...base,id:'failed',content:'',status:'failed'}],
+    progress:{messageId:'waiting',stage:'queued'},retryableMessageIds:['failed'],
+  }})
+  expect(wrapper.findAll('.message')[0]!.text()).toContain('正在排队等待模型')
+  expect(wrapper.findAll('.message')[1]!.text()).not.toContain('正在排队等待模型')
+  await wrapper.get('button[aria-label="重试这条提问"]').trigger('click')
+  expect(wrapper.emitted('retry')).toEqual([['failed']])
+})
