@@ -7,6 +7,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid5
 
+from sqlalchemy import or_, select, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 from app.core.config import Settings
 from app.core.database import create_db_engine
 from app.modules.auth.models import User
@@ -17,9 +21,6 @@ from app.modules.knowledge.models import FAQ, KnowledgeBase
 from app.modules.rag.schemas import Citation
 from app.modules.retrieval.embedding import MODEL_ID, MODEL_REVISION
 from app.modules.retrieval.jobs import enqueue_faq_index
-from sqlalchemy import or_, select, text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
 NAMESPACE = UUID("af0dd200-8785-4e97-afbd-ca56a73cc74c")
 CONTENT_SHA256 = "554f8239dbf45f121d1375a3e2246290022e99a4f6ece764e6ae50d553f156a1"
