@@ -5,7 +5,7 @@ import type { Citation } from './stream'
 import FeedbackControl from '../feedback/FeedbackControl.vue'
 
 withDefaults(defineProps<{messages:MessageView[];canFeedback?:boolean}>(),{canFeedback:false})
-const emit=defineEmits<{citations:[items:Citation[]]}>()
+const emit=defineEmits<{citations:[items:Citation[],messageId:string]}>()
 const roleLabels={user:'用户',assistant:'智能助手',agent:'客服',system:'系统'}
 const statusLabels={generating:'生成中…',complete:'',failed:'生成失败',cancelled:'已取消'}
 </script>
@@ -16,7 +16,7 @@ const statusLabels={generating:'生成中…',complete:'',failed:'生成失败',
       <div class="message-heading"><strong>{{ roleLabels[item.role] }}</strong><small>{{ new Date(item.created_at).toLocaleString() }}</small></div>
       <p class="message-content">{{ item.content }}</p>
       <p v-if="item.status!=='complete'" class="muted">{{ statusLabels[item.status] }}</p>
-      <ElButton v-if="item.citations.length && !item.evidence_hidden" aria-label="查看引用" @click="emit('citations',item.citations)">查看引用（{{ item.citations.length }}）</ElButton>
+      <ElButton v-if="item.citations.length && !item.evidence_hidden" aria-label="查看引用" @click="emit('citations',item.citations,item.id)">查看引用（{{ item.citations.length }}）</ElButton>
       <FeedbackControl v-if="canFeedback && item.role==='assistant' && item.status==='complete'" :key="item.id" :message-id="item.id" />
     </article>
   </div>

@@ -7,16 +7,16 @@ import { ApiError, errorMessage } from '../../shared/api/errors'
 import { getConversation, listMessages, postText, type ConversationView, type MessageView } from '../chat/api'
 import MessageList from '../chat/MessageList.vue'
 import CitationPanel from '../chat/CitationPanel.vue'
-import type { Citation } from '../chat/stream'
 import { closeHandoff, getHandoff, type HandoffView } from './api'
 
 const route=useRoute(),id=computed(()=>typeof route.params.handoffId==='string'?route.params.handoffId:null)
 const transfer=ref<HandoffView|null>(null),conversation=ref<ConversationView|null>(null),messages=ref<MessageView[]>([]),messagePage=ref(1)
-const citations=ref<Citation[]|null>(null),draft=ref(''),error=ref(''),loading=ref(false),sending=ref(false),closing=ref(false),olderLoading=ref(false)
+const selectedSource=ref<{messageId:string}|{chunkId:string}|null>(null)
+const draft=ref(''),error=ref(''),loading=ref(false),sending=ref(false),closing=ref(false),olderLoading=ref(false)
 let version=0,scopeVersion=0,olderExpanded=false,timer:ReturnType<typeof setTimeout>|undefined
 const canReply=computed(()=>transfer.value?.state==='human' && session.state.user?.role==='agent' && transfer.value.assigned_agent_id===session.state.user.id)
 const canClose=computed(()=>transfer.value?.state==='human' && (session.state.user?.role==='admin' || canReply.value))
-function clear() {version++;scopeVersion++;olderExpanded=false;clearTimeout(timer);transfer.value=null;conversation.value=null;messages.value=[];citations.value=null;loading.value=false;sending.value=false;closing.value=false}
+function clear() {version++;scopeVersion++;olderExpanded=false;clearTimeout(timer);transfer.value=null;conversation.value=null;messages.value=[];selectedSource.value=null;loading.value=false;sending.value=false;closing.value=false}
 async function load() {
   const selected=id.value
   if(!selected) return
@@ -32,7 +32,7 @@ async function load() {
       return target===1?Promise.resolve(first):listMessages(handoff.conversation_id,target)
     }))
     if(current!==version) return
-    transfer.value=handoff;conversation.value=chat;messages.value=pages.flatMap(page=>page.items).filter((value,index,all)=>all.findIndex(item=>item.id===value.id)===index);messagePage.value=start;citations.value=null
+    transfer.value=handoff;conversation.value=chat;messages.value=pages.flatMap(page=>page.items).filter((value,index,all)=>all.findIndex(item=>item.id===value.id)===index);messagePage.value=start
     if(handoff.state==='human' && !sending.value && !closing.value && session.state.user) timer=setTimeout(()=>{void load()},3000)
   } catch(cause) {
     if(current!==version) return
@@ -74,6 +74,13 @@ const sources=computed(()=>{
   const visible=messages.value.filter(message=>!message.evidence_hidden).flatMap(message=>message.citations)
   return [...new Map(visible.map(source=>[source.chunk_id,source])).values()]
 })
+const citations=computed(()=>{
+  const selection=selectedSource.value
+  if(!selection) return []
+  if('chunkId' in selection) return sources.value.filter(source=>source.chunk_id===selection.chunkId)
+  const message=messages.value.find(item=>item.id===selection.messageId)
+  return message && !message.evidence_hidden ? message.citations : []
+})
 const timeFormat=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})
 const formatTime=(value:string)=>timeFormat.format(new Date(value))
 </script>
@@ -88,8 +95,8 @@ const formatTime=(value:string)=>timeFormat.format(new Date(value))
           <h2>{{ conversation.title }}</h2>
         </header>
         <ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton>
-        <MessageList :messages="messages" @citations="citations=$event" />
-        <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
+        <MessageList :messages="messages" @citations="(_items,messageId)=>selectedSource={messageId}" />
+        <CitationPanel v-if="citations.length" :items="citations" @close="selectedSource=null" />
         <form v-if="canReply" class="composer" @submit.prevent="reply">
           <label class="sr-only" for="agent-reply">回复内容</label>
           <textarea id="agent-reply" v-model="draft" aria-label="回复内容" placeholder="输入回复…" maxlength="2000" rows="2" :disabled="sending" />
@@ -102,7 +109,7 @@ const formatTime=(value:string)=>timeFormat.format(new Date(value))
           <template v-if="transfer.claimed_at"><dt>接入时间</dt><dd>{{ formatTime(transfer.claimed_at) }}</dd></template>
           <template v-if="transfer.closed_at"><dt>结束时间</dt><dd>{{ formatTime(transfer.closed_at) }}</dd></template>
         </dl>
-        <section v-if="sources.length"><h3>本次引用</h3><button v-for="source in sources" :key="source.chunk_id" class="source" @click="citations=[source]">{{ source.title }}</button></section>
+        <section v-if="sources.length"><h3>本次引用</h3><button v-for="source in sources" :key="source.chunk_id" class="source" @click="selectedSource={chunkId:source.chunk_id}">{{ source.title }}</button></section>
         <ElButton v-if="canClose" :disabled="closing" @click="close">{{ closing?'关闭中…':'关闭会话' }}</ElButton>
       </aside>
     </div>
