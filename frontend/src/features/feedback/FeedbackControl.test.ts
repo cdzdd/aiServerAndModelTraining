@@ -17,6 +17,8 @@ it('loads persisted feedback, edits it once and shows reopened state',async()=>{
   await flushPromises()
   expect(wrapper.text()).toContain('已处理')
   expect(wrapper.text()).toContain('已核对')
+  expect(wrapper.find('textarea').exists()).toBe(false)
+  await wrapper.get('.ratings button').trigger('click')
   await wrapper.get('textarea').setValue('仍不准确')
   await wrapper.get('button[aria-label="保存反馈修改"]').trigger('click')
   await flushPromises()

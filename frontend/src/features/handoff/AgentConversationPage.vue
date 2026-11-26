@@ -69,23 +69,56 @@ async function close() {
 watch(id,()=>{clear();error.value='';draft.value='';void load()},{immediate:true})
 watch(()=>[session.state.user?.id,session.state.user?.role],clear)
 onUnmounted(clear)
+const stateLabels={queued:'等待客服',human:'人工处理中',closed:'已关闭'}
+const sources=computed(()=>{
+  const visible=messages.value.filter(message=>!message.evidence_hidden).flatMap(message=>message.citations)
+  return [...new Map(visible.map(source=>[source.chunk_id,source])).values()]
+})
+const timeFormat=new Intl.DateTimeFormat('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})
+const formatTime=(value:string)=>timeFormat.format(new Date(value))
 </script>
 <template>
-  <header class="page-heading"><p class="eyebrow">客户服务</p><h1>会话工作台</h1></header>
-  <p v-if="error" role="alert" class="error">{{ error }}</p>
-  <section class="panel" aria-label="人工会话">
-    <p v-if="loading" role="status">正在加载会话…</p>
-    <template v-else-if="transfer && conversation">
-      <div class="heading"><h2>{{ conversation.title }}</h2><span class="status-tag">{{ transfer.state==='human'?'人工处理中':transfer.state==='closed'?'已关闭':'等待客服' }}</span></div>
-      <div class="actions"><ElButton @click="load">刷新会话</ElButton><ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton><ElButton v-if="canClose" :disabled="closing" @click="close">{{ closing?'关闭中…':'关闭会话' }}</ElButton></div>
-      <MessageList :messages="messages" @citations="citations=$event" />
-      <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
-      <form v-if="canReply" class="composer" @submit.prevent="reply"><label for="agent-reply">回复内容</label><textarea id="agent-reply" v-model="draft" aria-label="回复内容" maxlength="2000" rows="4" :disabled="sending" /><div class="actions"><ElButton type="primary" native-type="submit" :disabled="sending">发送回复</ElButton></div></form>
-      <p v-else-if="transfer.state==='closed'" class="muted">会话已关闭，仅可阅读历史。</p>
-    </template>
-    <p v-else class="muted">当前无可查看的会话。</p>
+  <section class="handoff-page" aria-label="人工会话">
+    <header class="bar"><RouterLink to="/handoffs">人工客服</RouterLink><span aria-hidden="true">/</span><h1>会话工作台</h1><ElButton @click="load">刷新会话</ElButton></header>
+    <p v-if="error" role="alert" class="error">{{ error }}</p>
+    <p v-if="loading" role="status" class="notice">正在加载会话…</p>
+    <div v-else-if="transfer && conversation" class="handoff-grid">
+      <div class="thread">
+        <header class="topic"><div class="meta"><code>#{{ transfer.id.slice(0,8) }}</code><span class="badge" :class="{live:transfer.state==='human'}">{{ stateLabels[transfer.state] }}</span></div>
+          <h2>{{ conversation.title }}</h2>
+        </header>
+        <ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton>
+        <MessageList :messages="messages" @citations="citations=$event" />
+        <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
+        <form v-if="canReply" class="composer" @submit.prevent="reply">
+          <label class="sr-only" for="agent-reply">回复内容</label>
+          <textarea id="agent-reply" v-model="draft" aria-label="回复内容" placeholder="输入回复…" maxlength="2000" rows="2" :disabled="sending" />
+          <div class="composer-foot"><span>以客服身份回复</span><ElButton type="primary" native-type="submit" :disabled="sending">发送回复</ElButton></div>
+        </form>
+        <p v-else-if="transfer.state==='closed'" class="muted">会话已关闭，仅可阅读历史。</p>
+      </div>
+      <aside class="details" aria-label="会话信息"><h3>会话信息</h3>
+        <dl><dt>申请时间</dt><dd>{{ formatTime(transfer.requested_at) }}</dd>
+          <template v-if="transfer.claimed_at"><dt>接入时间</dt><dd>{{ formatTime(transfer.claimed_at) }}</dd></template>
+          <template v-if="transfer.closed_at"><dt>结束时间</dt><dd>{{ formatTime(transfer.closed_at) }}</dd></template>
+        </dl>
+        <section v-if="sources.length"><h3>本次引用</h3><button v-for="source in sources" :key="source.chunk_id" class="source" @click="citations=[source]">{{ source.title }}</button></section>
+        <ElButton v-if="canClose" :disabled="closing" @click="close">{{ closing?'关闭中…':'关闭会话' }}</ElButton>
+      </aside>
+    </div>
+    <p v-else class="notice">当前无可查看的会话。</p>
   </section>
 </template>
 <style scoped>
-.heading{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.heading h2{margin:0;overflow-wrap:anywhere}.composer{margin-top:22px;border-top:1px solid #dce5e9;padding-top:16px}.composer textarea{width:100%;padding:10px;border:1px solid #b7c6cf;border-radius:7px;font:inherit;resize:vertical}.actions{flex-wrap:wrap}.actions .el-button{margin:0}
+.bar {display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 24px;border-bottom:1px solid #e6e6e4;font-size:13px}
+.bar a{color:#656561;text-decoration:none}.bar span{color:#aaaba7}.bar h1{font-size:14px;letter-spacing:0;margin:0;font-weight:550}.bar .el-button{margin-left:auto;border:none}
+.notice{padding:0 24px}.handoff-grid{display:grid;grid-template-columns:minmax(0,1fr) clamp(195px,17vw,260px);min-height:calc(100dvh - 56px)}
+.thread{display:flex;flex-direction:column;gap:18px;min-width:0;padding:32px clamp(20px,4.5vw,80px) 26px}
+.topic{border-bottom:1px solid #e7e7e5;padding-bottom:18px}.meta{display:flex;align-items:center;gap:12px;color:#70706c;font-size:12px}
+.topic h2{font-size:clamp(22px,2.05vw,28px);font-weight:500;letter-spacing:-.035em;line-height:1.4;margin:10px 0 0;overflow-wrap:anywhere}
+.badge{border-radius:99px;background:#f3f3f1;padding:2px 8px;font-size:11px}.badge.live{background:#eff6ef;color:#395e42}.badge.live::before{content:'●';font-size:8px;margin-right:5px}
+.details{padding:28px 20px;border-left:1px solid #e7e7e5}.details h3{font-size:14px;font-weight:600;margin:0 0 16px}.details dl{display:grid;grid-template-columns:auto 1fr;gap:10px;font-size:12px;border-bottom:1px solid #e6e6e4;padding-bottom:20px;margin:0 0 20px}.details dt,.composer-foot span{color:#6c6c68}.details dd{margin:0;text-align:right}.details .el-button{width:100%}.details section{margin-bottom:20px}.source{display:block;border:0;background:none;text-align:left;text-decoration:underline;cursor:pointer;padding:5px 0}
+.thread :deep(.message-list){gap:20px}.thread :deep(.message){border:0;background:none;padding:0;max-width:94%}.thread :deep(.message.user){justify-self:end}.thread :deep(.message-heading){justify-content:flex-start;gap:10px;align-items:baseline;flex-direction:row;font-size:12px}.thread :deep(.user .message-heading){justify-content:flex-end}.thread :deep(.message-heading small){color:#777773;font-size:11px}.thread :deep(.message-content){margin:6px 0;font-size:14px;line-height:1.8}.thread :deep(.user .message-content){background:#f3f3f1;border-radius:14px 4px 14px 14px;padding:9px 14px}
+.composer{margin-top:auto;border:1px solid #d4d4d0;border-radius:15px;padding:12px 14px;box-shadow:0 3px 12px #00000006}.composer:focus-within{border-color:#888}.composer textarea{width:100%;resize:vertical;border:0;background:none;font:inherit;outline:none}.composer-foot{display:flex;align-items:center;justify-content:space-between;font-size:12px}
+@media(max-width:900px){.handoff-grid{display:flex;flex-direction:column}.thread{flex:1}.details{border-left:0;border-top:1px solid #e7e7e5;padding:16px 20px}.details dl{display:flex;flex-wrap:wrap}.details .el-button{width:auto}}
 </style>

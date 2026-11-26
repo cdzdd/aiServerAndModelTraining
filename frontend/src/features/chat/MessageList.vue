@@ -22,6 +22,12 @@ const statusLabels={generating:'生成中…',complete:'',failed:'生成失败',
   </div>
 </template>
 <style scoped>
-.message-list{display:grid;gap:12px}.message{border:1px solid #dce5e9;border-radius:14px;padding:16px;background:#fff;min-width:0;overflow-wrap:anywhere}.message.user{background:#eaf5f4}.message-heading{display:flex;justify-content:space-between;gap:12px;align-items:baseline}.message-heading small{color:#647887}.message-content{white-space:pre-wrap;overflow-wrap:anywhere;margin-bottom:8px}
-@media(max-width:500px){.message-heading{flex-direction:column;gap:2px}}
+.message-list { display: grid; gap: 20px; }
+.message { min-width: 0; max-width: 94%; overflow-wrap: anywhere; }
+.message.user { justify-self: end; }
+.message-heading { display: flex; align-items: baseline; gap: 10px; font-size: 12px; }
+.message-heading small { margin: 0; font-size: 11px; }
+.user .message-heading { justify-content: flex-end; }
+.message-content { white-space: pre-wrap; margin: 6px 0; line-height: 1.8; }
+.user .message-content { background: #f3f3f1; padding: 9px 14px; border-radius: 14px 4px 14px 14px; }
 </style>

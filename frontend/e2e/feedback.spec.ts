@@ -86,6 +86,7 @@ test('owner feedback persists, administrator resolves, owner edit reopens, and a
     await page.reload()
     await expect(control.getByText('已处理')).toBeVisible()
     await expect(control.getByText('已核对办理材料')).toBeVisible()
+    await control.getByRole('button',{name:'修改反馈'}).click()
     await control.locator('textarea').fill('仍缺少办理地点')
     await control.getByRole('button',{name:'保存反馈修改'}).click()
     await expect(control.getByText('待处理')).toBeVisible()

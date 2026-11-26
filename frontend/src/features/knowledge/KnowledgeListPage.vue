@@ -51,7 +51,7 @@ onMounted(()=>load())
       <table><caption class="sr-only">知识库列表</caption><thead><tr><th>知识库</th><th>访问范围</th><th>状态</th><th v-if="admin">操作</th></tr></thead>
         <tbody><tr v-for="kb in items" :key="kb.id">
           <td><RouterLink v-if="kb.is_active" :to="'/knowledge/'+kb.id">{{ kb.name }}</RouterLink><strong v-else>{{ kb.name }}</strong><small>{{ kb.description }}</small></td>
-          <td>{{ kb.visibility==='public'?'所有登录用户':'仅授权成员' }}</td><td>{{ kb.is_active?'已启用':'已停用' }}</td>
+          <td>{{ kb.visibility==='public'?'所有登录用户':'仅授权成员' }}</td><td><span class="status-tag" :class="{ active: kb.is_active }">{{ kb.is_active?'已启用':'已停用' }}</span></td>
           <td v-if="admin"><div class="row-actions"><ElButton :disabled="saving || editing" @click="edit(kb)">编辑知识库</ElButton><ElButton :disabled="saving || editing" @click="toggle(kb)">{{ kb.is_active?'停用知识库':'启用知识库' }}</ElButton></div></td>
         </tr></tbody>
       </table>
@@ -70,8 +70,8 @@ onMounted(()=>load())
   </section>
 </template>
 <style scoped>
-textarea{width:100%;padding:10px;border:1px solid #b7c6cf;border-radius:7px;font:inherit;resize:vertical}
+textarea{width:100%;padding:10px;border:1px solid var(--edge);border-radius:7px;font:inherit;resize:vertical}
 td{max-width:320px;overflow-wrap:anywhere}.row-actions{display:flex;flex-wrap:wrap;gap:8px}.row-actions .el-button{margin:0}
 .actions{margin-top:0;margin-bottom:18px}
-@media(max-width:680px){table,tbody,tr,td{display:block}thead{display:none}tr{padding:14px 0;border-bottom:1px solid #e7edf1}td{border:0;max-width:none;padding:6px 8px}td:first-child{font-weight:600}.row-actions{margin-top:6px}}
+@media(max-width:680px){table,tbody,tr,td{display:block}thead{display:none}tr{padding:14px 0;border-bottom:1px solid var(--line)}td{border:0;max-width:none;padding:6px 8px}td:first-child{font-weight:600}.row-actions{margin-top:6px}}
 </style>

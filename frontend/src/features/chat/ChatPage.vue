@@ -178,7 +178,7 @@ onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout
         <div class="actions"><ElButton :disabled="messagesLoading" @click="loadSelected(selectedId)">刷新历史</ElButton><ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton><ElButton v-if="conversation.mode==='bot' && conversation.user_id===userId" :disabled="handoffBusy" @click="handoff">{{ handoffBusy?'申请中…':'申请人工客服' }}</ElButton></div>
         <MessageList :can-feedback="conversation?.user_id===userId" :messages="messages" @citations="citations=$event" />
         <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
-        <form v-if="canSend" class="composer" @submit.prevent="send()"><label for="chat-message">消息内容</label><textarea id="chat-message" v-model="draft" aria-label="消息内容" maxlength="2000" rows="4" :disabled="sending" />
+        <form v-if="canSend" class="composer" @submit.prevent="send()"><label class="sr-only" for="chat-message">消息内容</label><textarea id="chat-message" v-model="draft" aria-label="消息内容" :placeholder="conversation.mode==='bot'?'输入你的问题…':'输入留言…'" maxlength="2000" rows="2" :disabled="sending" />
           <div class="actions"><ElButton type="primary" native-type="submit" :disabled="sending">{{ conversation.mode==='bot'?'发送问题':'发送留言' }}</ElButton><ElButton v-if="sending && conversation.mode==='bot'" @click="stop">停止生成</ElButton><ElButton v-if="lastFailed && !sending && conversation.mode==='bot'" @click="send(lastFailed)">重试提问</ElButton></div>
         </form>
         <p v-else-if="conversation.mode!=='closed'" class="muted">当前账号可阅读此会话，无法代替会话所有者发送消息。</p>
@@ -188,6 +188,18 @@ onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout
   </div>
 </template>
 <style scoped>
-.page-heading{margin:20px 0}.chat-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:18px;align-items:start}.chat-main{min-width:0}.chat-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.chat-heading h2{margin:0;overflow-wrap:anywhere}.status-tag{flex-shrink:0}.composer{margin-top:22px;border-top:1px solid #dce5e9;padding-top:16px}.composer textarea{width:100%;padding:10px;border:1px solid #b7c6cf;border-radius:7px;font:inherit;resize:vertical}.new-conversation{margin-top:12px}.new-conversation h2{margin-top:0}.new-conversation .checkbox{display:block;margin:8px 0;overflow-wrap:anywhere}.actions{flex-wrap:wrap}.actions .el-button{margin:0}
-@media(max-width:760px){.chat-layout{grid-template-columns:minmax(0,1fr)}}
+.chat-layout { display: grid; grid-template-columns: minmax(195px, 24%) minmax(0,1fr); align-items: start; gap: clamp(16px,2vw,30px); }
+.chat-main { display: flex; flex-direction: column; gap: 15px; min-height: 52vh; min-width: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; padding: 2px 0 4px clamp(16px,2vw,30px); }
+.chat-main > .muted { margin: 0; }
+.chat-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.chat-heading h2 { margin: 0; font-size: 20px; font-weight: 500; }
+.status-tag { flex-shrink: 0; }
+.chat-main > .actions { margin: 0; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.composer { margin-top: auto; padding: 12px 14px; border: 1px solid var(--edge); border-radius: 15px; }
+.composer:focus-within { border-color: #848480; }
+.composer textarea { display: block; padding: 0; border: 0; outline: 0; }
+.composer .actions { justify-content: flex-end; margin-top: 6px; }
+.new-conversation { margin-top: 12px; padding: 14px; }
+.new-conversation .checkbox { margin: 9px 0; overflow-wrap: anywhere; }
+@media (max-width:760px) { .chat-layout { grid-template-columns: minmax(0,1fr); } .chat-main { border: 0; padding: 6px 0; } }
 </style>

@@ -16,7 +16,7 @@ async function retry() {
 </script>
 <template>
   <main class="state-page panel">
-    <p class="eyebrow">知问 · 服务中心</p>
+    <p class="eyebrow">知识服务台</p>
     <h1>{{ kind==='session-error' ? '暂时无法确认登录状态' : kind==='forbidden' ? '没有访问权限' : '页面不存在' }}</h1>
     <p class="muted">{{ kind==='session-error' ? '请检查网络连接，稍后再试。' : kind==='forbidden' ? '当前账号无法访问此页面，请返回你的工作空间。' : '这个地址暂时没有可用的页面。' }}</p>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
