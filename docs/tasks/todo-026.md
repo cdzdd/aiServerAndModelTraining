@@ -37,3 +37,6 @@ QA业务源码、测试、接口文档和节点操作手册；如进入发布交
 - 正式运行包knowledge-qa-583f01d60e0c.tar.gz，644912538字节，SHA256 0bc0d5cc5e096edd3df94699bd898759d5d2367a8d465e6cafa77a655db111af。严格离线检查与镜像/BGE/web验证通过，私有草稿交付及运维PR另补实际回执。
 
 本任务保持in_review，代码与运行包交付后仍须由运维负责人部署、处理计算来源403，并记录原节点last_seen和一条新公网问题的成功任务、答案及引用，才完成现场修复验收。
+## PR交接
+
+业务修复[PR51](https://github.com/cdzdd/aiServerAndModelTraining/pull/51)，运维接入[PR44](https://github.com/cdzdd/Ferrari_Server/pull/44)。运维提案只更新knowledge-qa的运行身份和恢复说明，发布与来源策略由负责人按实际授权执行。代码、统一检查及本机真实模型链路已完成验证，公网403和原节点恢复验收仍待处理，任务继续in_review。
