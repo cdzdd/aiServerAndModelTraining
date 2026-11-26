@@ -38,7 +38,7 @@ const guides: Record<'user'|'agent'|'admin',Guide> = {
     steps:[
       {icon:'inbox',title:'查看排队',detail:'队列显示申请时间。选择待处理请求后接单。',to:'/handoffs'},
       {icon:'headset',title:'接手回复',detail:'接单后查看对话上下文，向用户确认已经尝试的步骤。',to:'/handoffs'},
-      {icon:'check',title:'跟进与结单',detail:'从会话列表找回自己接的工单，确认问题解决后关闭。',to:'/chat'},
+      {icon:'check',title:'跟进会话',detail:'从会话列表查看自己接的工单并继续回复。需结单时，在接单后的会话工作台关闭。',to:'/chat'},
     ],
     example:'远端参会者听到回声',
     question:'同一会议室有三台电脑入会，我们都关了麦克风，怎么还有回声？',
