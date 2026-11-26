@@ -36,6 +36,6 @@ async function download(item:Citation) {
   </aside>
 </template>
 <style scoped>
-.citation-panel{margin-top:16px;min-width:0;overflow-wrap:anywhere}.heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.heading h3{margin:0}.citation{border-top:1px solid #e1e9ed;padding:14px 0}.citation h4{margin:0}.citation blockquote{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 12px;padding-left:12px;border-left:3px solid #9ec7c8}
+.citation-panel{margin-top:16px;min-width:0;overflow-wrap:anywhere}.heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.heading h3{margin:0}.citation{border-top:1px solid var(--line);padding:14px 0}.citation h4{margin:0}.citation blockquote{white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0 12px;padding-left:12px;border-left:3px solid var(--edge)}
 @media(max-width:500px){.heading{flex-direction:column;align-items:flex-start}}
 </style>

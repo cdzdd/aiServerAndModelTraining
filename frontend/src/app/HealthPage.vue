@@ -37,7 +37,7 @@ onMounted(checkReadiness)
 <template>
   <main class="foundation">
     <header>
-      <p class="eyebrow">开发环境 · 工程骨架</p>
+      <p class="eyebrow">知识服务台</p>
       <h1>智能客服与知识问答系统</h1>
       <p class="intro">基础应用已启动，先确认服务连接。</p>
     </header>
@@ -57,37 +57,14 @@ onMounted(checkReadiness)
   </main>
 </template>
 
-<style>
-:root {
-  font-family: Inter, "Microsoft YaHei", "PingFang SC", sans-serif;
-  color: #182c3b;
-  background: #f3f6f8;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  --el-color-primary: #176b70;
-  --el-color-primary-light-3: #43868a;
-  --el-color-primary-dark-2: #0f5357;
-}
-* { box-sizing: border-box; }
-body { margin: 0; }
-.foundation { width: min(100% - 40px, 760px); margin: 12vh auto 48px; }
-.eyebrow, .section-label { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; }
-.eyebrow { color: #176b70; margin-bottom: 16px; }
-h1 { margin: 0; font-size: clamp(26px, 5vw, 38px); letter-spacing: -0.03em; line-height: 1.4; }
-.intro { color: #526573; margin: 14px 0 32px; line-height: 1.7; }
-.service-card { padding: 30px; border: 1px solid #dce4e8; border-radius: 18px; background: #fff; }
-.section-label { color: #526573; margin: 0 0 22px; }
-.service-status h2 { display: flex; align-items: center; gap: 10px; font-size: 21px; margin: 0; }
-.service-status p { color: #526573; line-height: 1.8; margin: 12px 0 24px; }
-.status-dot { width: 10px; height: 10px; flex: 0 0 10px; border-radius: 50%; background: #758796; }
-.ready .status-dot { background: #178062; }
-.unavailable .status-dot { background: #a56819; }
-.service-card .el-button { min-height: 42px; padding: 0 20px; font: inherit; }
-.service-card .el-button:focus-visible { outline: 3px solid #83bec2; outline-offset: 3px; }
-.scope-note { color: #526573; font-size: 13px; line-height: 1.9; margin-top: 24px; }
-@media (max-width: 480px) {
-  .foundation { margin-top: 48px; }
-  .service-card { padding: 24px; }
-}
+<style scoped>
+.foundation { width: min(calc(100% - 32px), 660px); margin: 10vh auto 40px; }
+.intro, .service-status p, .scope-note { color: var(--muted); }
+.service-card { padding: 24px; margin: 24px 0; border: 1px solid var(--line); border-radius: 12px; }
+.section-label { font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.service-status h2 { display: flex; align-items: center; gap: 10px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--edge); }
+.ready .status-dot { background: var(--green); }
+.unavailable .status-dot { background: var(--danger); }
+.scope-note { font-size: 12px; }
 </style>
-

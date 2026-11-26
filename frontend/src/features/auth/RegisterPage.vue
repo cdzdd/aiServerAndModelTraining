@@ -21,9 +21,9 @@ async function submit() {
 </script>
 <template>
   <main class="auth-page">
-    <RouterLink class="brand" to="/">知问 · 服务中心</RouterLink>
+    <RouterLink class="desk-brand" to="/"><span class="brand-mark" aria-hidden="true">❯_</span>知识服务台</RouterLink>
     <section class="panel auth-card">
-      <p class="eyebrow">开始使用</p><h1>注册账号</h1><p class="muted">注册后获得普通用户账号。</p>
+      <h1>注册账号</h1><p class="muted">注册后获得普通用户账号。</p>
       <form @submit.prevent="submit">
         <fieldset :disabled="busy">
           <label for="username">用户名</label>

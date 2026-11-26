@@ -54,5 +54,5 @@ async function update(status:'open'|'resolved') {
   </template>
 </template>
 <style scoped>
-.detail,.panel{min-width:0;overflow-wrap:anywhere}.body{white-space:pre-wrap;overflow-wrap:anywhere}.resolve-label{display:grid;gap:6px}.resolve-label textarea{width:100%;box-sizing:border-box;font:inherit;border:1px solid #b7c6cf;border-radius:6px;padding:8px;resize:vertical}.actions{margin-top:12px}.actions button{font:inherit;border:1px solid #7c9da5;background:#f0f9f8;border-radius:6px;padding:8px 14px}.actions button:disabled{opacity:.5}
+.detail,.panel{min-width:0;overflow-wrap:anywhere}.body{white-space:pre-wrap;overflow-wrap:anywhere}.resolve-label{display:grid;gap:6px}.resolve-label textarea{width:100%;box-sizing:border-box;font:inherit;border:1px solid var(--edge);border-radius:6px;padding:8px;resize:vertical}.actions{margin-top:12px}.actions button{font:inherit;border:1px solid var(--edge);background:var(--wash);border-radius:6px;padding:8px 14px}.actions button:first-child{color:white;background:var(--ink);border-color:var(--ink)}.actions button:disabled{opacity:.5}
 </style>

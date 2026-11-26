@@ -45,5 +45,5 @@ watch(()=>[status.value,rating.value,session.state.user?.id,session.state.user?.
   </section>
 </template>
 <style scoped>
-.feedback-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:16px}.feedback-filters label{display:grid;gap:4px}.feedback-filters select,.feedback-filters button,.pagination button{font:inherit;border:1px solid #b7c6cf;border-radius:6px;padding:7px 10px;background:#fff}.comment{max-width:400px;white-space:pre-wrap;overflow-wrap:anywhere}td{overflow-wrap:anywhere}@media(max-width:680px){table,tbody,tr,td{display:block}thead{display:none}tr{padding:12px 0;border-bottom:1px solid #e7edf1}td{border:0;padding:5px 8px}}
+.feedback-filters{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-bottom:16px}.feedback-filters label{display:grid;gap:4px}.feedback-filters select,.feedback-filters button,.pagination button{font:inherit;border:1px solid var(--edge);border-radius:6px;padding:7px 10px;background:#fff}.comment{max-width:400px;white-space:pre-wrap;overflow-wrap:anywhere}td{overflow-wrap:anywhere}@media(max-width:680px){table,tbody,tr,td{display:block}thead{display:none}tr{padding:12px 0;border-bottom:1px solid var(--line)}td{border:0;padding:5px 8px}}
 </style>

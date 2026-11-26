@@ -21,9 +21,9 @@ async function submit() {
 </script>
 <template>
   <main class="auth-page">
-    <RouterLink class="brand" to="/">知问 · 服务中心</RouterLink>
+    <RouterLink class="desk-brand" to="/"><span class="brand-mark" aria-hidden="true">❯_</span>知识服务台</RouterLink>
     <section class="panel auth-card">
-      <p class="eyebrow">欢迎回来</p><h1>登录</h1><p class="muted">登录你的账号，进入服务中心。</p>
+      <h1>登录</h1><p class="muted">登录你的账号，进入服务中心。</p>
       <p v-if="route.query.registered === '1'" role="status" class="success">注册成功，请登录。</p>
       <p v-if="session.state.expired" role="alert" class="error">登录已失效，请重新登录。</p>
       <form @submit.prevent="submit">

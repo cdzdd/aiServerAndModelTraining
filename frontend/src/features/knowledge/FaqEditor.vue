@@ -30,5 +30,5 @@ async function save() {
   </section>
 </template>
 <style scoped>
-textarea{width:100%;padding:10px;border:1px solid #b7c6cf;border-radius:7px;font:inherit;resize:vertical}
+textarea{width:100%;padding:10px;border:1px solid var(--edge);border-radius:7px;font:inherit;resize:vertical}
 </style>
