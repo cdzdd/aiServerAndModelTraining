@@ -1,6 +1,6 @@
 # todo-025 本地页面与知识会话交付
 
-状态：in_review。创建：2026-11-26。依赖：todo-022、todo-024。
+状态：done。创建：2026-11-26。依赖：todo-022、todo-024。
 分支：codex/local-edit-20261126。
 
 ## 范围
@@ -27,7 +27,7 @@
 - 首次统一检查继承了本地PUBLIC_ORIGIN，造成使用testserver的认证用例CSRF失败。修正隔离检查进程环境后重新运行，未调整生产鉴权。
 - 本地样本中的一条队列记录已被演示操作改变。内容包以原始授权清单重建原状态，不导出该后续变化或修改本地现状。
 
-业务[PR49](https://github.com/cdzdd/aiServerAndModelTraining/pull/49)已提交，最终包与运维PR待补充。完成含义为业务与运维PR交付，实际云端发布由运维记录。
+业务[PR49](https://github.com/cdzdd/aiServerAndModelTraining/pull/49)已合并。运维[PR41](https://github.com/cdzdd/Ferrari_Server/pull/41)已实际提交为可评审状态，由运维负责人合并和部署。完成含义为业务与运维PR交付，实际云端发布由运维记录。
 
 ## 2026-11-26 验收结果
 
@@ -37,3 +37,11 @@
 - 重复knowledge和history步骤无重复记录，索引未完成则拒绝历史导入，目标消息已变更或出现同名异ID知识库时整阶段回滚并保留已有记录。额外独立账号保持，无compute任务和usage伪造记录。
 - 内容附件 `knowledge-qa-service-content-20261126-v2.zip`，20491字节，SHA256 `34baf67437891fd3abe217772fa607ceb339df041675e619571e726efc8e80e2`。包只含3个经过审阅的普通文件，逐文件摘要由运维提案登记。
 - 导入程序要求目标端3个明确且独立的专用账号，强随机口令由运维创建并私密交付。公开内容仅含角色映射键，不含本地账号名、哈希、UUID、数据库或节点凭据；源码中的自动化测试仍保留，测试数据库和测试资料不进入发布附件。
+## 最终交付与合并
+
+- 业务PR49以普通squash合并为34b60ad542cf3a352779bf0458012dd42f888d3e，受检功能头07f812988dadc77df3e52cbd0c25ebac464a6ce2。独立内容程序仅做导入排序修正，Ruff及最终目标库verify通过。GitHub Actions未运行，本地验收模式继续适用。
+- 正式运行包 `knowledge-qa-fc21ef5e84cf.tar.gz`，644886230字节，SHA256 `287e94507f58e085962eb09552a0915cde58ffdc2f811e24f5e537220de39117`。三镜像配置ID经Docker29导出与现有Docker26重导出逐项一致，镜像内10个BGE文件、UID10001只读条件及实际web路由/资源通过。没有创建或复制虚拟磁盘，复用VM与专用daemon已停止。
+- 运行包及内容ZIP均在私有草稿tag `artifact/knowledge-qa/fc21ef5e84cf40736b3de38b91d423b3c6492465`，GitHub服务端完整SHA256及大小与本地一致。ZIP已完整回下载并逐文件复验。运行包额外回下载因限速停止，保留片段，未记为完整回下载通过；运维接收时须按CLI完整check-artifact再发布。
+- 运维分支codex/qa-workspace-demo-20261126，头678550bb4ffe28f6b137246e80dcd57fe1973d70，PR41可评审。只更改knowledge-qa的4个项目文件，填写运行身份、独立内容附件元数据及发布/导入/备份/回退说明。
+- 运维validate、plan、严格check-artifact与随机本地env的Compose渲染/契约检查通过。Windows运维98项中92通过、6项POSIX跳过，默认Windows短路径临时目录问题改用本任务常规临时目录后通过，公共运维脚本未修改。离线runtimeVerified=false保留。
+- 本任务完成边界为业务与两个附件/运维PR的交付。云端账号创建、发布与导入及最终公网验收由运维负责人执行，原本地开发服务和数据继续可用。
