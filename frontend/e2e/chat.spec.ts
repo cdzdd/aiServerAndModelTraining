@@ -79,7 +79,7 @@ test('real login, cited stream, history, stop/retry, revocation and ownership',a
 
     const streamKeys:string[]=[]
     page.on('request',request=>{
-      if(request.url().endsWith('/messages/stream') && request.postDataJSON()?.client_message_id) streamKeys.push(request.postDataJSON().client_message_id as string)
+      if(new URL(request.url()).pathname.endsWith('/messages/stream') && request.postDataJSON()?.client_message_id) streamKeys.push(request.postDataJSON().client_message_id as string)
     })
     await page.getByRole('textbox',{name:'消息内容'}).fill('慢速问题')
     await page.getByRole('button',{name:'发送问题'}).click()
