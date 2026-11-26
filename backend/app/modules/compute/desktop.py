@@ -3,8 +3,10 @@
 import argparse
 import asyncio
 import json
+import os
+import stat
 import sys
-from contextlib import aclosing
+from contextlib import aclosing, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -23,6 +25,13 @@ BODY_LIMIT = 65536
 
 class NodeError(Exception):
     """Only fixed diagnostic codes cross the CLI boundary."""
+
+
+class NodeParser(argparse.ArgumentParser):
+    def error(self, message):
+        super().error(
+            "invalid arguments; use --config PATH (credentials are read only from the file)"
+        )
 
 
 class DesktopConfig(BaseModel):
@@ -72,6 +81,55 @@ def load_config(path: Path) -> DesktopConfig:
         return DesktopConfig.model_validate_json(raw)
     except (OSError, ValueError, ValidationError, RecursionError):
         raise NodeError("NODE_CONFIG_ERROR") from None
+
+
+@contextmanager
+def node_lock(config_path: Path):
+    """Hold an OS lock for this config; the harmless sidecar remains after exit."""
+    resolved = config_path.resolve()
+    path = resolved.with_name(resolved.name + ".lock")
+    if path.is_symlink():
+        raise NodeError("NODE_LOCK_ERROR")
+    try:
+        stream = path.open("a+b")
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            stream.close()
+            raise NodeError("NODE_LOCK_ERROR")
+        if stream.seek(0, 2) == 0:
+            stream.write(b"\0")
+            stream.flush()
+        stream.seek(0)
+    except OSError:
+        raise NodeError("NODE_LOCK_ERROR") from None
+    try:
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            raise NodeError("NODE_ALREADY_RUNNING") from None
+        try:
+            yield
+        finally:
+            stream.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(stream.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+    finally:
+        stream.close()
+
+
+def node_log(event, *, code=None):
+    entry = {"event": event, "at": datetime.now(UTC).isoformat()}
+    if code:
+        entry["code"] = code
+    print(json.dumps(entry), flush=True)
 
 
 class _Payload(BaseModel):
@@ -241,16 +299,22 @@ async def run_node(config: DesktopConfig, *, once=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = NodeParser(description=__doc__)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
     try:
-        asyncio.run(run_node(load_config(args.config), once=args.once))
+        config = load_config(args.config)
+        with node_lock(args.config):
+            node_log("node_started")
+            asyncio.run(run_node(config, once=args.once))
+            node_log("node_stopped")
     except NodeError as error:
+        node_log("node_failed", code=str(error))
         print(str(error), file=sys.stderr)
         return 1
     except KeyboardInterrupt:
+        node_log("node_stopped", code="NODE_INTERRUPTED")
         return 130
     return 0
 

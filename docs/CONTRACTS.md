@@ -305,3 +305,15 @@ CI默认使用Mock模型和可复现的小型 embedding fixture，数据库权�
 专属内部接口`/internal/fund-assistant`的字段、异步状态、鉴权、知识导入和网络边界见[模块契约](../backend/app/modules/fund_assistant/README.md)。基金用户沿基金登录，由基金后端固定服务密钥和认证用户ID调用，不接收浏览器选择的QA用户、知识库、模型或工具。只对专有标记的私有KB提供业务解释，永不执行交易。
 
 `FUND_ASSISTANT_SERVICE_KEY`和`FUND_ASSISTANT_KB_ID`未配置或为空时集成禁用，不改变原QA用户路由。每基金用户的技术身份/会话隔离，生成复用原chat全局槽、compute队列及既有台式机认证；原节点token和协议不变，不为接入默认注册新节点或加载第二模型。服务端内部连接由运维核定，秘密不下发浏览器、不提交Git。
+
+## 026 模型状态与等待反馈补充
+
+GET /api/v1/model/status 要求有效登录并返回no-store，响应为
+`{state,available,provider,model_id}`。state为ready/busy/offline。queued按30秒内活动节点或有效运行租约判断，按精确模型隔离；非queued状态只表示现有provider配置，不做额外网络探测或付费调用。接口不返回worker、任务身份或正文。
+
+普通问答的queued调用在入队时检查节点离线，排队后节点失联时返回安全错误MODEL_OFFLINE，已受理请求仍按原规则保存失败消息与配额；运行任务继续使用原租约和期限。基金助手复用相同节点状态规则，现有DeepSeek指南路线保持其独立可用性判断。
+
+新前端在POST /conversations/{id}/messages/stream中携带查询参数progress=true，以申请meta后的progress事件。
+`{stage}`只含preparing、rewriting、retrieving、queued、generating或validating之一，不包含模型原文、资料或身份数据。未申请进度的旧客户端仍使用原meta/delta/citations/done/error序列。正文在引用及权限复核完成后展示，不按token伪造实时输出。
+
+失败消息继续持久化error_code，前端仅将已知代码映射到安全中文说明；未知旧错误使用通用提示。重试由本人在bot会话主动发起，原问题必须来自当前已加载历史，使用新请求UUID，不自动重放。

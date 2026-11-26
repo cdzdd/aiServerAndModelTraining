@@ -407,3 +407,49 @@ async def test_normal_loop_waits_one_second_after_results_before_next_serial_cla
         f"/internal/compute/{claims[1]}/result",
         "/internal/compute/claim",
     ]
+
+
+@pytest.mark.parametrize("exit_mode", ["normal", "crash"])
+async def test_node_lock_rejects_another_process_and_releases_on_exit(desktop, tmp_path, exit_mode):
+    path = tmp_path / "private.json"
+    path.write_text("{}")
+    code = (
+        "from pathlib import Path; import sys; "
+        "from app.modules.compute.desktop import node_lock; "
+        "lock=node_lock(Path(sys.argv[1])); lock.__enter__(); "
+        "print('LOCKED',flush=True); sys.stdin.readline(); lock.__exit__(None,None,None)"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", code, str(path)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        assert await asyncio.wait_for(asyncio.to_thread(process.stdout.readline), 5) == "LOCKED\n"
+        with pytest.raises(desktop.NodeError, match="NODE_ALREADY_RUNNING"):
+            with desktop.node_lock(path):
+                pytest.fail("two nodes acquired the same configuration")
+    finally:
+        if exit_mode == "crash":
+            process.kill()
+            process.communicate(timeout=5)
+        else:
+            process.communicate("\n", timeout=5)
+    if exit_mode == "normal":
+        assert process.returncode == 0
+    with desktop.node_lock(path):
+        pass
+
+
+@pytest.mark.parametrize("module", ["desktop", "doctor"])
+async def test_unknown_cli_credential_argument_is_never_repeated(module):
+    process = await asyncio.to_thread(
+        subprocess.run,
+        [sys.executable, "-m", "app.modules.compute." + module, "--token", TOKEN],
+        capture_output=True,
+        timeout=5,
+    )
+    assert process.returncode == 2
+    assert TOKEN.encode() not in process.stdout + process.stderr

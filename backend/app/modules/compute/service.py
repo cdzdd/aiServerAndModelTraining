@@ -23,6 +23,7 @@ from app.modules.compute.schemas import FailureResult, Payload, SuccessResult, b
 QUEUE_CAPACITY = 16
 MAX_METADATA_ROWS = 10000
 LIVE_STATES = ("queued", "running", "succeeded")
+ONLINE_WINDOW_SECONDS = 30
 TimeSource = datetime | Callable[[], datetime]
 
 
@@ -134,6 +135,48 @@ def _validated(schema, value):
         raise AuthError(422, "VALIDATION_ERROR", "计算数据格式无效") from None
 
 
+def get_model_status(db, model_id: str, *, now):
+    """Read only the matching model's recent activity and still-valid leases."""
+    checked_at = _time(now)
+    seen_since = checked_at - timedelta(seconds=ONLINE_WINDOW_SECONDS)
+    workers = db.execute(
+        select(ComputeWorker.id, ComputeWorker.last_seen_at).where(
+            ComputeWorker.is_active.is_(True), ComputeWorker.model_id == model_id
+        )
+    ).all()
+    worker_ids = [identity for identity, _ in workers]
+    running = set(
+        db.scalars(
+            select(ComputeJob.worker_id).where(
+                ComputeJob.worker_id.in_(worker_ids),
+                ComputeJob.model_id == model_id,
+                ComputeJob.status == "running",
+                ComputeJob.lease_until > checked_at,
+                ComputeJob.deadline > checked_at,
+            )
+        )
+    )
+    online = {
+        identity for identity, seen in workers if seen is not None and seen >= seen_since
+    } | running
+    queued = db.scalar(
+        select(func.count())
+        .select_from(ComputeJob)
+        .where(
+            ComputeJob.model_id == model_id,
+            ComputeJob.status == "queued",
+            ComputeJob.deadline > checked_at,
+        )
+    )
+    if not online:
+        state = "offline"
+    elif queued or not (online - running):
+        state = "busy"
+    else:
+        state = "ready"
+    return dict(state=state, available=state == "ready", queue_depth=queued, active=len(running))
+
+
 def enqueue(db, scope: GenerationScope, payload: dict, *, now) -> UUID:
     data = _validated(Payload, payload)
     _lock(db)
@@ -141,6 +184,8 @@ def enqueue(db, scope: GenerationScope, payload: dict, *, now) -> UUID:
     valid, checked_at = _scope_valid(db, scope, now)
     if not valid:
         raise _conflict()
+    if get_model_status(db, data["model_id"], now=checked_at)["state"] == "offline":
+        raise AuthError(503, "MODEL_OFFLINE", "本地模型节点暂未连接，请稍后重试或申请人工客服")
     count = db.scalar(select(func.count()).select_from(ComputeJob))
     queued = db.scalar(
         select(func.count()).select_from(ComputeJob).where(ComputeJob.status == "queued")
@@ -306,6 +351,13 @@ def take_result(db, job_id, scope, *, now) -> dict | None:
     if not valid:
         raise _conflict()
     if job.status in {"queued", "running"}:
+        if (
+            job.status == "queued"
+            and get_model_status(db, job.model_id, now=checked_at)["state"] == "offline"
+        ):
+            _clear(job, "failed", checked_at, "MODEL_OFFLINE")
+            db.flush()
+            raise AuthError(503, "MODEL_OFFLINE", "本地模型节点暂未连接，请稍后重试或申请人工客服")
         if job.status == "running" and (job.lease_until is None or job.lease_until <= checked_at):
             raise _conflict("COMPUTE_LEASE_EXPIRED")
         return None

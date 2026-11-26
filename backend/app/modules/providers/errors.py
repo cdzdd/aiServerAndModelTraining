@@ -1,6 +1,7 @@
 from typing import Literal
 
 ProviderErrorCode = Literal[
+    "MODEL_OFFLINE",
     "PROVIDER_CONFIG_ERROR",
     "PROVIDER_BAD_REQUEST",
     "PROVIDER_AUTH_FAILED",
@@ -14,6 +15,7 @@ ProviderErrorCode = Literal[
 ]
 
 MESSAGES: dict[ProviderErrorCode, str] = {
+    "MODEL_OFFLINE": "本地模型节点暂未连接，请稍后重试或申请人工客服",
     "PROVIDER_CONFIG_ERROR": "模型配置无效，请检查服务端配置",
     "PROVIDER_BAD_REQUEST": "模型请求参数不受支持",
     "PROVIDER_AUTH_FAILED": "模型服务认证失败",

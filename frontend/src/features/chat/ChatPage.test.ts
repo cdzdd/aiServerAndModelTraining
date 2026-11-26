@@ -11,6 +11,7 @@ import * as handoff from '../handoff/api'
 vi.mock('./api',()=>({
   listConversations:vi.fn(),getConversation:vi.fn(),listMessages:vi.fn(),listAvailableKnowledge:vi.fn(),
   createConversation:vi.fn(),deleteConversation:vi.fn(),postText:vi.fn(),streamQuestion:vi.fn(),
+  getModelStatus:vi.fn(),
 }))
 vi.mock('../handoff/api',()=>({requestHandoff:vi.fn()}))
 enableAutoUnmount(afterEach)
@@ -25,6 +26,7 @@ async function mountPage(mode:'bot'|'queued'|'closed'='bot') {
   vi.mocked(api.getConversation).mockResolvedValue({...conversation,mode})
   vi.mocked(api.listMessages).mockResolvedValue(page([]))
   vi.mocked(api.listAvailableKnowledge).mockResolvedValue(page([]))
+  vi.mocked(api.getModelStatus).mockResolvedValue({state:'ready',provider:'queued',model_id:'local-model',available:true})
   const router=createRouter({history:createMemoryHistory(),routes:[{path:'/chat/:id?',component:ChatPage}]})
   await router.push('/chat/c');await router.isReady()
   const wrapper=mount(ChatPage,{global:{plugins:[router]}})
@@ -52,6 +54,65 @@ it('streams a bot answer and refreshes persisted history after done',async()=>{
   expect(usedKey).toMatch(/^[0-9a-f-]{36}$/)
   expect(wrapper.text()).toContain('安全答案')
   expect(wrapper.text()).not.toContain('生成中…')
+})
+
+it('displays an offline model status without disabling human support or discarding the draft',async()=>{
+  const wrapper=await mountPage()
+  vi.mocked(api.getModelStatus).mockResolvedValue({state:'offline',provider:'queued',model_id:'local-model',available:false})
+  await wrapper.get('button[aria-label="刷新模型状态"]').trigger('click')
+  await flushPromises()
+  expect(wrapper.text()).toContain('本地模型未连接')
+  expect(wrapper.findAll('button').find(button=>button.text()==='申请人工客服')!.attributes('disabled')).toBeUndefined()
+  vi.mocked(api.streamQuestion).mockImplementation(()=>(async function*(){throw new ApiError(503,'MODEL_OFFLINE','本地模型未连接');yield new Uint8Array()})())
+  await wrapper.get('textarea[aria-label="消息内容"]').setValue('需要查询借阅规则')
+  await wrapper.get('form.composer').trigger('submit')
+  await flushPromises()
+  expect(wrapper.get('textarea').element.value).toBe('需要查询借阅规则')
+  expect(api.streamQuestion).toHaveBeenCalledTimes(1)
+})
+
+it('shows progress until a terminal event and preserves the persisted failure explanation',async()=>{
+  let finish!:()=>void
+  const wrapper=await mountPage()
+  const failed={...message,status:'failed' as const,error_code:'PROVIDER_TIMEOUT',content:''}
+  vi.mocked(api.streamQuestion).mockImplementation(()=>(async function*(){
+    yield new TextEncoder().encode('event: meta\ndata: {"user_message_id":"u","assistant_message_id":"a"}\n\nevent: progress\ndata: {"stage":"generating"}\n\n')
+    await new Promise<void>(resolve=>{finish=resolve})
+    vi.mocked(api.listMessages).mockResolvedValue(page([failed]))
+    yield new TextEncoder().encode('event: error\ndata: {"code":"PROVIDER_TIMEOUT","message":"模型服务响应超时"}\n\n')
+  })())
+  await wrapper.get('textarea').setValue('借阅规则')
+  await wrapper.get('form.composer').trigger('submit');await flushPromises()
+  expect(wrapper.get('.message-list').text()).toContain('模型正在生成')
+  finish();await flushPromises()
+  expect(wrapper.get('.message-list').text()).toContain('模型服务响应超时')
+  expect(wrapper.get('.message-list').text()).not.toContain('模型正在生成')
+  expect(wrapper.get('textarea').element.value).toBe('借阅规则')
+})
+
+it('retries a persisted failed reply with the original question and a new request key only on click',async()=>{
+  const wrapper=await mountPage()
+  const question={...message,id:'u',role:'user' as const,author_id:'owner',in_reply_to_id:null,content:'原来的借阅问题'}
+  vi.mocked(api.listMessages).mockResolvedValue(page([question,{...message,status:'failed',content:'',error_code:'MODEL_OFFLINE'}]))
+  await wrapper.findAll('button').find(button=>button.text()==='刷新历史')!.trigger('click');await flushPromises()
+  expect(api.streamQuestion).not.toHaveBeenCalled()
+  await wrapper.get('textarea').setValue('另一条尚未发送的问题')
+  vi.mocked(api.streamQuestion).mockImplementation(()=>(async function*(){yield new TextEncoder().encode('event: meta\ndata: {"user_message_id":"new-u","assistant_message_id":"new-a"}\n\nevent: done\ndata: {"answer_status":"no_answer","evidence_level":"none","intent":"knowledge"}\n\n')})())
+  await wrapper.get('button[aria-label="重试这条提问"]').trigger('click');await flushPromises()
+  expect(api.streamQuestion).toHaveBeenCalledWith('c','原来的借阅问题',expect.stringMatching(/^[0-9a-f-]{36}$/),expect.any(AbortSignal))
+  expect(wrapper.get('textarea').element.value).toBe('另一条尚未发送的问题')
+})
+
+it('describes other providers as configured and shows an unavailable check without blocking composition',async()=>{
+  const wrapper=await mountPage()
+  vi.mocked(api.getModelStatus).mockResolvedValue({state:'ready',provider:'cloud',model_id:'cloud-model',available:true})
+  await wrapper.get('button[aria-label="刷新模型状态"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[aria-label="模型服务状态"]').text()).toContain('已配置云端模型')
+  expect(wrapper.get('[aria-label="模型服务状态"]').text()).not.toContain('已连接')
+  vi.mocked(api.getModelStatus).mockRejectedValue(new ApiError(503,'UNAVAILABLE','内部错误'))
+  await wrapper.get('button[aria-label="刷新模型状态"]').trigger('click');await flushPromises()
+  expect(wrapper.get('[aria-label="模型服务状态"]').text()).toContain('暂时无法确认模型状态')
+  expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
 })
 
 it('uses ordinary text POST in queued mode without invoking the AI stream',async()=>{

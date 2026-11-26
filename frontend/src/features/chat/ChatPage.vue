@@ -4,8 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElButton } from 'element-plus'
 import { session } from '../auth/session'
 import { ApiError, errorMessage } from '../../shared/api/errors'
-import { createConversation, deleteConversation, getConversation, listAvailableKnowledge, listConversations, listMessages, postText, streamQuestion, type ConversationView, type MessageView } from './api'
-import { decodeChatEvents, type Citation } from './stream'
+import { createConversation, deleteConversation, getConversation, getModelStatus, listAvailableKnowledge, listConversations, listMessages, postText, streamQuestion, type ConversationView, type MessageView, type ModelStatus } from './api'
+import { decodeChatEvents, type Citation, type ProgressStage } from './stream'
 import { requestHandoff } from '../handoff/api'
 import ConversationList from './ConversationList.vue'
 import MessageList from './MessageList.vue'
@@ -18,6 +18,9 @@ const conversation=ref<ConversationView|null>(null),messages=ref<MessageView[]>(
 const error=ref(''),notice=ref(''),draft=ref(''),sending=ref(false),lastFailed=ref<string|null>(null),citations=ref<Citation[]|null>(null)
 const creating=ref(false),newOpen=ref(false),available=ref<{id:string;name:string}[]>([]),kbPage=ref(1),kbTotal=ref(0),kbLoading=ref(false),selectedKbs=ref<string[]>([])
 const handoffBusy=ref(false)
+const progress=ref<{messageId:string;stage:ProgressStage}|null>(null)
+const modelStatus=ref<ModelStatus|null>(null),modelStatusLoading=ref(false)
+let modelStatusVersion=0
 let listVersion=0,detailVersion=0,knowledgeVersion=0,streamVersion=0,handoffScope=0,instanceActive=true,olderExpanded=false,activeStream:AbortController|null=null,historyTimer:ReturnType<typeof setTimeout>|undefined
 const userId=computed(()=>session.state.user?.id ?? '')
 const canSend=computed(()=>{
@@ -26,8 +29,42 @@ const canSend=computed(()=>{
   if(item.mode==='bot' || item.mode==='queued') return item.user_id===user.id
   return item.user_id===user.id || (user.role==='agent' && item.assigned_agent_id===user.id)
 })
+const modelStatusLabel=computed(()=>{
+  if(modelStatusLoading.value && !modelStatus.value) return '正在检查模型状态…'
+  const status=modelStatus.value
+  if(!status) return '暂时无法确认模型状态'
+  if(status.provider!=='queued') {
+    return ({mock:'已配置演示模型',ollama:'已配置本地模型',cloud:'已配置云端模型'} as Record<string,string>)[status.provider] ?? '已配置模型服务'
+  }
+  return {ready:'本地模型已连接',busy:'本地模型忙碌',offline:'本地模型未连接'}[status.state]
+})
+const retryableMessageIds=computed(()=>{
+  if(conversation.value?.mode!=='bot' || conversation.value.user_id!==userId.value || sending.value) return []
+  return messages.value.filter(item=>item.role==='assistant' && ['failed','cancelled'].includes(item.status)
+    && messages.value.some(question=>question.id===item.in_reply_to_id && question.role==='user' && question.author_id===userId.value))
+    .map(item=>item.id)
+})
+async function loadModelStatus() {
+  if(modelStatusLoading.value || !session.state.user) return
+  const current=++modelStatusVersion
+  modelStatusLoading.value=true
+  try {
+    const result=await getModelStatus()
+    if(instanceActive && current===modelStatusVersion) modelStatus.value=result
+  } catch {
+    if(instanceActive && current===modelStatusVersion) modelStatus.value=null
+  } finally {
+    if(instanceActive && current===modelStatusVersion) modelStatusLoading.value=false
+  }
+}
+async function retryMessage(messageId:string) {
+  if(!retryableMessageIds.value.includes(messageId)) return
+  const answer=messages.value.find(item=>item.id===messageId)
+  const question=messages.value.find(item=>item.id===answer?.in_reply_to_id)
+  if(question) await send(question.content)
+}
 function stop() {activeStream?.abort()}
-function cancelStream() {streamVersion++;stop();activeStream=null;sending.value=false}
+function cancelStream() {streamVersion++;stop();activeStream=null;sending.value=false;progress.value=null}
 async function loadConversations(target=1) {
   const current=++listVersion
   conversationsLoading.value=true
@@ -116,18 +153,22 @@ async function send(again?:string) {
   if(!content || content.length>2000) {error.value='消息需为 1–2000 个字符。';return}
   const key=crypto.randomUUID(),current=++streamVersion
   clearTimeout(historyTimer)
-  if(item.mode==='bot') draft.value=''
+  if(item.mode==='bot' && (!again || draft.value.trim()===content)) draft.value=''
   lastFailed.value=null;error.value='';notice.value='';sending.value=true
+  let assistantId:string|null=null
   try {
     if(item.mode==='bot') {
       const controller=new AbortController()
       activeStream=controller
-      let assistantId:string|null=null,done=false
+      let done=false
       for await(const event of decodeChatEvents(streamQuestion(id,content,key,controller.signal))) {
         if(current!==streamVersion) return
         if(event.type==='meta') {
           assistantId=event.assistant_message_id
           messages.value=[...messages.value,optimistic(event.user_message_id,'user',content,'complete'),optimistic(assistantId,'assistant','','generating')]
+          progress.value={messageId:assistantId,stage:'preparing'}
+        } else if(event.type==='progress' && assistantId) {
+          progress.value={messageId:assistantId,stage:event.stage}
         } else if(event.type==='delta' && assistantId) {
           messages.value=messages.value.map(value=>value.id===assistantId?{...value,content:value.content+event.text}:value)
         } else if(event.type==='citations' && assistantId) {
@@ -143,18 +184,31 @@ async function send(again?:string) {
       if(current===streamVersion) {messages.value=[...messages.value,saved];draft.value=''}
     }
   } catch(cause) {
-    if(current===streamVersion) {lastFailed.value=content;error.value=cause instanceof ApiError && cause.code==='CANCELLED'?'已停止生成；可手动重试。':errorMessage(cause)}
+    if(current===streamVersion) {
+      lastFailed.value=content
+      error.value=cause instanceof ApiError && cause.code==='CANCELLED'?'已停止生成；可手动重试。':errorMessage(cause)
+      if(item.mode==='bot' && !draft.value) draft.value=content
+      if(assistantId) {
+        const code=cause instanceof ApiError?cause.code:'GENERATION_FAILED'
+        messages.value=messages.value.map(value=>value.id===assistantId?{...value,status:code==='CANCELLED'?'cancelled':'failed',error_code:code}:value)
+      }
+    }
   } finally {
-    if(current===streamVersion) {activeStream=null;sending.value=false;await loadSelected(id);await loadConversations(conversationPage.value)}
+    if(current===streamVersion) {activeStream=null;sending.value=false;progress.value=null;await loadSelected(id);await loadConversations(conversationPage.value);void loadModelStatus()}
   }
 }
 watch(selectedId,id=>{handoffScope++;handoffBusy.value=false;cancelStream();clearTimeout(historyTimer);olderExpanded=false;conversation.value=null;messages.value=[];citations.value=null;error.value='';notice.value='';lastFailed.value=null;void loadSelected(id)},{immediate:true})
-watch(()=>[session.state.user?.id,session.state.user?.role],()=>{handoffScope++;handoffBusy.value=false;cancelStream();clearTimeout(historyTimer);detailVersion++;conversation.value=null;messages.value=[];citations.value=null})
-onMounted(()=>{void loadConversations()})
-onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout(historyTimer);listVersion++;detailVersion++;knowledgeVersion++})
+watch(()=>[session.state.user?.id,session.state.user?.role],()=>{handoffScope++;handoffBusy.value=false;cancelStream();clearTimeout(historyTimer);detailVersion++;conversation.value=null;messages.value=[];citations.value=null;modelStatusVersion++;modelStatus.value=null;modelStatusLoading.value=false;void loadModelStatus()})
+onMounted(()=>{void loadConversations();void loadModelStatus()})
+onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout(historyTimer);listVersion++;detailVersion++;knowledgeVersion++;modelStatusVersion++})
 </script>
 <template>
   <header class="page-heading"><p class="eyebrow">知识与服务</p><h1>问答与会话</h1><p class="muted">选择可访问的知识库发起会话。回答、来源和历史以当前权限为准。</p></header>
+  <div class="model-status" aria-label="模型服务状态">
+    <span role="status">{{ modelStatusLabel }}</span>
+    <ElButton aria-label="刷新模型状态" :disabled="modelStatusLoading" @click="loadModelStatus">刷新模型状态</ElButton>
+    <small v-if="modelStatus?.provider==='queued' && modelStatus.state==='offline'">知识提问可能暂时无法生成，仍可查看历史或申请人工客服。</small>
+  </div>
   <p v-if="error" role="alert" class="error">{{ error }}</p>
   <p v-if="notice" role="status" class="success">{{ notice }}</p>
   <div v-if="session.state.user" class="chat-layout">
@@ -176,7 +230,7 @@ onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout
         <p v-if="conversation.mode==='queued'" class="muted">消息将作为待处理留言保存。</p>
         <p v-if="conversation.mode==='closed'" class="muted">会话已关闭，仅可阅读历史。</p>
         <div class="actions"><ElButton :disabled="messagesLoading" @click="loadSelected(selectedId)">刷新历史</ElButton><ElButton v-if="messagePage>1" :disabled="olderLoading" @click="older">加载更早消息</ElButton><ElButton v-if="conversation.mode==='bot' && conversation.user_id===userId" :disabled="handoffBusy" @click="handoff">{{ handoffBusy?'申请中…':'申请人工客服' }}</ElButton></div>
-        <MessageList :can-feedback="conversation?.user_id===userId" :messages="messages" @citations="citations=$event" />
+        <MessageList :can-feedback="conversation?.user_id===userId" :messages="messages" :progress="progress" :retryable-message-ids="retryableMessageIds" @citations="citations=$event" @retry="retryMessage" />
         <CitationPanel v-if="citations" :items="citations" @close="citations=null" />
         <form v-if="canSend" class="composer" @submit.prevent="send()"><label class="sr-only" for="chat-message">消息内容</label><textarea id="chat-message" v-model="draft" aria-label="消息内容" :placeholder="conversation.mode==='bot'?'输入你的问题…':'输入留言…'" maxlength="2000" rows="2" :disabled="sending" />
           <div class="actions"><ElButton type="primary" native-type="submit" :disabled="sending">{{ conversation.mode==='bot'?'发送问题':'发送留言' }}</ElButton><ElButton v-if="sending && conversation.mode==='bot'" @click="stop">停止生成</ElButton><ElButton v-if="lastFailed && !sending && conversation.mode==='bot'" @click="send(lastFailed)">重试提问</ElButton></div>
@@ -188,6 +242,8 @@ onUnmounted(()=>{instanceActive=false;handoffScope++;cancelStream();clearTimeout
   </div>
 </template>
 <style scoped>
+.model-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: -6px 0 20px; color: var(--muted); font-size: 12px; }
+.model-status small { flex-basis: 100%; margin: 0; }
 .chat-layout { display: grid; grid-template-columns: minmax(195px, 24%) minmax(0,1fr); align-items: start; gap: clamp(16px,2vw,30px); }
 .chat-main { display: flex; flex-direction: column; gap: 15px; min-height: 52vh; min-width: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; padding: 2px 0 4px clamp(16px,2vw,30px); }
 .chat-main > .muted { margin: 0; }

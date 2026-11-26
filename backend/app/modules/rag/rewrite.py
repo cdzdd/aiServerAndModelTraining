@@ -4,6 +4,7 @@ import json
 import re
 from dataclasses import dataclass
 
+from app.modules.compute.progress import report_stage
 from app.modules.providers.base import Provider
 from app.modules.providers.schemas import LLMMessage, LLMUsage
 
@@ -54,6 +55,7 @@ async def rewrite_query(
         if error.code != "CONTEXT_LIMIT":
             raise
         return RewriteResult(question, dependent, False)
+    report_stage("rewriting")
     completion = await collect_completion(provider, messages, max_tokens=max_tokens)
     fallback = RewriteResult(question, dependent, True, completion.usage)
     try:

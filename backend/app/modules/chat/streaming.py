@@ -17,6 +17,7 @@ from app.modules.auth.schemas import Actor
 from app.modules.auth.service import find_session
 from app.modules.chat import service
 from app.modules.compute.context import GenerationScope, bind_scope
+from app.modules.compute.progress import stream_with_progress
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ def failure(code="GENERATION_FAILED"):
 
 
 class GenerationStream:
-    def __init__(self, request, reservation):
+    def __init__(self, request, reservation, *, progress=False):
         self.request = request
         self.reservation = reservation
         self.state = request.app.state
@@ -38,6 +39,7 @@ class GenerationStream:
         self.citations = []
         self.finished = False
         self.started = time.monotonic()
+        self.progress = progress
 
     def _current(self):
         with self.state.session_factory() as db:
@@ -106,15 +108,19 @@ class GenerationStream:
                 self.reservation.question,
                 self.reservation.history,
             )
-            async with aclosing(result):
-                async for event in result:
+            tracked = stream_with_progress(result) if self.progress else result
+            async with aclosing(tracked):
+                async for event in tracked:
                     if not await run_in_threadpool(self._current):
                         await run_in_threadpool(
                             self._finish, "cancelled", error_code="AUTHORITY_CHANGED"
                         )
                         yield failure("AUTHORITY_CHANGED")
                         return
-                    if event.type == "delta":
+                    if event.type == "progress":
+                        yield encode_event("progress", event.payload)
+                        continue
+                    elif event.type == "delta":
                         if citations_bound:
                             raise ValueError("Text arrived after source binding")
                         pending_text += event.payload["text"]

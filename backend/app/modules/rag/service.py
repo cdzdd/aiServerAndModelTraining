@@ -8,9 +8,11 @@ from uuid import UUID
 
 from app.core.request_context import log_failure
 from app.modules.auth.schemas import Actor
+from app.modules.compute.progress import report_stage
 from app.modules.providers.errors import MESSAGES as PROVIDER_MESSAGES
 from app.modules.providers.errors import ProviderError
 from app.modules.providers.factory import create_provider
+from app.modules.providers.queued import QueuedProvider
 from app.modules.providers.schemas import LLMMessage, LLMUsage
 from app.modules.rag.citations import render_answer, validate_selection
 from app.modules.rag.generation import collect_completion
@@ -138,6 +140,7 @@ class RAGService:
                 usages.append(rewritten.usage)
             if rewritten.needs_clarification:
                 return _events(CLARIFY, status="clarify", usages=usages)
+            report_stage("retrieving")
             hits = await self.retriever(actor, kb_ids, rewritten.query, top_k=5)
             if not hits:
                 return _events(NO_ANSWER, usages=usages)
@@ -157,10 +160,13 @@ class RAGService:
                 raise
             return _events(SHORTEN, status="clarify", usages=usages)
 
+        if not isinstance(self.provider, QueuedProvider):
+            report_stage("generating")
         completion = await collect_completion(
             self.provider, messages, max_tokens=384 if rewritten.used_model else 512
         )
         usages.append(completion.usage)
+        report_stage("validating")
         try:
             status, citations, used_hits = validate_selection(completion.text, prompt_hits)
         except RAGError as exc:

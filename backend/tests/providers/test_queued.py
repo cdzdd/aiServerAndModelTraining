@@ -79,6 +79,7 @@ def queue_data(migrated_engine, api):
             )
         )
         worker, _ = api[2].register_worker(db, name=uuid4().hex, model_id="local-model", now=now)
+        worker.last_seen_at = now
         db.commit()
     scope = api[1].GenerationScope(
         conversation_id=reservation.conversation_id,
@@ -105,6 +106,50 @@ def test_queued_requires_bound_scope_without_enqueuing(api, migrated_engine):
                 )
             )
         assert error.value.code == "PROVIDER_CONFIG_ERROR"
+
+    asyncio.run(run())
+
+
+def test_queued_reports_waiting_and_running_once(api, queue_data, monkeypatch):
+    factory, scope, worker = queue_data
+    stages = []
+    monkeypatch.setattr(api[0], "report_stage", stages.append)
+
+    async def run():
+        with api[1].bind_scope(scope):
+            stream = provider(api, factory).stream(MESSAGES, max_tokens=64, temperature=0)
+            pending = asyncio.create_task(anext(stream))
+            for _ in range(200):
+                if "queued" in stages:
+                    break
+                await asyncio.sleep(0.01)
+            assert stages == ["queued"]
+            with factory.begin() as db:
+                claimed = api[2].claim(db, worker, now=datetime.now(UTC))
+                assert claimed is not None
+            for _ in range(200):
+                if "generating" in stages:
+                    break
+                await asyncio.sleep(0.01)
+            assert stages == ["queued", "generating"]
+            await asyncio.sleep(0.15)
+            assert stages == ["queued", "generating"]
+            with factory.begin() as db:
+                api[2].submit_result(
+                    db,
+                    worker,
+                    claimed["job_id"],
+                    claimed["lease_token"],
+                    {
+                        "model_id": "local-model",
+                        "text": "已核验答复",
+                        "finish_reason": "stop",
+                        "usage": None,
+                    },
+                    now=datetime.now(UTC),
+                )
+            assert (await asyncio.wait_for(pending, 3)).text == "已核验答复"
+            await stream.aclose()
 
     asyncio.run(run())
 
